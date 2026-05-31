@@ -1,0 +1,585 @@
+{
+  "cng_mismatch": [
+    {
+      "sent_id": "311160",
+      "chunk": "4",
+      "lemma": "tva",
+      "lemma_norm": "tva",
+      "matched_candidate_forms": [
+        "tvad"
+      ],
+      "expected_cng": "31",
+      "available_cngs": [
+        "32"
+      ]
+    },
+    {
+      "sent_id": "6991",
+      "chunk": "1",
+      "lemma": "vṛddhi",
+      "lemma_norm": "vfdDi",
+      "matched_candidate_forms": [
+        "vfdDi"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "30"
+      ]
+    },
+    {
+      "sent_id": "6991",
+      "chunk": "2",
+      "lemma": "samāna",
+      "lemma_norm": "samAna",
+      "matched_candidate_forms": [
+        "samAna"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "30",
+        "30",
+        "99",
+        "101",
+        "99",
+        "101",
+        "99",
+        "101",
+        "99",
+        "30"
+      ]
+    },
+    {
+      "sent_id": "6991",
+      "chunk": "3",
+      "lemma": "sarva",
+      "lemma_norm": "sarva",
+      "matched_candidate_forms": [
+        "sarva"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "30",
+        "3",
+        "159",
+        "161"
+      ]
+    },
+    {
+      "sent_id": "6991",
+      "chunk": "4",
+      "lemma": "viparīta",
+      "lemma_norm": "viparIta",
+      "matched_candidate_forms": [
+        "viparIta"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "101",
+        "99",
+        "30"
+      ]
+    },
+    {
+      "sent_id": "6991",
+      "chunk": "5",
+      "lemma": "viparyaya",
+      "lemma_norm": "viparyaya",
+      "matched_candidate_forms": [
+        "viparyaya"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "29"
+      ]
+    },
+    {
+      "sent_id": "385144",
+      "chunk": "3",
+      "lemma": "vāray",
+      "lemma_norm": "vAray",
+      "matched_candidate_forms": [
+        "vAr"
+      ],
+      "expected_cng": "-49",
+      "available_cngs": [
+        "3",
+        "71",
+        "31"
+      ]
+    },
+    {
+      "sent_id": "5943",
+      "chunk": "1",
+      "lemma": "tad",
+      "lemma_norm": "tad",
+      "matched_candidate_forms": [
+        "tad"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "80",
+        "40",
+        "74",
+        "34"
+      ]
+    },
+    {
+      "sent_id": "5943",
+      "chunk": "2",
+      "lemma": "eva",
+      "lemma_norm": "eva",
+      "matched_candidate_forms": [
+        "eva"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "2"
+      ]
+    },
+    {
+      "sent_id": "5943",
+      "chunk": "3",
+      "lemma": "sabīja",
+      "lemma_norm": "sabIja",
+      "matched_candidate_forms": [
+        "sabIja"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "29"
+      ]
+    },
+    {
+      "sent_id": "5943",
+      "chunk": "4",
+      "lemma": "samādhi",
+      "lemma_norm": "samADi",
+      "matched_candidate_forms": [
+        "samADi"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "29"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "1",
+      "lemma": "samasta",
+      "lemma_norm": "samasta",
+      "matched_candidate_forms": [
+        "samasta"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "3"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "1",
+      "lemma": "sṛṣṭi",
+      "lemma_norm": "sfzwi",
+      "matched_candidate_forms": [
+        "sfzwi"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "3",
+        "71",
+        "31"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "1",
+      "lemma": "saṃhāra",
+      "lemma_norm": "saMhAra",
+      "matched_candidate_forms": [
+        "saMhAra"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "3",
+        "30"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "1",
+      "lemma": "anugraha",
+      "lemma_norm": "anugraha",
+      "matched_candidate_forms": [
+        "anugraha"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "3"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "1",
+      "lemma": "kārin",
+      "lemma_norm": "kArin",
+      "matched_candidate_forms": [
+        "kArin"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "71",
+        "31"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "2",
+      "lemma": "kāraṇa",
+      "lemma_norm": "kAraRa",
+      "matched_candidate_forms": [
+        "kAraRa"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "71",
+        "31"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "3",
+      "lemma": "tad",
+      "lemma_norm": "tad",
+      "matched_candidate_forms": [
+        "tad"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "110",
+        "151",
+        "149"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "3",
+      "lemma": "eka",
+      "lemma_norm": "eka",
+      "matched_candidate_forms": [
+        "eka"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "149",
+        "151"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "3",
+      "lemma": "api",
+      "lemma_norm": "api",
+      "matched_candidate_forms": [
+        "api"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "2",
+        "2"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "4",
+      "lemma": "guṇa",
+      "lemma_norm": "guRa",
+      "matched_candidate_forms": [
+        "guRa"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "3"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "4",
+      "lemma": "dharma",
+      "lemma_norm": "Darma",
+      "matched_candidate_forms": [
+        "Darma"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "3"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "4",
+      "lemma": "bheda",
+      "lemma_norm": "Beda",
+      "matched_candidate_forms": [
+        "Beda"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "131",
+        "3",
+        "129"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "5",
+      "lemma": "vibhāga",
+      "lemma_norm": "viBAga",
+      "matched_candidate_forms": [
+        "viBAga"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "29",
+        "169"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "7",
+      "lemma": "anya",
+      "lemma_norm": "anya",
+      "matched_candidate_forms": [
+        "anya"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "71",
+        "31",
+        "3"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "7",
+      "lemma": "patitva",
+      "lemma_norm": "patitva",
+      "matched_candidate_forms": [
+        "patitva"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "71",
+        "31"
+      ]
+    },
+    {
+      "sent_id": "16766",
+      "chunk": "8",
+      "lemma": "ityādi",
+      "lemma_norm": "ityAdi",
+      "matched_candidate_forms": [
+        "iti"
+      ],
+      "expected_cng": "1",
+      "available_cngs": [
+        "2",
+        "3"
+      ]
+    },
+    {
+      "sent_id": "122388",
+      "chunk": "2",
+      "lemma": "bhāvay",
+      "lemma_norm": "BAvay",
+      "matched_candidate_forms": [
+        "BA"
+      ],
+      "expected_cng": "-190",
+      "available_cngs": [
+        "30",
+        "3"
+      ]
+    },
+    {
+      "sent_id": "381860",
+      "chunk": "4",
+      "lemma": "nāma",
+      "lemma_norm": "nAma",
+      "matched_candidate_forms": [
+        "nAman"
+      ],
+      "expected_cng": "2",
+      "available_cngs": [
+        "71",
+        "31",
+        "51"
+      ]
+    },
+    {
+      "sent_id": "304933",
+      "chunk": "2",
+      "lemma": "vaktṛ",
+      "lemma_norm": "vaktf",
+      "matched_candidate_forms": [
+        "vaktf"
+      ],
+      "expected_cng": "3",
+      "available_cngs": [
+        "71",
+        "31"
+      ]
+    }
+  ],
+  "lemma_mismatch": [
+    {
+      "sent_id": "310868",
+      "chunk": "3",
+      "expected_lemma_raw": "ātmaka",
+      "expected_lemma_norm": "Atmaka",
+      "candidates_tried": [
+        "Atmaka",
+        "aatmaka"
+      ],
+      "expected_cng": "3",
+      "available_in_chunk": [
+        {
+          "lemma": "kAraRa",
+          "cng": "3"
+        },
+        {
+          "lemma": "kim",
+          "cng": "30"
+        },
+        {
+          "lemma": "a",
+          "cng": "3"
+        },
+        {
+          "lemma": "raRa",
+          "cng": "3"
+        },
+        {
+          "lemma": "raR",
+          "cng": "-32"
+        },
+        {
+          "lemma": "guRa",
+          "cng": "3"
+        },
+        {
+          "lemma": "guRa",
+          "cng": "30"
+        },
+        {
+          "lemma": "Atmakatva",
+          "cng": "131"
+        },
+        {
+          "lemma": "Atmakatva",
+          "cng": "3"
+        },
+        {
+          "lemma": "ad",
+          "cng": "29"
+        },
+        {
+          "lemma": "ad",
+          "cng": "71"
+        },
+        {
+          "lemma": "ad",
+          "cng": "31"
+        },
+        {
+          "lemma": "ad",
+          "cng": "30"
+        }
+      ],
+      "available_lemmas_unique": [
+        "Atmakatva",
+        "a",
+        "ad",
+        "guRa",
+        "kAraRa",
+        "kim",
+        "raR",
+        "raRa"
+      ]
+    },
+    {
+      "sent_id": "310868",
+      "chunk": "3",
+      "expected_lemma_raw": "tva",
+      "expected_lemma_norm": "tva",
+      "candidates_tried": [
+        "tva",
+        "tvad"
+      ],
+      "expected_cng": "131",
+      "available_in_chunk": [
+        {
+          "lemma": "kAraRa",
+          "cng": "3"
+        },
+        {
+          "lemma": "kim",
+          "cng": "30"
+        },
+        {
+          "lemma": "a",
+          "cng": "3"
+        },
+        {
+          "lemma": "raRa",
+          "cng": "3"
+        },
+        {
+          "lemma": "raR",
+          "cng": "-32"
+        },
+        {
+          "lemma": "guRa",
+          "cng": "3"
+        },
+        {
+          "lemma": "guRa",
+          "cng": "30"
+        },
+        {
+          "lemma": "Atmakatva",
+          "cng": "131"
+        },
+        {
+          "lemma": "Atmakatva",
+          "cng": "3"
+        },
+        {
+          "lemma": "ad",
+          "cng": "29"
+        },
+        {
+          "lemma": "ad",
+          "cng": "71"
+        },
+        {
+          "lemma": "ad",
+          "cng": "31"
+        },
+        {
+          "lemma": "ad",
+          "cng": "30"
+        }
+      ],
+      "available_lemmas_unique": [
+        "Atmakatva",
+        "a",
+        "ad",
+        "guRa",
+        "kAraRa",
+        "kim",
+        "raR",
+        "raRa"
+      ]
+    }
+  ]
+}

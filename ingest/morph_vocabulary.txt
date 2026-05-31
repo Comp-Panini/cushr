@@ -1,0 +1,847 @@
+0	UNKNOWN
+1	adv.
+2	acc. sg. n.
+3	nom. sg. n.
+4	acc. sg. m.
+5	pfp. [3]
+6	pr. [4] md. pl. 3
+7	pr. ps. pl. 3
+8	iic.
+9	nom. pl. m.
+10	acc. pl. f.
+11	nom. pl. f.
+12	voc. pl. m.
+13	voc. pl. f.
+14	conj.
+15	voc. sg. m.
+16	voc. sg. n.
+17	acc. du. m.
+18	nom. du. m.
+19	pfp. [1]
+20	nom. sg. f.
+21	pft. ac. pl. 2
+22	imp. [1] ac. sg. 2
+23	i. sg. m.
+24	acc. du. n.
+25	nom. du. n.
+26	loc. sg. n.
+27	acc. du. f.
+28	nom. du. f.
+29	loc. sg. m.
+30	voc. du. n.
+31	prep.
+32	ind.
+33	acc. sg. *
+34	part.
+35	ppr. [1] ac.
+36	impft. [1] ac. sg. 3
+37	pr. [4] md. sg. 3
+38	dat. sg. n.
+39	dat. sg. m.
+40	ppr. [4] ac.
+41	imp. [4] ac. sg. 2
+42	abs.
+43	impft. [1] md. sg. 1
+44	pr. [1] md. sg. 3
+45	pr. [1] md. sg. 1
+46	pp.
+47	voc. du. f.
+48	voc. sg. f.
+49	ppr. [2] ac.
+50	g. sg. *
+51	dat. sg. *
+52	imp. [1] ac. pl. 2
+53	opt. [9] ac. sg. 1
+54	i. sg. n.
+55	per. fut. ac. sg. 3
+56	ca. pp.
+57	impft. [2] ac. du. 1
+58	nom. sg. *
+59	nom. sg. m.
+60	i. sg. f.
+61	g. sg. n.
+62	abl. sg. n.
+63	pft. ac. sg. 3
+64	pft. ac. sg. 1
+65	g. sg. f.
+66	abl. sg. f.
+67	g. sg. m.
+68	pr. [4] ac. sg. 3
+69	imp. [2] ac. du. 2
+70	acc. sg. f.
+71	pr. [2] ac. du. 3
+72	ppa.
+73	voc. du. m.
+74	impft. [1] ac. sg. 2
+75	acc. pl. m.
+76	abl. sg. m.
+77	g. pl. *
+78	dat. pl. *
+79	acc. pl. *
+80	ca. per. fut. ac. sg. 1
+81	ca. per. fut. ac. sg. 3
+82	imp. [2] ac. pl. 2
+83	pr. [2] ac. sg. 1
+84	fut. md. sg. 1
+85	i. sg. *
+86	ppr. [1] md.
+87	imp. [8] ac. sg. 2
+88	impft. [1] ac. pl. 3
+89	aor. [1] ac. sg. 3
+90	aor. [1] ac. sg. 2
+91	ca. pfp. [1]
+92	pr. [3] md. sg. 1
+93	pft. md. sg. 3
+94	pft. md. sg. 1
+95	loc. pl. m.
+96	loc. pl. n.
+97	loc. sg. *
+98	loc. pl. f.
+99	pr. [2] ac. du. 1
+100	i. pl. n.
+101	i. pl. m.
+102	impft. [2] ac. sg. 2
+103	i. pl. f.
+104	tasil
+105	opt. [8] ac. sg. 3
+106	imp. [6] ac. sg. 2
+107	inj. [1] ac. pl. 2
+108	pr. [2] md. sg. 1
+109	ca. impft. md. sg. 1
+110	ca. pr. md. sg. 1
+111	ca. abs.
+112	acc. pl. n.
+113	nom. pl. n.
+114	voc. pl. n.
+115	impft. [1] ac. sg. 1
+116	loc. sg. f.
+117	pft. ac. pl. 3
+118	aor. [2] ac. sg. 3
+119	inj. [2] ac. sg. 3
+120	imp. [1] ac. pl. 3
+121	imp. [4] ac. pl. 3
+122	nom. pl. *
+123	aor. [2] ac. sg. 1
+124	imp. [2] ac. du. 1
+125	pfu. ac.
+126	impft. [4] ac. pl. 3
+127	impft. [2] ac. sg. 1
+128	inj. [1] ac. sg. 3
+129	loc. du. m.
+130	g. du. m.
+131	loc. du. n.
+132	g. du. n.
+133	abl. sg. *
+134	ca. impft. ac. sg. 3
+135	ca. impft. ac. pl. 3
+136	ca. ppr. ac.
+137	g. pl. m.
+138	g. pl. n.
+139	pr. [2] ac. sg. 2
+140	impft. [2] md. sg. 1
+141	g. pl. f.
+142	pr. ps. sg. 3
+143	pr. [2] md. sg. 3
+144	pr. [4] md. sg. 1
+145	pr. ps. sg. 1
+146	inj. [4] ac. sg. 2
+147	pr. [2] ac. sg. 3
+148	ppr. [9] ac.
+149	fut. ac. sg. 3
+150	fut. ac. sg. 1
+151	impft. [6] ac. sg. 1
+152	ca. impft. ps. sg. 1
+153	ca. pr. ps. sg. 1
+154	pr. [9] md. sg. 2
+155	imp. [2] ac. sg. 1
+156	ppr. ps.
+157	g. du. *
+158	dat. du. *
+159	acc. du. *
+160	ppr. [4] md.
+161	inf.
+162	pr. [6] md. pl. 1
+163	imp. [6] ac. pl. 1
+164	impft. [2] ac. sg. 3
+165	impft. ps. pl. 3
+166	imp. ps. sg. 3
+167	imp. [1] ac. du. 3
+168	impft. [2] ac. pl. 3
+169	aor. [1] ac. sg. 1
+170	pr. [1] ac. pl. 3
+171	ca. impft. ac. sg. 1
+172	aor. [2] ac. pl. 2
+173	pr. [4] ac. sg. 1
+174	opt. [1] ac. sg. 3
+175	imp. [1] md. sg. 2
+176	pr. [1] ac. sg. 1
+177	imp. [10] ac. sg. 2
+178	ppr. [10] md.
+179	pr. [1] ac. du. 3
+180	impft. [4] ac. sg. 1
+181	opt. [7] md. sg. 3
+182	ca. opt. ac. sg. 3
+183	opt. [2] md. sg. 1
+184	aor. [5] ac. sg. 3
+185	act.
+186	dat. sg. f.
+187	ppr. [2] md.
+188	pr. [6] ac. pl. 3
+189	ppr. [6] ac.
+190	imp. [1] md. pl. 2
+191	impft. ps. sg. 1
+192	pr. [9] ac. sg. 2
+193	pft. ac. sg. 2
+194	imp. [1] ac. pl. 1
+195	opt. [2] ac. sg. 2
+196	opt. [2] ac. pl. 3
+197	aor. [1] ac. pl. 2
+198	inj. [4] md. sg. 3
+199	inj. [1] md. sg. 3
+200	pr. [1] ac. sg. 3
+201	imp. [5] ac. pl. 2
+202	imp. [2] md. pl. 3
+203	inj. [1] ac. pl. 1
+204	opt. [6] ac. sg. 2
+205	pr. [1] ac. sg. 2
+206	ppr. [10] ac.
+207	pr. [2] ac. pl. 3
+208	aor. [5] md. sg. 2
+209	imp. [1] ac. sg. 1
+210	ca. pr. ps. sg. 3
+211	aor. [2] ac. sg. 2
+212	pfp. [2]
+213	ca. pfp. [2]
+214	ppr. [8] md.
+215	abl. pl. m.
+216	dat. pl. m.
+217	abl. pl. n.
+218	dat. pl. n.
+219	pr. [5] ac. sg. 3
+220	imp. [5] ac. sg. 2
+221	imp. [7] ac. sg. 2
+222	ppr. [3] md.
+223	ppf. md.
+224	pr. [5] ac. pl. 3
+225	ppr. [5] ac.
+226	pr. [2] ac. pl. 2
+227	imp. [2] ac. sg. 2
+228	opt. [2] ac. sg. 3
+229	pr. [6] ac. du. 3
+230	imp. [8] md. sg. 2
+231	des. pp.
+232	opt. ps. sg. 3
+233	opt. [10] ac. sg. 3
+234	fut. ac. sg. 2
+235	iiv.
+236	pr. [4] ac. sg. 2
+237	pr. [6] ac. sg. 1
+238	imp. [1] ac. du. 1
+239	per. fut. ac. pl. 3
+240	opt. [1] ac. sg. 2
+241	inj. [2] ac. sg. 1
+242	inj. [1] ac. sg. 1
+243	pr. [6] md. sg. 3
+244	pr. [1] md. pl. 3
+245	opt. [3] ac. pl. 3
+246	pr. [4] ac. pl. 3
+247	ppr. [8] ac.
+248	pr. [8] md. pl. 3
+249	imp. ps. sg. 1
+250	imp. [2] ac. pl. 1
+251	impft. [2] ac. pl. 1
+252	impft. [7] ac. sg. 2
+253	impft. [vn.] ac. sg. 1
+254	aor. [1] ac. pl. 3
+255	ppf. ac.
+256	pft. ac. du. 1
+257	aor. [1] ps. sg. 3
+258	pr. [9] ac. sg. 3
+259	inj. [1] ac. du. 2
+260	inj. [1] ps. sg. 3
+261	fut. ac. du. 3
+262	pr. [6] ac. sg. 3
+263	loc. du. f.
+264	g. du. f.
+265	opt. [9] ac. sg. 3
+266	imp. [6] ac. sg. 1
+267	opt. [5] ac. sg. 3
+268	impft. [2] ac. du. 3
+269	impft. [2] md. sg. 3
+270	impft. [2] ac. pl. 2
+271	abl. du. m.
+272	dat. du. m.
+273	i. du. m.
+274	abl. du. n.
+275	dat. du. n.
+276	i. du. n.
+277	abl. du. f.
+278	dat. du. f.
+279	i. du. f.
+280	inj. [1] ac. pl. 3
+281	pr. [9] ac. pl. 3
+282	impft. [1] md. sg. 3
+283	impft. [1] ac. pl. 2
+284	pr. [3] ac. sg. 3
+285	ca. pr. ac. sg. 3
+286	ppr. [7] md.
+287	pr. [7] ac. sg. 3
+288	pr. [5] md. sg. 3
+289	imp. [2] ac. sg. 3
+290	imp. [1] md. sg. 3
+291	opt. [6] ac. sg. 3
+292	opt. [1] ac. pl. 3
+293	imp. [9] ac. sg. 2
+294	inj. [1] ac. sg. 2
+295	imp. [4] ac. sg. 3
+296	impft. [4] md. sg. 1
+297	pr. [4] ac. pl. 1
+298	ca. impft. ps. sg. 2
+299	aor. [1] ac. du. 2
+300	pr. [5] md. pl. 3
+301	opt. [4] md. sg. 3
+302	opt. [1] md. sg. 3
+303	opt. [1] ac. pl. 2
+304	opt. [2] md. sg. 3
+305	aor. [2] ac. pl. 3
+306	fut. ac. pl. 3
+307	impft. ps. sg. 3
+308	impft. [4] md. sg. 3
+309	pr. ps. sg. 2
+310	pr. [4] md. sg. 2
+311	inj. [1] md. sg. 1
+312	ca. imp. ps. sg. 3
+313	imp. ps. sg. 2
+314	imp. [4] md. sg. 2
+315	pr. [7] ac. pl. 3
+316	ppr. [7] ac.
+317	pr. [8] md. sg. 3
+318	opt. [5] ac. pl. 1
+319	opt. [5] ac. sg. 1
+320	pr. [2] md. pl. 3
+321	abl. pl. f.
+322	dat. pl. f.
+323	imp. [1] md. sg. 1
+324	imp. [2] ac. du. 3
+325	opt. [4] ac. pl. 2
+326	ca. opt. ps. sg. 3
+327	pr. [2] ac. pl. 1
+328	aor. [2] ac. du. 2
+329	pr. [2] ac. du. 2
+330	aor. [7] ac. sg. 2
+331	impft. [6] ac. sg. 2
+332	impft. [1] ac. pl. 1
+333	pr. [10] ac. sg. 1
+334	ca. impft. ac. sg. 2
+335	pr. [6] ac. pl. 1
+336	impft. [6] ac. pl. 3
+337	aor. [2] md. sg. 1
+338	cond. ac. sg. 3
+339	fut. md. pl. 3
+340	pr. [9] md. sg. 1
+341	impft. [4] md. sg. 2
+342	impft. [1] md. sg. 2
+343	aor. [4] ac. sg. 2
+344	pr. [4] ac. du. 3
+345	loc. pl. *
+346	imp. [1] ac. sg. 3
+347	pr. [6] md. sg. 1
+348	aor. [4] ac. pl. 2
+349	pr. [6] ac. sg. 2
+350	ca. ppr. ps.
+351	imp. [9] md. sg. 2
+352	opt. [1] ac. sg. 1
+353	per. fut. ac. sg. 1
+354	imp. [2] md. sg. 3
+355	pr. [8] ac. sg. 3
+356	pft. md. pl. 3
+357	imp. [4] ac. pl. 2
+358	fut. md. sg. 2
+359	imp. [vn.] ac. sg. 2
+360	impft. [9] ac. sg. 3
+361	imp. [3] ac. pl. 2
+362	abl. du. *
+363	i. du. *
+364	opt. [4] ac. sg. 1
+365	imp. [3] ac. sg. 1
+366	opt. [2] ac. sg. 1
+367	aor. [1] md. pl. 3
+368	pr. [8] ac. pl. 3
+369	i. pl. *
+370	opt. [2] ac. pl. 1
+371	aor. [4] ac. du. 2
+372	pr. [3] md. sg. 3
+373	aor. [4] md. sg. 3
+374	pr. [3] ac. sg. 2
+375	aor. [2] ac. du. 1
+376	opt. [2] ac. du. 3
+377	imp. [2] md. du. 3
+378	opt. [8] ac. pl. 3
+379	imp. [4] ac. du. 3
+380	impft. [7] ac. pl. 3
+381	fut. md. du. 3
+382	pr. [9] ac. sg. 1
+383	opt. [4] ac. pl. 3
+384	pr. [1] md. pl. 1
+385	pr. [1] md. sg. 2
+386	fut. ac. pl. 1
+387	ca. impft. md. sg. 3
+388	ca. impft. ac. pl. 2
+389	ca. imp. ac. sg. 2
+390	opt. [1] ac. du. 1
+391	pr. [1] ac. du. 1
+392	impft. [4] ac. sg. 2
+393	ca. fut. ac. sg. 3
+394	ca. pfu. ac.
+395	pr. [10] md. sg. 1
+396	inj. [2] ac. sg. 2
+397	imp. [3] md. sg. 2
+398	impft. [4] ac. sg. 3
+399	?
+400	inj. [4] md. sg. 2
+401	inj. [1] md. sg. 2
+402	opt. [6] md. sg. 2
+403	imp. [2] md. sg. 1
+404	des. imp. ac. sg. 2
+405	abl. pl. *
+406	pr. [8] ac. sg. 1
+407	impft. [9] ac. sg. 1
+408	imp. [3] ac. sg. 2
+409	impft. [6] ac. sg. 3
+410	impft. [2] md. sg. 2
+411	inj. [2] ac. pl. 3
+412	opt. ps. sg. 2
+413	opt. [4] md. sg. 2
+414	aor. [1] ac. du. 1
+415	ca. pr. ac. pl. 3
+416	imp. [6] ac. sg. 3
+417	impft. [2] ac. du. 2
+418	ca. fut. ac. sg. 1
+419	aor. [4] ac. sg. 3
+420	imp. [3] ac. du. 2
+421	impft. [1] ac. du. 1
+422	impft. [5] ac. sg. 3
+423	pr. [3] ac. pl. 3
+424	ppr. [3] ac.
+425	pr. [3] ac. sg. 1
+426	pr. [7] md. pl. 3
+427	opt. [8] md. sg. 3
+428	opt. [6] ac. sg. 1
+429	opt. [4] ac. sg. 3
+430	imp. [1] ac. du. 2
+431	pr. [1] md. du. 3
+432	impft. [4] ac. pl. 2
+433	pr. [9] md. sg. 3
+434	ca. fut. ac. sg. 2
+435	pr. [1] ac. pl. 1
+436	ben. ac. sg. 2
+437	pr. [10] ac. pl. 3
+438	impft. [1] ac. du. 2
+439	ca. pr. ps. pl. 3
+440	impft. [4] md. pl. 3
+441	pr. ps. du. 3
+442	imp. [1] md. du. 3
+443	imp. [5] md. pl. 3
+444	aor. [1] md. sg. 3
+445	imp. [1] md. pl. 3
+446	per. fut. ac. sg. 2
+447	imp. [4] ac. sg. 1
+448	imp. [8] ac. pl. 2
+449	impft. [1] md. pl. 3
+450	impft. [6] md. pl. 3
+451	des. pft. ac. pl. 2
+452	des. pft. ac. sg. 3
+453	des. pft. ac. sg. 1
+454	impft. [8] ac. sg. 3
+455	impft. [6] md. sg. 3
+456	impft. [6] ac. pl. 2
+457	nom. du. *
+458	imp. [8] ac. sg. 1
+459	fut. ac. pl. 2
+460	imp. [10] md. sg. 3
+461	imp. [10] ac. du. 3
+462	impft. [5] ac. sg. 1
+463	voc. sg. *
+464	impft. [10] ac. pl. 3
+465	ca. imp. md. sg. 2
+466	impft. [10] ac. sg. 3
+467	imp. [4] md. sg. 3
+468	imp. [6] md. sg. 3
+469	imp. [6] ac. du. 3
+470	opt. [3] ac. sg. 3
+471	impft. [4] ac. du. 3
+472	fut. ac. du. 1
+473	pft. ac. du. 3
+474	ppr. [5] md.
+475	impft. [5] ac. du. 1
+476	des. per. fut. ac. sg. 3
+477	imp. [3] md. pl. 3
+478	impft. [9] md. sg. 3
+479	impft. [9] ac. pl. 2
+480	impft. [9] md. sg. 1
+481	ca. opt. md. sg. 2
+482	pr. [8] ac. sg. 2
+483	fut. md. du. 1
+484	pr. ps. du. 1
+485	pr. [5] ac. sg. 1
+486	opt. [8] ac. sg. 2
+487	imp. [3] ac. sg. 3
+488	pr. [9] ac. pl. 1
+489	fut. md. pl. 1
+490	pr. ps. pl. 1
+491	impft. [9] md. pl. 3
+492	aor. [2] ac. pl. 1
+493	imp. ps. pl. 3
+494	pr. [1] ac. pl. 2
+495	pr. [7] md. sg. 1
+496	impft. [5] ac. pl. 3
+497	aor. [1] ac. du. 3
+498	opt. [9] md. sg. 3
+499	imp. [9] ac. pl. 2
+500	imp. [6] ac. pl. 2
+501	inj. [4] ac. pl. 2
+502	pft. md. du. 3
+503	opt. [4] ac. du. 1
+504	des. pft. ac. pl. 3
+505	pr. [2] md. sg. 2
+506	opt. [1] ac. du. 3
+507	ca. imp. ps. sg. 1
+508	impft. [8] ac. du. 1
+509	aor. [4] ac. du. 3
+510	ca. imp. md. sg. 1
+511	aor. [4] ac. sg. 1
+512	imp. [10] md. sg. 2
+513	pr. [8] md. sg. 2
+514	impft. [8] ac. pl. 3
+515	impft. [9] ac. pl. 3
+516	impft. [1] ac. du. 3
+517	pfu. md.
+518	imp. [7] md. sg. 2
+519	impft. [3] ac. sg. 3
+520	imp. [4] ac. du. 1
+521	opt. [2] ac. du. 1
+522	inj. [1] md. pl. 3
+523	imp. [2] md. sg. 2
+524	imp. [4] md. pl. 2
+525	pr. [8] md. pl. 1
+526	pr. [10] md. pl. 1
+527	imp. [10] ac. pl. 1
+528	opt. [3] ac. sg. 1
+529	opt. [1] md. sg. 2
+530	pr. [9] md. pl. 3
+531	ca. pr. md. sg. 3
+532	ca. pr. ac. sg. 1
+533	impft. [3] ac. pl. 3
+534	pr. [3] ac. du. 3
+535	fut. md. sg. 3
+536	impft. [8] ac. pl. 1
+537	imp. [9] ac. sg. 1
+538	opt. [8] ac. sg. 1
+539	impft. [10] md. sg. 3
+540	impft. [10] ac. pl. 2
+541	imp. ps. pl. 2
+542	ca. pr. ps. du. 3
+543	pr. [10] md. sg. 3
+544	aor. [5] ac. sg. 2
+545	pr. [2] md. pl. 1
+546	imp. [4] md. sg. 1
+547	pr. [8] ac. pl. 1
+548	aor. [2] ac. du. 3
+549	opt. [1] ac. pl. 1
+550	pr. [10] md. pl. 3
+551	loc. du. *
+552	pr. [6] ac. pl. 2
+553	pr. [2] md. du. 3
+554	impft. [3] ac. du. 2
+555	imp. [3] md. sg. 3
+556	imp. [3] ac. du. 3
+557	imp. [3] md. sg. 1
+558	opt. [6] md. sg. 3
+559	opt. [6] ac. pl. 2
+560	imp. [4] md. du. 3
+561	opt. [4] ac. du. 3
+562	imp. [8] ac. sg. 3
+563	opt. [5] ac. pl. 3
+564	opt. [8] md. sg. 2
+565	imp. [8] md. pl. 3
+566	impft. [10] ac. sg. 2
+567	opt. [1] md. pl. 1
+568	aor. [3] ac. sg. 2
+569	imp. [2] ac. pl. 3
+570	imp. [6] md. sg. 2
+571	pr. [6] ac. du. 2
+572	pr. [1] ac. du. 2
+573	pr. [6] md. sg. 2
+574	imp. [5] ac. sg. 3
+575	impft. [4] md. du. 3
+576	pr. [7] md. sg. 3
+577	aor. [1] ac. pl. 1
+578	inj. [1] ac. du. 3
+579	pft. ac. du. 2
+580	imp. [6] ac. pl. 3
+581	impft. [6] ac. du. 3
+582	ca. inf.
+583	pr. [4] ac. du. 1
+584	imp. ps. du. 3
+585	opt. [3] ac. sg. 2
+586	opt. [10] ac. sg. 1
+587	impft. [7] md. pl. 3
+588	opt. ps. pl. 3
+589	pr. [4] ac. pl. 2
+590	per. fut. ac. du. 2
+591	opt. [2] ac. pl. 2
+592	aor. [1] md. sg. 1
+593	ca. pr. ac. du. 3
+594	opt. [9] md. sg. 1
+595	ca. pr. ac. sg. 2
+596	opt. [3] md. sg. 3
+597	impft. [3] md. sg. 1
+598	opt. [1] md. pl. 3
+599	pr. [10] ac. du. 3
+600	cond. ac. pl. 3
+601	imp. [6] ac. du. 1
+602	pr. [10] ac. sg. 3
+603	opt. [7] ac. sg. 3
+604	imp. [4] ac. du. 2
+605	impft. [8] md. sg. 1
+606	impft. [2] md. pl. 3
+607	imp. [5] ac. pl. 3
+608	aor. [3] ac. sg. 3
+609	ca. fut. ac. pl. 3
+610	pr. [6] md. pl. 3
+611	pr. [10] ac. pl. 1
+612	impft. [3] ac. du. 3
+613	opt. [vn.] ac. du. 1
+614	pr. [5] ac. sg. 2
+615	aor. [3] ac. pl. 3
+616	imp. [9] ac. sg. 3
+617	ca. pfp. [3]
+618	impft. [3] md. sg. 3
+619	impft. [3] ac. pl. 2
+620	impft. [9] ac. sg. 2
+621	impft. [3] ac. sg. 1
+622	pr. [1] md. du. 1
+623	impft. [7] ac. sg. 3
+624	opt. [1] md. sg. 1
+625	pft. ac. pl. 1
+626	imp. [8] md. pl. 2
+627	impft. [8] md. pl. 3
+628	pr. [5] ac. pl. 1
+629	ca. impft. md. pl. 3
+630	imp. [9] ac. pl. 1
+631	opt. [7] md. sg. 2
+632	ca. impft. md. du. 3
+633	opt. [8] ac. pl. 1
+634	cond. ac. sg. 2
+635	imp. [vn.] ac. du. 3
+636	ppr. [vn.] ac.
+637	opt. [6] ac. pl. 3
+638	ca. pr. ac. pl. 1
+639	ca. imp. ac. pl. 3
+640	ca. fut. md. sg. 1
+641	ca. impft. ps. sg. 3
+642	imp. [4] ac. pl. 1
+643	impft. [4] ac. pl. 1
+644	per. fut. ac. du. 3
+645	impft. [7] md. sg. 1
+646	pr. [9] ac. du. 1
+647	impft. [1] md. pl. 2
+648	opt. [1] ac. du. 2
+649	impft. [6] md. sg. 1
+650	impft. [4] ac. du. 1
+651	imp. [6] md. pl. 2
+652	aor. [4] md. sg. 1
+653	imp. [9] md. pl. 2
+654	opt. [9] md. pl. 2
+655	impft. [7] md. sg. 3
+656	impft. [7] ac. pl. 2
+657	impft. ps. du. 3
+658	imp. [8] ac. pl. 3
+659	imp. [8] md. sg. 3
+660	imp. [8] ac. du. 3
+661	imp. [6] ac. du. 2
+662	pr. [7] md. du. 3
+663	imp. [9] md. sg. 3
+664	imp. [9] ac. du. 3
+665	inj. [4] md. sg. 1
+666	impft. [8] ac. du. 3
+667	opt. [9] ac. pl. 3
+668	pr. [8] ac. pl. 2
+669	imp. [9] ac. pl. 3
+670	ben. ac. sg. 3
+671	aor. [5] ac. sg. 1
+672	opt. [4] ac. pl. 1
+673	imp. [10] ac. pl. 2
+674	impft. [vn.] ac. sg. 2
+675	des. imp. ac. sg. 1
+676	ca. opt. ac. pl. 3
+677	imp. [3] ac. pl. 3
+678	pr. [3] md. pl. 3
+679	opt. [7] md. pl. 3
+680	aor. [2] md. sg. 3
+681	int. pr. md. sg. 1
+682	ca. ppr. md.
+683	ca. imp. ac. pl. 2
+684	imp. [7] ac. pl. 2
+685	pr. [4] md. du. 3
+686	opt. [1] md. du. 3
+687	ca. pr. ps. sg. 2
+688	aor. [7] ac. sg. 1
+689	opt. [7] ac. pl. 3
+690	pr. [8] md. du. 3
+691	ca. fut. ac. pl. 2
+692	opt. [6] ac. du. 1
+693	impft. [3] ac. pl. 1
+694	imp. [3] ac. pl. 1
+695	opt. [7] ac. sg. 1
+696	pr. [7] md. sg. 2
+697	opt. [2] md. pl. 3
+698	pr. [8] ac. du. 3
+699	ppr. [6] md.
+700	impft. ps. sg. 2
+701	imp. [9] md. pl. 3
+702	ca. opt. ac. sg. 2
+703	pr. [6] md. du. 3
+704	ca. opt. md. du. 3
+705	inj. [1] ac. du. 1
+706	pr. [9] md. pl. 1
+707	ca. opt. md. sg. 3
+708	ca. opt. ac. pl. 2
+709	ca. imp. ac. sg. 3
+710	impft. [10] ac. sg. 1
+711	imp. [10] ac. pl. 3
+712	imp. [6] md. du. 3
+713	opt. [6] ac. du. 3
+714	pr. [vn.] ac. sg. 3
+715	opt. [7] ac. sg. 2
+716	ca. imp. ps. sg. 2
+717	opt. [5] md. sg. 3
+718	pr. [10] md. sg. 2
+719	des. opt. ac. sg. 1
+720	impft. [1] md. du. 3
+721	pr. [10] ac. pl. 2
+722	pr. [3] md. sg. 2
+723	ca. ppa.
+724	imp. [10] md. pl. 2
+725	ca. opt. ac. sg. 1
+726	ben. ac. du. 1
+727	opt. [10] md. sg. 3
+728	opt. [10] ac. pl. 2
+729	int. impft. ac. sg. 2
+730	opt. [6] md. pl. 3
+731	opt. [5] ac. sg. 2
+732	opt. [3] ac. du. 1
+733	des. imp. ac. du. 1
+734	impft. [9] ac. du. 3
+735	impft. [3] ac. sg. 2
+736	pr. [vn.] ac. sg. 2
+737	aor. [4] md. sg. 2
+738	pr. [vn.] ac. du. 3
+739	des. pfp. [1]
+740	imp. [7] md. pl. 3
+741	ppr. [9] md.
+742	aor. [1] md. sg. 2
+743	ca. imp. ac. pl. 1
+744	des. pr. md. sg. 1
+745	imp. [vn.] ac. du. 1
+746	opt. [4] md. sg. 1
+747	ca. impft. ps. pl. 3
+748	impft. [6] ac. pl. 1
+749	opt. [4] md. pl. 3
+750	imp. [4] md. pl. 3
+751	pr. [4] md. pl. 1
+752	impft. [8] ac. sg. 2
+753	imp. [8] ac. pl. 1
+754	opt. [10] ac. pl. 3
+755	opt. [4] ac. sg. 2
+756	ca. opt. ac. du. 1
+757	pr. [vn.] md. sg. 2
+758	impft. [8] ac. sg. 1
+759	pr. [8] md. sg. 1
+760	aor. [7] md. sg. 3
+761	aor. [7] ac. pl. 2
+762	opt. [10] md. pl. 3
+763	pr. [3] md. du. 3
+764	pr. [10] ac. sg. 2
+765	inj. [4] ac. sg. 3
+766	fut. ac. du. 2
+767	ca. pr. md. sg. 2
+768	pr. [7] ac. du. 3
+769	impft. [5] ac. sg. 2
+770	pr. [9] ac. du. 3
+771	des. pr. md. sg. 3
+772	des. ppr. ac.
+773	pr. [10] ac. du. 1
+774	opt. [4] md. pl. 1
+775	pr. [3] ac. pl. 1
+776	aor. [5] md. sg. 1
+777	ca. imp. md. pl. 2
+778	ca. pr. md. pl. 3
+779	impft. [8] md. sg. 3
+780	impft. [8] ac. pl. 2
+781	opt. ps. du. 3
+782	opt. [4] md. du. 3
+783	des. impft. md. sg. 1
+784	pr. [6] ac. du. 1
+785	pr. [8] ac. du. 1
+786	imp. [8] md. sg. 1
+787	aor. [4] ac. pl. 1
+788	int. ppr. ac.
+789	aor. [3] ac. sg. 1
+790	pr. [5] md. du. 3
+791	imp. [6] md. sg. 1
+792	inj. [1] md. pl. 2
+793	ben. ac. sg. 1
+794	per. fut. ac. pl. 2
+795	pr. [9] ac. pl. 2
+796	impft. [1] md. du. 1
+797	des. imp. ps. sg. 3
+798	des. pfu. ac.
+799	pr. [4] md. du. 1
+800	aor. [4] md. pl. 1
+801	opt. [9] ac. pl. 2
+802	impft. [8] md. du. 1
+803	imp. [5] ac. du. 2
+804	opt. [8] ac. du. 2
+805	impft. [2] md. du. 3
+806	opt. [2] md. sg. 2
+807	imp. [vn.] ac. sg. 1
+808	imp. [3] ac. du. 1
+809	pft. md. sg. 2
+810	impft. [5] ac. du. 3
+811	ca. impft. ac. du. 3
+812	aor. [4] ac. pl. 3
+813	ca. imp. md. du. 3
+814	ca. opt. ac. du. 3
+815	impft. [6] md. du. 3
+816	impft. [5] ac. pl. 2
+817	ben. ac. pl. 1
+818	opt. [2] ac. du. 2
+819	ca. imp. ac. du. 1
+820	impft. [10] md. pl. 3
+821	impft. [10] md. du. 3
+822	impft. [10] md. sg. 1
+823	pr. [7] md. pl. 1
+824	opt. [5] md. pl. 1
+825	opt. ps. pl. 1
+826	pr. [5] ac. du. 3
+827	pr. [5] md. sg. 2
+828	aor. [5] md. sg. 3
+829	aor. [5] ac. pl. 2
+830	imp. [vn.] ac. pl. 2
+831	impft. [vn.] ac. pl. 2
+832	ca. pr. ps. pl. 1
+833	imp. [7] ac. sg. 3
+834	opt. [8] ac. du. 3
+835	pr. [6] md. du. 1
+836	opt. [6] ac. pl. 1
+837	cond. ac. sg. 1
+838	pr. [7] ac. sg. 2
+839	ca. imp. md. du. 2
+840	cond. md. sg. 1
+841	opt. [5] ac. du. 1
+842	imp. [5] md. pl. 2
+843	imp. [vn.] ac. pl. 1
+844	imp. [7] md. sg. 1
+845	imp. [5] ac. pl. 1
+846	aor. [6] ac. sg. 3
