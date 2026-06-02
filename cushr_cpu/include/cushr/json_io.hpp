@@ -1,25 +1,3 @@
-// cushr/json_io.hpp
-//
-// Tiny dependency-free JSON writer for the golden-output file. We only ever
-// emit -- never parse -- so this stays minimal.
-//
-// Output schema (golden_outputs.json):
-//   {
-//     "schema_version": 1,
-//     "scorer": "log_linear",
-//     "K": 10,
-//     "sentences": [
-//        {
-//           "sentence_id": 0,
-//           "paths": [
-//              { "score": 12.345, "nodes": [0, 3, 7, 9] },
-//              ...
-//           ]
-//        },
-//        ...
-//     ]
-//   }
-
 #pragma once
 
 #include <string>
@@ -35,9 +13,10 @@ struct GoldenSentence {
 };
 
 void write_golden_outputs_json(
-    const std::string& path,
-    const std::string& scorer_name,
+    const std::string& path, // dest path
+    const std::string& scorer_name, // which scorer used
     int K,
-    const std::vector<GoldenSentence>& sentences);
+    const std::vector<GoldenSentence>& sentences); // one entry per input sentence
+    // contains sentence ID, topk decoded paths (score + nodes)
 
-}  // namespace cushr
+}  

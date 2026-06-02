@@ -1,4 +1,4 @@
-#include "cushr/decoder.hpp"
+﻿#include "cushr/decoder.hpp"
 
 #include "cushr/lattice.hpp"
 #include "cushr/scorer.hpp"
@@ -87,14 +87,14 @@ std::vector<std::vector<DecodedPath>> TopKDecoder::decode(const Lattice& lat, in
         }
 
         // create paths only at the sink
-        const auto& sink_entries = topk_[sv.sink_node];
+        const auto& sink_entries = topk_[sv.node_end - 1];
 
         results[s].reserve(sink_entries.size()); // the amount of sink entries is how many results
         
         for (int r = 0; r < (int)sink_entries.size(); ++r) {
             DecodedPath p;
             p.score = sink_entries[r].score; // for each path, get score and nodes and sort
-            p.nodes = reconstruct(sv.sink_node, r);
+            p.nodes = reconstruct(sv.node_end - 1, r);
             results[s].push_back(std::move(p));
         }
     }

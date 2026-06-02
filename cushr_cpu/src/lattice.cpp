@@ -1,4 +1,4 @@
-#include "cushr/lattice.hpp"
+﻿#include "cushr/lattice.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -161,8 +161,6 @@ SentenceView Lattice::sentence(int s) const {
     v.sentence_id = s;
     v.node_begin = sentence_offsets_[s];
     v.node_end = sentence_offsets_[s + 1];
-    v.source_node = v.node_begin;
-    v.sink_node = v.node_end - 1;
     return v;
 }
 
@@ -229,10 +227,10 @@ bool Lattice::validate(std::string* err) const {
     // each sentence must have one source (in-degree 0) and one sink (out-degree 0) 
     for (int s = 0; s < num_sentences(); ++s) {
         auto sv = sentence(s);
-        if (in_degree(sv.source_node) != 0) {
+        if (in_degree(sv.node_begin) != 0) {
             return fail("sentence source has non-zero in-degree");
         }
-        if (out_degree(sv.sink_node) != 0) {
+        if (out_degree(sv.node_end - 1) != 0) {
             return fail("sentence sink has non-zero out-degree");
         }
         // no edge may connect a node in sentence s to a node outside sentence s.

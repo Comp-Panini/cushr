@@ -1,4 +1,4 @@
-// tests/test_lattice.cpp
+﻿// tests/test_lattice.cpp
 #include <algorithm>
 #include <doctest/doctest.h>
 
@@ -78,9 +78,7 @@ TEST_CASE("sentence boundaries are reported correctly") {
     auto s0 = lat.sentence(0);
     auto s1 = lat.sentence(1);
     CHECK(s0.node_begin == 0); CHECK(s0.node_end == 4);
-    CHECK(s0.source_node == 0); CHECK(s0.sink_node == 3);
     CHECK(s1.node_begin == 4); CHECK(s1.node_end == 8);
-    CHECK(s1.source_node == 4); CHECK(s1.sink_node == 7);
 
     std::string err;
     CHECK(lat.validate(&err));

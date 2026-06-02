@@ -1,4 +1,4 @@
-#include "cushr/metrics.hpp"
+﻿#include "cushr/metrics.hpp"
 
 #include "cushr/lattice.hpp"
 
@@ -73,11 +73,11 @@ std::vector<int> gold_path_nodes(const Lattice& lat, int sentence_idx) {
     // an ambiguous or broken path, return empty (caller treats it as
     // "skip this sentence").
     std::vector<int> path;
-    if (!lat.is_gold(sv.source_node)) return {};
-    path.push_back(sv.source_node);
+    if (!lat.is_gold(sv.node_begin)) return {};
+    path.push_back(sv.node_begin);
 
-    int v = sv.source_node;
-    while (v != sv.sink_node) {
+    int v = sv.node_begin;
+    while (v != sv.node_end - 1) {
         int next = -1;
         int count = 0;
         for (int e = lat.out_edge_begin(v); e < lat.out_edge_end(v); ++e) {

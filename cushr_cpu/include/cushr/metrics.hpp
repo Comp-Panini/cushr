@@ -1,13 +1,3 @@
-// cushr/metrics.hpp
-//
-// Word-level Precision/Recall/F1 and sentence-level Perfect Match.
-//
-// "Word" here means a (start, length, surface_id) triple identifying a
-// specific node in the lattice. Two segmentations match iff they select the
-// same set of nodes -- order is determined by topology, so set equality is
-// enough. We use the node id itself as the equality key; it encodes
-// position+surface uniquely within a sentence.
-
 #pragma once
 
 #include <vector>
@@ -20,8 +10,8 @@ struct WordMetrics {
     double precision;
     double recall;
     double f1;
-    long   tp;
-    long   fp;
+    long tp;
+    long fp;
     long   fn;
     long   perfect_match;   // sentences with PM == 1
     long   num_sentences;

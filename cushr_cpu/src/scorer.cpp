@@ -28,7 +28,6 @@ float LogLinearScorer::score(const Lattice& lat, int edge_id) const {
     }
 
     // f points to the contiguous feature row for node v in the flat
-    // node_features array (length feat_dim). acc accumulates bias + w · f,
     const float* f = lat.node_feature_ptr(v);
     float acc = bias_;
     for (int i = 0; i < (int)weights_.size(); ++i) {
@@ -37,4 +36,4 @@ float LogLinearScorer::score(const Lattice& lat, int edge_id) const {
     return acc;
 }
 
-}  // namespace cushr
+} 
