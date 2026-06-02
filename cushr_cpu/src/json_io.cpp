@@ -22,6 +22,9 @@ void write_float(std::ostream& os, float x) {
 
 }  // namespace
 
+// Serialise decoded results to the golden-output JSON file.
+// Format matches the schema in json_io.hpp. Scores are written with 9
+// significant digits to guarantee IEEE-754 float32 round-trip fidelity.
 void write_golden_outputs_json(
     const std::string& path,
     const std::string& scorer_name,

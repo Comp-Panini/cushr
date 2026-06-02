@@ -1,4 +1,5 @@
 // tests/test_lattice.cpp
+#include <algorithm>
 #include <doctest/doctest.h>
 
 #include "cushr/lattice.hpp"

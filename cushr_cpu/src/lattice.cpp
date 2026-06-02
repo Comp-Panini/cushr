@@ -1,5 +1,3 @@
-// cushr/lattice.cpp
-
 #include "cushr/lattice.hpp"
 
 #include <algorithm>
@@ -14,21 +12,35 @@ namespace cushr {
 
 namespace {
 
-template <typename T>
-std::vector<T> load_required(cnpy::npz_t& z, const std::string& key) {
-    auto it = z.find(key);
-    if (it == z.end()) {
+// USED WHEN DECODER ABSOLUTELY NEEDS THIS ARR
+// load a named array from an open .npz file as a std::vector<T>.
+// arr.data<T>() gives a raw pointer to the array bytes interpreted as T.
+template <typename T> std::vector<T> load_required(cnpy::npz_t& z, const std::string& key) {
+// template <typename T> means it will be generated differently based on what type T is
+// cnpy lib opens ZIP of .npy files and loads into C++ dictionary which is referred to by z
+// key is the array you want
+
+    auto it = z.find(key); 
+    // search dict for key, it is a ptr to where key/val lives in dict
+    
+    if (it == z.end()) { // if no value for given key, it returns special marker marking end of dict
         throw std::runtime_error("cushr: missing required array '" + key + "' in npz");
-    }
-    const cnpy::NpyArray& arr = it->second;
-    const T* p = arr.data<T>();
+    } // garbage memory
+
+    const cnpy::NpyArray& arr = it->second; 
+    // it->second is the value/numpy arr obj
+
+    const T* p = arr.data<T>(); 
+    // copy the raw bytes into a vector so the Lattice owns its memory independently of the cnpy map (which we discard after load_npz returns).
+    
     return std::vector<T>(p, p + arr.num_vals);
+    // executes a range constructor, deep copies data so when dict deleted you have data permanently
 }
 
-template <typename T>
-std::vector<T> load_optional(cnpy::npz_t& z, const std::string& key) {
+// USED WHEN IF ARR NOT THERE ITS OK
+template <typename T> std::vector<T> load_optional(cnpy::npz_t& z, const std::string& key) {
     auto it = z.find(key);
-    if (it == z.end()) return {};
+    if (it == z.end()) return {};   // key absent -> caller gets empty vector
     const cnpy::NpyArray& arr = it->second;
     const T* p = arr.data<T>();
     return std::vector<T>(p, p + arr.num_vals);
@@ -36,17 +48,28 @@ std::vector<T> load_optional(cnpy::npz_t& z, const std::string& key) {
 
 }  // namespace
 
+
+// opens the .npz file produced by ingest script
+// loads each named array into the corresponding member vector
+// builds the reverse CSR
+// validates the result
 Lattice Lattice::load_npz(const std::string& path) {
+
+    // returns a map from array name to NpyArray.
     cnpy::npz_t z = cnpy::npz_load(path);
 
     Lattice lat;
 
-    lat.row_ptr_          = load_required<int>(z, "row_ptr");
-    lat.col_idx_          = load_required<int>(z, "col_idx");
-    lat.topo_level_       = load_required<int>(z, "topo_level");
+    // forward CSR
+    lat.row_ptr_ = load_required<int>(z, "row_ptr");
+    lat.col_idx_ = load_required<int>(z, "col_idx");
+    lat.topo_level_ = load_required<int>(z, "topo_level");
     lat.sentence_offsets_ = load_required<int>(z, "sentence_offsets");
 
-    // node_features is 2-D, [num_nodes, feat_dim]; cnpy gives us shape info.
+    // node_features is [num_nodes, feat_dim] or a 2D arr, flatten to 1D
+    // flatten it to a 1-D vector and store feat_dim_ separately so that
+    //   node_feature_ptr(v) = node_features_.data() + v * feat_dim_
+    // gives the feature vector for node v.
     {
         auto it = z.find("node_features");
         if (it == z.end()) {
@@ -56,16 +79,20 @@ Lattice Lattice::load_npz(const std::string& path) {
         if (arr.shape.size() != 2) {
             throw std::runtime_error("cushr: node_features must be 2-D");
         }
-        lat.feat_dim_ = (int)arr.shape[1];
+        lat.feat_dim_ = (int)arr.shape[1]; // stride
+        // to get node v's feature, do pts arithmetic.
         const float* p = arr.data<float>();
-        lat.node_features_.assign(p, p + arr.num_vals);
+        lat.node_features_.assign(p, p + arr.num_vals); // store deep copy
     }
 
-    lat.gold_path_mask_   = load_optional<uint8_t>(z, "gold_path_mask");
+
+    lat.gold_path_mask_ = load_optional<uint8_t>(z, "gold_path_mask");
     lat.node_word_length_ = load_optional<int>(z, "node_word_length");
 
+    // build the reverse CSR
     lat.build_reverse_csr_();
 
+    // check graph structure before returning
     std::string err;
     if (!lat.validate(&err)) {
         throw std::runtime_error("cushr: lattice failed validation: " + err);
@@ -73,6 +100,8 @@ Lattice Lattice::load_npz(const std::string& path) {
     return lat;
 }
 
+// in-memory constructor used by unit tests only.
+// takes pre-built arrays directly instead of reading from disk
 Lattice::Lattice(std::vector<int> row_ptr,
                  std::vector<int> col_idx,
                  std::vector<int> topo_level,
@@ -90,46 +119,58 @@ Lattice::Lattice(std::vector<int> row_ptr,
     build_reverse_csr_();
 }
 
-void Lattice::build_reverse_csr_() {
-    const int N = (int)topo_level_.size();
-    const int E = (int)col_idx_.size();
-    in_row_ptr_.assign(N + 1, 0);
 
-    // count in-degrees
+void Lattice::build_reverse_csr_() {
+    const int N = (int)topo_level_.size(); // num_nodes
+    const int E = (int)col_idx_.size(); // num_edges
+
+    // count how many incoming edges each node has
+    in_row_ptr_.assign(N + 1, 0);
     for (int e = 0; e < E; ++e) {
-        int v = col_idx_[e];
+        int v = col_idx_[e]; // destination of forward edge e
         in_row_ptr_[v + 1]++;
     }
-    // prefix sum
+
+    // prefix-sum to convert counts to start offsets.
+    // in_row_ptr_[v] = index of the first incoming edge of v
     for (int v = 0; v < N; ++v) {
         in_row_ptr_[v + 1] += in_row_ptr_[v];
     }
-    // scatter
+
+    // put source nodes and forward edge ids into their slots.
+    // cursor[v] tracks how many incoming edges of v we've placed so far.
     in_col_idx_.assign(E, 0);
     in_edge_id_.assign(E, 0);
     std::vector<int> cursor(N, 0);
     for (int u = 0; u < N; ++u) {
         for (int e = row_ptr_[u]; e < row_ptr_[u + 1]; ++e) {
-            int v = col_idx_[e];
-            int slot = in_row_ptr_[v] + cursor[v]++;
-            in_col_idx_[slot] = u;
-            in_edge_id_[slot] = e;
+            int v = col_idx_[e]; // forward edge u->v
+            int slot = in_row_ptr_[v] + cursor[v]++; // next free slot for v
+            in_col_idx_[slot] = u; // source of this incoming edge
+            in_edge_id_[slot] = e; // original forward edge id
         }
     }
 }
 
+// returns a SentenceView which is a lightweight struct describing which global node ids
+// belong to sentence s. Nodes [node_begin, node_end) are the entire graph for
+// that sentence.
+// starts path reconstruction from the sink and follows backpointers to source
 SentenceView Lattice::sentence(int s) const {
     SentenceView v;
     v.sentence_id = s;
-    v.node_begin  = sentence_offsets_[s];
-    v.node_end    = sentence_offsets_[s + 1];
-    // By convention the source is the first node (in-degree 0) and the sink
-    // is the last node (out-degree 0). We verify this in validate().
+    v.node_begin = sentence_offsets_[s];
+    v.node_end = sentence_offsets_[s + 1];
     v.source_node = v.node_begin;
-    v.sink_node   = v.node_end - 1;
+    v.sink_node = v.node_end - 1;
     return v;
 }
 
+// returns the nodes of sentence s sorted by topo_level (ascending).
+// decoder must visit nodes in this order so that when it processes node v,
+// all predecessors of v have already been fully scored.
+
+// ingest script expected to write nodes in topo order already, so safety net
 std::vector<int> Lattice::topo_order_for_sentence(int s) const {
     const auto sv = sentence(s);
     std::vector<int> nodes;
@@ -137,34 +178,40 @@ std::vector<int> Lattice::topo_order_for_sentence(int s) const {
     for (int v = sv.node_begin; v < sv.node_end; ++v) {
         nodes.push_back(v);
     }
-    // Stable sort by topo_level. Should already be sorted post-ingest, but
-    // we don't trust the input file.
     std::stable_sort(nodes.begin(), nodes.end(),
         [this](int a, int b){ return topo_level_[a] < topo_level_[b]; });
     return nodes;
 }
 
+
+// checks that loaded lattice is internally consistent
 bool Lattice::validate(std::string* err) const {
     auto fail = [&](const std::string& m){
         if (err) *err = m;
         return false;
     };
 
+    // row_ptr must have exactly num_nodes+1 entries
     if (row_ptr_.size() != (size_t)num_nodes() + 1) {
         return fail("row_ptr size mismatch");
     }
+    // The last entry of row_ptr must equal num_edges
     if ((int)row_ptr_.back() != num_edges()) {
         return fail("row_ptr tail != num_edges");
     }
+
+    // sentence_offsets must start at 0 and end at num_nodes 
     if (sentence_offsets_.empty() || sentence_offsets_.front() != 0
         || sentence_offsets_.back() != num_nodes()) {
         return fail("sentence_offsets does not span [0, num_nodes]");
     }
+
+    // node_features is stored flat: total elements must be num_nodes * feat_dim.
     if ((int)node_features_.size() != num_nodes() * feat_dim_) {
         return fail("node_features size mismatch");
     }
 
-    // Edge topological consistency.
+    // for every edge (u->v), level[u] < level[v] (topological stuff)
     for (int u = 0; u < num_nodes(); ++u) {
         for (int e = row_ptr_[u]; e < row_ptr_[u + 1]; ++e) {
             int v = col_idx_[e];
@@ -179,9 +226,7 @@ bool Lattice::validate(std::string* err) const {
         }
     }
 
-    // Each sentence: first node should have in-degree 0, last out-degree 0.
-    // (We can only check the global in/out-degree, which is equivalent since
-    // no edges cross sentence boundaries.)
+    // each sentence must have one source (in-degree 0) and one sink (out-degree 0) 
     for (int s = 0; s < num_sentences(); ++s) {
         auto sv = sentence(s);
         if (in_degree(sv.source_node) != 0) {
@@ -190,7 +235,7 @@ bool Lattice::validate(std::string* err) const {
         if (out_degree(sv.sink_node) != 0) {
             return fail("sentence sink has non-zero out-degree");
         }
-        // Edges must stay within the sentence.
+        // no edge may connect a node in sentence s to a node outside sentence s.
         for (int v = sv.node_begin; v < sv.node_end; ++v) {
             for (int e = row_ptr_[v]; e < row_ptr_[v + 1]; ++e) {
                 int dst = col_idx_[e];
@@ -204,4 +249,4 @@ bool Lattice::validate(std::string* err) const {
     return true;
 }
 
-}  // namespace cushr
+}  
