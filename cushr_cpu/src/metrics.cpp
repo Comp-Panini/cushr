@@ -24,12 +24,11 @@ WordMetrics evaluate_word_metrics(
         // to precision, recall, or the sentence count.
         if (g.empty()) continue;
         // A missing prediction is treated as an empty path: every gold node
-        // becomes a false negative. We pass g as a dummy pred so the set
-        // arithmetic below produces tp=0, fn=|g|, fp=0 naturally... except
-        // we override: pass an empty vector instead. (g trick avoided by
-        // explicit check below -- but the original code uses g as a sentinel,
-        // which makes fn = |g|. Keep as-is.)
-        const auto& p = (i < pred.size()) ? pred[i] : g;  // missing pred -> all FN
+        // becomes a false negative (tp=0, fn=|g|, fp=0). Using an empty vector
+        // here is essential — passing `g` would make a missing prediction look
+        // like a perfect match.
+        static const std::vector<int> kEmpty;
+        const auto& p = (i < pred.size()) ? pred[i] : kEmpty;
 
         // We compare paths as *sets* of node ids. A path is fully identified
         // by which nodes it visits; two paths that select the same nodes are
@@ -66,14 +65,23 @@ WordMetrics evaluate_word_metrics(
 }
 
 std::vector<int> gold_path_nodes(const Lattice& lat, int sentence_idx) {
+    // Preferred path: newer archives carry an explicit, pre-resolved gold path
+    // (one node per gold word, already disambiguated against DAG connectivity
+    // during ingest). Return it directly — no mask walking, no ambiguity.
+    if (lat.has_explicit_gold()) {
+        return lat.gold_path(sentence_idx);
+    }
+
+    // Fallback for older archives that only have the per-node gold mask.
     const auto sv = lat.sentence(sentence_idx);
 
     // Walk forward from source, at each step taking the unique outgoing
     // edge whose destination is on the gold path. If the gold mask defines
     // an ambiguous or broken path, return empty (caller treats it as
     // "skip this sentence").
+    // Always include source (decoder paths also start at source).
+    // Source is a structural node and is not expected to be gold itself.
     std::vector<int> path;
-    if (!lat.is_gold(sv.node_begin)) return {};
     path.push_back(sv.node_begin);
 
     int v = sv.node_begin;
@@ -87,10 +95,21 @@ std::vector<int> gold_path_nodes(const Lattice& lat, int sentence_idx) {
                 ++count;
             }
         }
-        if (count != 1) return {};   // ambiguous or dead-end
+        if (count == 0) {
+            // No gold successor — valid end if this node has a direct edge to sink.
+            bool to_sink = false;
+            for (int e = lat.out_edge_begin(v); e < lat.out_edge_end(v); ++e) {
+                if (lat.edge_dst(e) == sv.node_end - 1) { to_sink = true; break; }
+            }
+            if (to_sink) break;
+            return {};  // broken gold path
+        }
+        if (count != 1) return {};   // ambiguous gold path
         path.push_back(next);
         v = next;
     }
+    // Require at least one gold word node beyond source.
+    if ((int)path.size() <= 1) return {};
     return path;
 }
 

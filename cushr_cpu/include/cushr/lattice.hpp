@@ -46,6 +46,22 @@ public:
         return !gold_path_mask_.empty() && gold_path_mask_[v] != 0;
     }
 
+    // True if the npz carried an explicit, pre-resolved gold path per sentence
+    // (gold_path_nodes / gold_path_offsets). Newer ingest emits this; older
+    // archives only have the per-node mask.
+    bool has_explicit_gold() const { return !gold_path_offsets_.empty(); }
+
+    // Explicit gold path (ordered word node ids) for sentence s. Empty when the
+    // sentence has no resolved gold path. Boundary super-source/sink nodes are
+    // NOT included.
+    std::vector<int> gold_path(int s) const {
+        if (gold_path_offsets_.empty()) return {};
+        const int b = gold_path_offsets_[s];
+        const int e = gold_path_offsets_[s + 1];
+        return std::vector<int>(gold_path_nodes_.begin() + b,
+                                gold_path_nodes_.begin() + e);
+    }
+
     // edge iteration
     // forward CSR: outgoing edges of v are [row_ptr_[v], row_ptr_[v+1])
     int out_edge_begin(int v) const { 
@@ -108,6 +124,11 @@ private:
     int feat_dim_ = 0;
     std::vector<int> node_word_length_;
     std::vector<uint8_t> gold_path_mask_;
+
+    // explicit gold path: gold_path_nodes_ is a flat list of word node ids;
+    // gold_path_offsets_[s..s+1] slices out sentence s's path (CSR-style).
+    std::vector<int> gold_path_nodes_;
+    std::vector<int> gold_path_offsets_;
 
     // sentences
     std::vector<int> sentence_offsets_;

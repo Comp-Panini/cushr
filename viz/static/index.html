@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cuSHR — Sanskrit segmentation DAG visualizer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; color: #1b1b1f; }
+  header { padding: 10px 16px; background: #15233b; color: #fff; display: flex;
+           gap: 14px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header input[type=number] { width: 90px; padding: 5px; border-radius: 4px; border: none; }
+  header button { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer;
+                  background: #4f7cff; color: #fff; font-weight: 600; }
+  header label { display: flex; gap: 6px; align-items: center; font-size: 14px; }
+  #meta { font-size: 13px; opacity: .85; }
+  #cy { width: 100vw; height: calc(100vh - 52px); display: block; background: #f6f7fb; }
+  #tip { position: fixed; pointer-events: none; background: #15233b; color: #fff;
+         padding: 6px 9px; border-radius: 5px; font-size: 12px; display: none; max-width: 260px; }
+  .err { color: #ff9a9a; }
+</style>
+</head>
+<body>
+<header>
+  <h1>cuSHR DAG</h1>
+  <label>sentence #
+    <input id="idx" type="number" min="0" value="0" />
+  </label>
+  <button id="load">Load</button>
+  <label>sent_id
+    <input id="stem" type="text" placeholder="e.g. 100012" style="width:110px" />
+  </label>
+  <button id="find">Find</button>
+  <label><input id="gold" type="checkbox" checked /> highlight gold path</label>
+  <span id="meta"></span>
+</header>
+<div id="cy"></div>
+<div id="tip"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

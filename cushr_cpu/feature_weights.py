@@ -1,6 +1,6 @@
 import numpy as np
 
-NPZ_PATH = '../data/cushr_data_fixed.npz'
+NPZ_PATH = '../data/new_cushr_data_fixed.npz'
 
 FEATURE_TOKENS = [
     'nom', 'acc', 'dat', 'abl', 'g', 'loc', 'voc', 'i',

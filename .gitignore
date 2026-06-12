@@ -1,0 +1,12 @@
+# Oversized data archives (exceed GitHub's 100 MB file limit)
+data/cushr_data_fixed.npz
+data/new_cushr_data_fixed.npz
+
+# Build artifacts and compiled binaries
+*.exe
+*.o
+cushr_cpu/cushr_tests
+
+# Python bytecode
+__pycache__/
+*.pyc

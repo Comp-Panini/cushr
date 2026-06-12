@@ -131,7 +131,13 @@ int main(int argc, char** argv) {
     for (int s = 0; s < lat.num_sentences(); ++s) {
         gold[s] = cushr::gold_path_nodes(lat, s);
         if (!results[s].empty()) {
-            pred[s] = results[s][0].nodes;   // top-1
+            // top-1 decoded path runs super-source -> words... -> super-sink.
+            // The explicit gold path contains word nodes only, so drop the two
+            // boundary nodes (front/back) before comparing.
+            const auto& nodes = results[s][0].nodes;
+            if (nodes.size() > 2) {
+                pred[s].assign(nodes.begin() + 1, nodes.end() - 1);
+            }
         }
     }
 

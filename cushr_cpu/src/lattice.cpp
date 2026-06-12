@@ -89,6 +89,10 @@ Lattice Lattice::load_npz(const std::string& path) {
     lat.gold_path_mask_ = load_optional<uint8_t>(z, "gold_path_mask");
     lat.node_word_length_ = load_optional<int>(z, "node_word_length");
 
+    // explicit pre-resolved gold path (optional; newer ingest emits it)
+    lat.gold_path_nodes_ = load_optional<int>(z, "gold_path_nodes");
+    lat.gold_path_offsets_ = load_optional<int>(z, "gold_path_offsets");
+
     // build the reverse CSR
     lat.build_reverse_csr_();
 
@@ -139,15 +143,15 @@ void Lattice::build_reverse_csr_() {
 
     // put source nodes and forward edge ids into their slots.
     // cursor[v] tracks how many incoming edges of v we've placed so far.
-    in_col_idx_.assign(E, 0);
-    in_edge_id_.assign(E, 0);
-    std::vector<int> cursor(N, 0);
-    for (int u = 0; u < N; ++u) {
-        for (int e = row_ptr_[u]; e < row_ptr_[u + 1]; ++e) {
-            int v = col_idx_[e]; // forward edge u->v
-            int slot = in_row_ptr_[v] + cursor[v]++; // next free slot for v
-            in_col_idx_[slot] = u; // source of this incoming edge
-            in_edge_id_[slot] = e; // original forward edge id
+    in_col_idx_.assign(E, 0); // remembers source nodes
+    in_edge_id_.assign(E, 0); // remembers original edge ids
+    std::vector<int> cursor(N, 0); // create a counter for every node that counts incoming edges
+    for (int u = 0; u < N; ++u) { // loop over every node
+        for (int e = row_ptr_[u]; e < row_ptr_[u + 1]; ++e) { // look at rowptr to see start and stop, loop thru those edges
+            int v = col_idx_[e]; // look at destination array to see destination of edge e from node v
+            int slot = in_row_ptr_[v] + cursor[v]++; // node v starts at in_row_ptr[v] and ends at the amount of edges already there, increment
+            in_col_idx_[slot] = u; // source of this incoming edge is u, write in that box
+            in_edge_id_[slot] = e; // original forward edge id is also written
         }
     }
 }
@@ -224,7 +228,21 @@ bool Lattice::validate(std::string* err) const {
         }
     }
 
-    // each sentence must have one source (in-degree 0) and one sink (out-degree 0) 
+    // explicit gold path arrays (optional) must be internally consistent
+    if (!gold_path_offsets_.empty()) {
+        if ((int)gold_path_offsets_.size() != num_sentences() + 1) {
+            return fail("gold_path_offsets size != num_sentences+1");
+        }
+        if (gold_path_offsets_.front() != 0
+            || gold_path_offsets_.back() != (int)gold_path_nodes_.size()) {
+            return fail("gold_path_offsets does not span gold_path_nodes");
+        }
+        for (int g : gold_path_nodes_) {
+            if (g < 0 || g >= num_nodes()) return fail("gold_path node OOB");
+        }
+    }
+
+    // each sentence must have one source (in-degree 0) and one sink (out-degree 0)
     for (int s = 0; s < num_sentences(); ++s) {
         auto sv = sentence(s);
         if (in_degree(sv.node_begin) != 0) {

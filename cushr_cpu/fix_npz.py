@@ -1,8 +1,8 @@
 import numpy as np
 import os
 
-src = '../data/cushr_data_full_with_gold.npz'
-dst = '../data/cushr_data_fixed.npz'
+src = '../data/new_cushr_data_full_with_gold.npz'
+dst = '../data/new_cushr_data_fixed.npz'
 VOCAB_PATH = '../ingest/morph_vocabulary.txt'
 
 # ---------------------------------------------------------------------------
@@ -101,33 +101,32 @@ if zero_rows:
           '(tag IDs not in vocabulary?)')
 
 # ---------------------------------------------------------------------------
-# Compute node_word_length from topo-level spans.
+# node_word_length: real surface character length.
 #
-# ingest.py never extracted surface-form character lengths. We derive a proxy:
-# for each node v, node_word_length[v] = the maximum topo-level gap across all
-# incoming edges (u → v).  In the SHR lattice topo_level tracks position within
-# the sentence, so topo[v] - topo[u] ≈ how many segmentation positions the word
-# at v spans — a reliable proxy for actual word length.
+# ingest.py now extracts the graphml `length_word` attribute directly into the
+# `node_length` array (boundary super-source/sink nodes are 0). LengthScorer
+# (scorer.cpp) reads this to score each edge as log(1 + word_length), biasing
+# toward fewer, longer words — the right prior for Sanskrit, where correct
+# analyses use compact compound words.
 #
-# This is what LengthScorer (scorer.cpp) reads to score each edge as
-# log(1 + word_length), which biases toward fewer, longer words — exactly the
-# right prior for Sanskrit, where correct analyses use compact compound words.
+# Older archives that predate `node_length` fall back to the previous
+# topo-level-span proxy so the pipeline still runs.
 # ---------------------------------------------------------------------------
-print('Computing node_word_length from topo-level spans ...')
 row_ptr_arr  = z['rowptr'].astype(np.int32)
 col_idx_arr  = z['colidx'].astype(np.int32)
 topo_arr     = z['topolevel'].astype(np.int32)
 
-# Build source-node index for every edge: u_idx[e] = source of edge e.
-out_degrees  = np.diff(row_ptr_arr)           # [N]
-u_idx        = np.repeat(np.arange(N, dtype=np.int32), out_degrees)  # [E]
-v_idx        = col_idx_arr                    # [E]  destination of edge e
-
-spans        = topo_arr[v_idx] - topo_arr[u_idx]   # [E]  >= 1 by construction
-
-# For each destination node, keep the maximum span across all incoming edges.
-node_word_length = np.zeros(N, dtype=np.int32)
-np.maximum.at(node_word_length, v_idx, spans)
+if 'node_length' in z.files:
+    print('Using real node_length (graphml length_word) ...')
+    node_word_length = z['node_length'].astype(np.int32)
+else:
+    print('node_length absent; deriving proxy from topo-level spans ...')
+    out_degrees  = np.diff(row_ptr_arr)
+    u_idx        = np.repeat(np.arange(N, dtype=np.int32), out_degrees)
+    v_idx        = col_idx_arr
+    spans        = topo_arr[v_idx] - topo_arr[u_idx]
+    node_word_length = np.zeros(N, dtype=np.int32)
+    np.maximum.at(node_word_length, v_idx, spans)
 
 print(f'  word_length range: [{node_word_length.min()}, {node_word_length.max()}]  '
       f'mean: {node_word_length.mean():.2f}')
@@ -136,7 +135,7 @@ print(f'  word_length range: [{node_word_length.min()}, {node_word_length.max()}
 # Save
 # ---------------------------------------------------------------------------
 print(f'Saving to {dst} ...')
-np.savez(dst,
+save_arrays = dict(
     node_features    = nf,
     node_word_length = node_word_length,
     row_ptr          = row_ptr_arr,
@@ -147,6 +146,14 @@ np.savez(dst,
     ).astype(np.int32),
     gold_path_mask   = z['goldpathmask'].astype(np.int8),
 )
+# Pass the explicit gold path (flat node ids + per-sentence CSR offsets) through
+# unchanged so the C++ side can read the unambiguous gold path directly.
+if 'gold_path_nodes' in z.files and 'gold_path_offsets' in z.files:
+    save_arrays['gold_path_nodes']   = z['gold_path_nodes'].astype(np.int32)
+    save_arrays['gold_path_offsets'] = z['gold_path_offsets'].astype(np.int32)
+    print(f'  gold path: {len(z["gold_path_nodes"]):,} nodes across '
+          f'{len(z["gold_path_offsets"])-1:,} sentences')
+np.savez(dst, **save_arrays)
 
 size_mb = os.path.getsize(dst) / 1e6
 print(f'done  node_features shape: {nf.shape}  feat_dim={FEAT_DIM}  '
