@@ -2,6 +2,9 @@
 data/cushr_data_fixed.npz
 data/new_cushr_data_fixed.npz
 
+# Visualizer database (exceeds GitHub's 100 MB file limit)
+viz/cushr_viz.db
+
 # Build artifacts and compiled binaries
 *.exe
 *.o
