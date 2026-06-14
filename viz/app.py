@@ -12,6 +12,7 @@ Run locally:
 """
 import os
 import json
+import zlib
 import sqlite3
 
 from fastapi import FastAPI, HTTPException
@@ -53,8 +54,14 @@ def sentence(idx: int):
     row = con.execute('SELECT data FROM sentences WHERE idx=?', (idx,)).fetchone()
     con.close()
     if row is None:
-        raise HTTPException(404, f'sentence {idx} not in demo subset')
-    return JSONResponse(json.loads(row['data']))
+        raise HTTPException(404, f'sentence {idx} not found')
+    blob = row['data']
+    # `data` is zlib-compressed JSON; older uncompressed DBs stored plain text.
+    if isinstance(blob, (bytes, bytearray)):
+        text = zlib.decompress(blob).decode('utf-8')
+    else:
+        text = blob
+    return JSONResponse(json.loads(text))
 
 
 @app.get('/api/lookup/{stem}')
@@ -64,7 +71,7 @@ def lookup(stem: str):
     row = con.execute('SELECT idx FROM sentences WHERE stem=?', (stem,)).fetchone()
     con.close()
     if row is None:
-        raise HTTPException(404, f'sent_id {stem} not in demo subset')
+        raise HTTPException(404, f'sent_id {stem} not found')
     return {'idx': row['idx'], 'stem': stem}
 
 

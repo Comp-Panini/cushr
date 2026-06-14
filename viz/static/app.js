@@ -46,7 +46,7 @@ async function load(idx) {
   let data;
   try {
     const r = await fetch('/api/sentence/' + idx);
-    if (!r.ok) { meta.className = 'err'; meta.textContent = 'sentence ' + idx + ' not in demo subset'; return; }
+    if (!r.ok) { meta.className = 'err'; meta.textContent = 'sentence ' + idx + ' not found'; return; }
     data = await r.json();
   } catch (e) { meta.className = 'err'; meta.textContent = 'network error'; return; }
 
@@ -87,7 +87,7 @@ async function findByStem(stem) {
   const meta = document.getElementById('meta');
   try {
     const r = await fetch('/api/lookup/' + encodeURIComponent(stem));
-    if (!r.ok) { meta.className = 'err'; meta.textContent = `sent_id ${stem} not in demo subset`; return; }
+    if (!r.ok) { meta.className = 'err'; meta.textContent = `sent_id ${stem} not found`; return; }
     const { idx } = await r.json();
     load(idx);
   } catch (e) { meta.className = 'err'; meta.textContent = 'network error'; }

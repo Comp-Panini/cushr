@@ -14,6 +14,7 @@ Usage:
 import os
 import sys
 import json
+import zlib
 import argparse
 import sqlite3
 
@@ -114,7 +115,8 @@ def build_sentence(stem):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--n', type=int, default=2000, help='number of sentences (npz indices 0..n-1)')
+    ap.add_argument('--n', type=int, default=0,
+                    help='number of sentences (npz indices 0..n-1); 0 = all')
     ap.add_argument('--out', default=os.path.join(os.path.dirname(__file__), 'cushr_viz.db'))
     args = ap.parse_args()
 
@@ -123,26 +125,31 @@ def main():
     with open(INDEX_JSON, encoding='utf-8') as f:
         sentence_index = json.load(f)
 
-    n = min(args.n, len(sentence_index))
-    print(f'building demo DB for npz indices 0..{n-1} -> {args.out}')
+    n = len(sentence_index) if args.n <= 0 else min(args.n, len(sentence_index))
+    print(f'building DB for npz indices 0..{n-1} -> {args.out}')
 
     if os.path.exists(args.out):
         os.remove(args.out)
     con = sqlite3.connect(args.out)
+    # `data` holds zlib-compressed UTF-8 JSON (the lattice compresses ~5-10x,
+    # which keeps the full-corpus DB small enough to ship in a free Space).
     con.execute('CREATE TABLE sentences (idx INTEGER PRIMARY KEY, stem TEXT, '
-                'has_gold INTEGER, n_nodes INTEGER, data TEXT)')
+                'has_gold INTEGER, n_nodes INTEGER, data BLOB)')
 
     n_gold = 0
     for idx in range(n):
-        if idx % 200 == 0 and idx:
+        if idx % 2000 == 0 and idx:
             print(f'  {idx}/{n}  ({n_gold} with gold)')
         s = build_sentence(sentence_index[idx])
         if s is None:
             continue
         has_gold = 1 if s['gold_path'] else 0
         n_gold += has_gold
+        blob = zlib.compress(json.dumps(s, ensure_ascii=False).encode('utf-8'), 9)
         con.execute('INSERT INTO sentences VALUES (?,?,?,?,?)',
-                    (idx, s['stem'], has_gold, len(s['nodes']), json.dumps(s, ensure_ascii=False)))
+                    (idx, s['stem'], has_gold, len(s['nodes']), blob))
+        if idx % 5000 == 0:
+            con.commit()
     con.commit()
 
     size_mb = os.path.getsize(args.out) / 1e6
