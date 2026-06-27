@@ -1,6 +1,6 @@
 # Oversized data archives (exceed GitHub's 100 MB file limit)
-data/cushr_data_fixed.npz
-data/new_cushr_data_fixed.npz
+data/*.npz
+data/*.npz.bak
 
 # Visualizer database (exceeds GitHub's 100 MB file limit)
 viz/cushr_viz.db

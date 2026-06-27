@@ -12,9 +12,9 @@ struct WordMetrics {
     double f1;
     long tp;
     long fp;
-    long   fn;
-    long   perfect_match;   // sentences with PM == 1
-    long   num_sentences;
+    long fn;
+    long perfect_match;  // sentences with PM == 1
+    long num_sentences;
 };
 
 // gold_paths_per_sentence[s] : list of node ids on the gold path (or empty
