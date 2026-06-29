@@ -86,7 +86,10 @@ def main():
 
     tmp = path + ".tmp.npz"
     print(f"writing {tmp}")
-    np.savez_compressed(tmp, **data)
+    # IMPORTANT: uncompressed (np.savez, NOT savez_compressed). cnpy, the C++
+    # .npz reader used by the CPU/GPU decoders, cannot read deflate-compressed
+    # archives and fails with "load_the_npy_file: failed fread".
+    np.savez(tmp, **data)
 
     bak = path + ".bak"
     if not os.path.exists(bak):
