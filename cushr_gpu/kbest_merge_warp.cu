@@ -195,3 +195,27 @@ template<int max> __global__ void kbest_merge_level(GpuLattice lat, GpuKBest kb,
         kb.count[v] = my_count;   // total valid entries for node v
     }
 }
+
+// Explicit template instantiations so the host driver / tests can link them.
+template __global__ void kbest_merge_level<32>(GpuLattice, GpuKBest, const int*, int);
+template __global__ void kbest_merge_level<64>(GpuLattice, GpuKBest, const int*, int);
+
+// pick the max that covers requested K and launch matching template
+// K<=32 used cap = 32, 32 < K <= 64 uses CAP=64
+// one warp per node in the level
+void launch_kbest_merge(const GpuLattice& lat, const GpuKBest& kb, const int* d_nodes, int n_nodes, int threads_per_block, cudaStream_t stream) {
+    
+    if (n_nodes <= 0) return;
+
+    const int warps  = n_nodes;
+    const int blocks = (warps * 32 + threads_per_block - 1) / threads_per_block;
+
+    if (kb.cap <= 32) {
+        kbest_merge_level<32><<<blocks, threads_per_block, 0, stream>>>(lat, kb, d_nodes, n_nodes);
+    }
+    else {
+        kbest_merge_level<64><<<blocks, threads_per_block, 0, stream>>>(lat, kb, d_nodes, n_nodes);
+    }
+}
+
+}  
