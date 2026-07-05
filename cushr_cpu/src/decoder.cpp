@@ -77,6 +77,8 @@ std::vector<std::vector<DecodedPath>> TopKDecoder::decode(const Lattice& lat, in
             }
 
             // number of things to keep is the min of K or size of buf
+
+            // check value of keep across all nodes.
             const int keep = std::min<int>(K, (int)buf.size());
 
             // sort the top K, using entryGreater operator defined above
