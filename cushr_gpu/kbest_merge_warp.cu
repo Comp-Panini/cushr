@@ -49,7 +49,32 @@ template<int cap> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
         }
 
         else { // exchange cross lane, partner is lane^j, same slot
-            
+            for (int slot = 0; slot < slots_per_lane; slot++) {
+                const int my_idx = slot*32 | lane;
+                const int partner_idx = my_idx ^ i;
+
+                const float parent_score = __shfl_xor_sync(mask, s[slot], i);
+                const float parent_node_2 = __shfl_xor_sync(mask, pn[slot], i);
+                const float parent_rank_2 = __shfl_xor_sync(mask, pr[slot], i);
+
+                const bool idx_is_low = (my_idx < partner_idx);
+
+                bool take_partner;
+                if (idx_is_low) {
+                    take_partner = better(parent_score, parent_node_2, parent_rank_2, s[slot], pn[slot], pr[slot]);
+                }
+                else {
+                    take_partner = better(s[slot], pn[slot], pr[slot], parent_score, parent_node_2, parent_rank_2);
+                }
+
+                if (take_partner) {
+                    s[slot] = parent_score;
+                    pn[slot] = parent_node_2;
+                    pr[slot] = parent_rank_2;
+                }
+            }
 
         }
+        __syncwarp(mask);
     }
+}
