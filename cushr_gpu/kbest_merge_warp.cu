@@ -20,7 +20,9 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
     const int slots_per_lane = total_combined_elements/32;
     const unsigned mask = 0xffffffffu;
 
-    for (int i = 2*total_combined_elements; i > 0; i /= 2) {
+    // Bitonic MERGE of a length-n (=total_combined_elements) bitonic sequence:
+    // compare-exchange distances run n/2, n/4, ..., 1.
+    for (int i = total_combined_elements/2; i > 0; i /= 2) {
         if (i >= 32) {
             const int slot_dist = i/32;
             for (int slot = 0; slot < slots_per_lane; slot++) {

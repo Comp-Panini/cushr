@@ -13,6 +13,7 @@
 //                  [--K 10]
 //                  [--golden golden_outputs.json]
 //                  [--golden-n 500]
+//                  [--keep-report keep_report.csv]
 
 #include "cushr/decoder.hpp"
 #include "cushr/json_io.hpp"
@@ -23,6 +24,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -46,7 +48,8 @@ void usage(const char* prog) {
     std::fprintf(stderr,
         "Usage: %s <lattice.npz> [--scorer uniform|length|log_linear]\n"
         "           [--weights w0,w1,...] [--bias b]\n"
-        "           [--K 10] [--golden out.json] [--golden-n 500]\n", prog);
+        "           [--K 10] [--golden out.json] [--golden-n 500]\n"
+        "           [--keep-report keep_report.csv]\n", prog);
 }
 
 }  // namespace
@@ -61,6 +64,7 @@ int main(int argc, char** argv) {
     int   K    = 10;
     std::string golden_path;
     int   golden_n = 500;
+    std::string keep_report_path;
 
     for (int i = 2; i < argc; ++i) {
         std::string a = argv[i];
@@ -77,6 +81,7 @@ int main(int argc, char** argv) {
         else if (a == "--K")        K = std::stoi(need("--K"));
         else if (a == "--golden")   golden_path = need("--golden");
         else if (a == "--golden-n") golden_n = std::stoi(need("--golden-n"));
+        else if (a == "--keep-report") keep_report_path = need("--keep-report");
         else { std::fprintf(stderr, "unknown arg: %s\n", a.c_str()); return 1; }
     }
 
@@ -124,6 +129,33 @@ int main(int argc, char** argv) {
     const double per_sec  = lat.num_sentences() / wall_sec;
     std::cout << "Decoded " << lat.num_sentences() << " sentences in "
               << wall_sec << " s  (" << per_sec << " sent/s)\n";
+
+    // Keep-value divergence report: how many nodes kept the full K candidates
+    // vs fewer (keep < K = under-full beam).
+    if (!keep_report_path.empty()) {
+        const auto& ks = dec.keep_stats();
+        const double full_pct  = ks.total_nodes ? 100.0 * ks.full  / ks.total_nodes : 0.0;
+        const double under_pct = ks.total_nodes ? 100.0 * ks.under / ks.total_nodes : 0.0;
+
+        char summary[256];
+        std::snprintf(summary, sizeof(summary),
+            "# K=%d  total_nodes=%lld  full(keep==K)=%lld (%.2f%%)  under(keep<K)=%lld (%.2f%%)",
+            ks.K, ks.total_nodes, ks.full, full_pct, ks.under, under_pct);
+
+        std::ofstream out(keep_report_path);
+        if (!out) {
+            std::fprintf(stderr, "could not open keep-report file: %s\n",
+                         keep_report_path.c_str());
+            return 1;
+        }
+        out << summary << "\n";
+        out << "keep,num_nodes\n";
+        for (int k = 0; k <= ks.K; ++k) out << k << "," << ks.hist[k] << "\n";
+
+        std::cout << "\n--- Keep-value divergence (K=" << ks.K << ") ---\n";
+        std::cout << summary << "\n";
+        std::cout << "Wrote keep report to " << keep_report_path << "\n";
+    }
 
     // Gather top-1 predictions and gold paths
     std::vector<std::vector<int>> gold(lat.num_sentences());

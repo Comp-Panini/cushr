@@ -24,7 +24,18 @@ struct Entry {
 // list of node ids from source to sink and including both
 struct DecodedPath {
     float score;
-    std::vector<int> nodes; 
+    std::vector<int> nodes;
+};
+
+// per-decode statistics on how many candidates each node actually kept.
+// "keep" = min(K, buf.size()); keep < K means the beam was under-full (fewer
+// than K candidate paths reached that node) -- the divergence from K.
+struct KeepStats {
+    int K = 0;
+    std::vector<long long> hist;   // hist[k] = # nodes whose keep == k, size K+1
+    long long total_nodes = 0;     // non-source nodes that ran the keep step
+    long long full = 0;            // keep == K
+    long long under = 0;           // keep <  K
 };
 
 class TopKDecoder {
@@ -47,9 +58,15 @@ public:
     // output is a vector<int> of the path
     std::vector<int> reconstruct(int sink_node, int rank) const;
 
+    // keep-value stats gathered during the most recent decode() call
+    const KeepStats& keep_stats() const { return keep_stats_; }
+
 private:
     // topk_[v] has up to K entries, sorted descending by score
     std::vector<std::vector<Entry>> topk_;
+
+    // populated by decode(): distribution of per-node keep values
+    KeepStats keep_stats_;
 };
 
 }  

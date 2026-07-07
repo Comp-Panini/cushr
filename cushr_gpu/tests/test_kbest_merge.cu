@@ -270,12 +270,81 @@ static void test_stress() {
     }
 }
 
+// ---- test 6: full-capacity real merge. Several parents each carrying a FULL
+// beam of K distinct real paths, so the sink must truncate genuine competitors
+// (no -inf padding involved in the winners). Run at K=32 and K=64 to exercise
+// both the max=32 and max=64 templates and the 2-slots-per-lane load path. ----
+static void test_full_capacity() {
+    std::printf("test_full_capacity (K=32, K=64)\n");
+    for (int K : {32, 64}) {
+        // Level0: K sources (so each hub can build a beam of exactly K).
+        // Level1: HUB hubs, each taking all K sources -> full beam of K.
+        // Level2: sink taking all hubs -> merges HUB full beams of K, must keep top K.
+        const int SRC = K, HUB = 3;
+        const int N = SRC + HUB + 1;
+        const int sink = N - 1;
+        const int E = SRC*HUB + HUB;
+        std::vector<int> irp(N+1,0), deg(N,0);
+        for (int h=0;h<HUB;++h) deg[SRC+h]=SRC;
+        deg[sink]=HUB;
+        for (int v=0;v<N;++v) irp[v+1]=irp[v]+deg[v];
+        std::vector<int> ici(E), iei(E); std::vector<float> es(E);
+        int w=0, eid=0;
+        // distinct edge weights so every candidate score is distinct.
+        for (int h=0;h<HUB;++h)
+            for (int u=0;u<SRC;++u){ici[w]=u;iei[w]=eid;es[eid]=1.0f+0.013f*u+0.7f*h;++w;++eid;}
+        for (int h=0;h<HUB;++h){ici[w]=SRC+h;iei[w]=eid;es[eid]=0.31f+0.017f*h;++w;++eid;}
+        std::vector<int> topo(N,0);
+        for (int h=0;h<HUB;++h) topo[SRC+h]=1;
+        topo[sink]=2;
+        std::vector<int> l0; for(int i=0;i<SRC;++i) l0.push_back(i);
+        std::vector<int> l1; for(int h=0;h<HUB;++h) l1.push_back(SRC+h);
+        std::vector<std::vector<int>> levels={l0,l1,{sink}};
+        auto g = run(N,E,irp,ici,iei,es,topo,levels,K);
+        auto ref = cpu_reference(N,irp,ici,iei,es,levels,K);
+        compare_all(K==32?"full_cap_k32":"full_cap_k64", N, K, g, ref);
+        // sink must be saturated at exactly K (HUB*K >= K candidates available).
+        CHECK(g.count[sink]==K, K==32?"full_cap_k32 sink saturated":"full_cap_k64 sink saturated");
+    }
+}
+
+// ---- test 7: K=64 diamond. Smaller than full-capacity but specifically drives
+// the max=64 template with a non-trivial two-beam merge and under-K counts. ----
+static void test_k64_diamond() {
+    std::printf("test_k64_diamond (K=64)\n");
+    const int K=64;
+    // 40 sources -> 2 hubs (beam of 40 each) -> sink merges two beams of 40 = 80
+    // candidates, truncated to 64.
+    const int SRC=40, HUB=2, N=SRC+HUB+1, sink=N-1, E=SRC*HUB+HUB;
+    std::vector<int> irp(N+1,0), deg(N,0);
+    for (int h=0;h<HUB;++h) deg[SRC+h]=SRC;
+    deg[sink]=HUB;
+    for (int v=0;v<N;++v) irp[v+1]=irp[v]+deg[v];
+    std::vector<int> ici(E), iei(E); std::vector<float> es(E);
+    int w=0, eid=0;
+    for (int h=0;h<HUB;++h)
+        for (int u=0;u<SRC;++u){ici[w]=u;iei[w]=eid;es[eid]=0.5f+0.011f*u+0.37f*h;++w;++eid;}
+    for (int h=0;h<HUB;++h){ici[w]=SRC+h;iei[w]=eid;es[eid]=0.2f+0.09f*h;++w;++eid;}
+    std::vector<int> topo(N,0);
+    for (int h=0;h<HUB;++h) topo[SRC+h]=1;
+    topo[sink]=2;
+    std::vector<int> l0; for(int i=0;i<SRC;++i) l0.push_back(i);
+    std::vector<int> l1; for(int h=0;h<HUB;++h) l1.push_back(SRC+h);
+    std::vector<std::vector<int>> levels={l0,l1,{sink}};
+    auto g = run(N,E,irp,ici,iei,es,topo,levels,K);
+    auto ref = cpu_reference(N,irp,ici,iei,es,levels,K);
+    compare_all("k64_diamond", N, K, g, ref);
+    CHECK(g.count[sink]==K, "k64_diamond sink truncated to 64");
+}
+
 int main() {
     test_k1();
     test_single_edge();
     test_diamond_k8();
     test_tie_break();
     test_stress();
+    test_full_capacity();
+    test_k64_diamond();
     if (g_failed == 0) { std::printf("\nALL K-BEST TESTS PASSED\n"); return 0; }
     std::printf("\n%d CHECK(S) FAILED\n", g_failed);
     return 1;

@@ -29,6 +29,11 @@ std::vector<std::vector<DecodedPath>> TopKDecoder::decode(const Lattice& lat, in
 
     topk_.assign(N, {}); // vector of vectors, there are N internal vectors that are all empty
 
+    // reset keep-value stats for this decode run
+    keep_stats_ = KeepStats{};
+    keep_stats_.K = K;
+    keep_stats_.hist.assign(K + 1, 0);
+
     //one slot per sentence (out of 119k)
     // results[s] = list of up to K decodedPath structs for sentence sorted best-first
     std::vector<std::vector<DecodedPath>> results(lat.num_sentences());
@@ -80,6 +85,11 @@ std::vector<std::vector<DecodedPath>> TopKDecoder::decode(const Lattice& lat, in
 
             // check value of keep across all nodes.
             const int keep = std::min<int>(K, (int)buf.size());
+
+            // record keep distribution: full (==K) vs under-full (<K = divergence)
+            ++keep_stats_.total_nodes;
+            ++keep_stats_.hist[keep];
+            if (keep == K) ++keep_stats_.full; else ++keep_stats_.under;
 
             // sort the top K, using entryGreater operator defined above
             std::partial_sort(buf.begin(), buf.begin() + keep, buf.end(), EntryGreater{});
