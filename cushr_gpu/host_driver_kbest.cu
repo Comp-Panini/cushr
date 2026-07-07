@@ -179,7 +179,12 @@ int main(int argc, char** argv) {
         const int n_check = std::min(limit, S);
         int   score_mismatch = 0;    // sentences whose top-K score list differs
         int   count_mismatch = 0;    // sentences whose #paths differs
-        double total_us = 0.0;
+        double total_us = 0.0;        // wall time of the whole per-sentence level loop
+        double total_kernel_ms = 0.0; // GPU-only time inside the merge kernels
+
+        cudaEvent_t ev0, ev1;
+        CUDA_CHECK(cudaEventCreate(&ev0));
+        CUDA_CHECK(cudaEventCreate(&ev1));
 
         for (int s = 0; s < n_check; ++s) {
             const auto sv = lat.sentence(s);
@@ -209,9 +214,16 @@ int main(int argc, char** argv) {
                 if (lat.in_degree(nodes[0]) == 0) continue;   // source level: seeded already
                 CUDA_CHECK(cudaMemcpy(d_level_nodes, nodes.data(),
                                       sizeof(int)*nodes.size(), cudaMemcpyHostToDevice));
+                // GPU-only timing of just this merge launch.
+                CUDA_CHECK(cudaEventRecord(ev0, 0));
                 launch_kbest_merge(d, kb, d_level_nodes, (int)nodes.size(),
                                    /*threads_per_block=*/256, /*stream=*/0);
                 CUDA_CHECK(cudaGetLastError());
+                CUDA_CHECK(cudaEventRecord(ev1, 0));
+                CUDA_CHECK(cudaEventSynchronize(ev1));
+                float ms = 0.0f;
+                CUDA_CHECK(cudaEventElapsedTime(&ms, ev0, ev1));
+                total_kernel_ms += ms;
             }
             CUDA_CHECK(cudaDeviceSynchronize());
             auto t1 = std::chrono::high_resolution_clock::now();
@@ -256,11 +268,17 @@ int main(int argc, char** argv) {
             }
         }
 
+        CUDA_CHECK(cudaEventDestroy(ev0));
+        CUDA_CHECK(cudaEventDestroy(ev1));
+
         std::printf("=== K=%2d ===  checked %d sentences: %s"
-                    "  (score_mismatch=%d, count_mismatch=%d)  avg %.1f us/sent\n",
+                    "  (score_mismatch=%d, count_mismatch=%d)"
+                    "  loop %.1f us/sent  kernel %.1f us/sent\n",
                     K, n_check,
                     (score_mismatch == 0 ? "SCORE-EQUIVALENT to CPU" : "FAILED"),
-                    score_mismatch, count_mismatch, total_us / std::max(1, n_check));
+                    score_mismatch, count_mismatch,
+                    total_us / std::max(1, n_check),
+                    (total_kernel_ms * 1000.0) / std::max(1, n_check));
 
         cudaFree(kb.score); cudaFree(kb.pnode); cudaFree(kb.prank); cudaFree(kb.count);
     }
