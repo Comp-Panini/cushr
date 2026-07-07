@@ -25,7 +25,7 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
             const int slot_dist = i/32;
             for (int slot = 0; slot < slots_per_lane; slot++) {
                 const int my_idx = (slot*32) | lane;
-                const int partner_idx = idx ^ i;
+                const int partner_idx = my_idx ^ i;
                 if (partner_idx <= my_idx) {
                     continue;
                 }
@@ -87,13 +87,7 @@ __global__ void init_kbest(GpuLattice lat, GpuKBest kb) {
 
     if (v >= lat.num_nodes) return;
 
-    const bool is_source;
-    if(lat.in_row_ptr[v] == lat.in_row_ptr[v + 1]) {
-        is_source = true;
-    }
-    else {
-        is_source = false;
-    }
+    const bool is_source = (lat.in_row_ptr[v] == lat.in_row_ptr[v + 1]);
 
     if (is_source) {
         kb.score[v*kb.K + 0] = 0.0f;
