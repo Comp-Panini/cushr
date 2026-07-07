@@ -48,12 +48,12 @@ test: cushr_viterbi_tests
 # ---- Week-6 K-best (K2) --------------------------------------------------
 # K-best decode driver: runs the warp-level k-best merge over every sentence
 # and checks score-equivalence against the Week-3 CPU TopKDecoder.
-KBEST_SRC = kbest_merge.cu host_driver_kbest.cu
+KBEST_SRC = kbest_merge_warp.cu host_driver_kbest.cu
 cushr_kbest: $(KBEST_SRC) $(CPU_SRC)
 	$(NVCC) $(NVCCFLAGS) -o $@ $(KBEST_SRC) $(CPU_SRC) $(LDLIBS)
 
 # K-best unit tests (synthetic lattices, no CPU lib / npz needed).
-KBEST_TEST_SRC = kbest_merge.cu tests/test_kbest_merge.cu
+KBEST_TEST_SRC = kbest_merge_warp.cu tests/test_kbest_merge.cu
 cushr_kbest_tests: $(KBEST_TEST_SRC)
 	$(NVCC) $(NVCCFLAGS) -o $@ $(KBEST_TEST_SRC) $(LDLIBS)
 
