@@ -32,4 +32,9 @@ Measured over the 59092 sentences that carry a resolved gold path (~50% of the c
 
 ## Nsight Compute summary
 
-_Profiling CSVs (`ncu_kbest_K*.csv`) not found. Run `profile_kbest.slurm`, copy the CSVs next to this script, and re-run `make_benchmark_md.py`._ **TODO**
+| K | occupancy % | DRAM throughput % | top warp-stall reasons |
+|---|------------:|------------------:|------------------------|
+| 32 | 4.7 | 0.0 | wait (3.32); long_scoreboard (2.81) |
+| 64 | 4.5 | 0.0 | wait (3.31); long_scoreboard (1.26) |
+
+_Occupancy = `sm__warps_active` % of peak; DRAM % = `dram__throughput` % of peak sustained. Stall values are avg warps stalled per active cycle for that reason._

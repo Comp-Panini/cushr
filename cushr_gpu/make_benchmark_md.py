@@ -64,8 +64,11 @@ def load_bench(path):
 # ---- Nsight Compute CSV --------------------------------------------------
 # Metric-name substrings we care about (ncu names vary by version, so match loosely).
 OCC_KEYS  = ["sm__warps_active.avg.pct_of_peak_sustained_active", "Achieved Occupancy"]
-DRAM_KEYS = ["dram__throughput.avg.pct_of_peak_sustained_elapsed", "DRAM Throughput"]
-STALL_RE  = re.compile(r"warps_issue_stalled_|stall", re.IGNORECASE)
+DRAM_KEYS = ["gpu__dram_throughput.avg.pct_of_peak_sustained_elapsed",
+             "dram__throughput.avg.pct_of_peak_sustained_elapsed", "DRAM Throughput"]
+# Canonical Nsight "Warp State" stall metrics: avg warps stalled for each reason
+# per issue-active cycle. Prefer these over pcsamp sampling columns.
+STALL_RE  = re.compile(r"average_warps_issue_stalled_.+_per_issue_active", re.IGNORECASE)
 
 
 def _to_float(s):
@@ -76,25 +79,44 @@ def _to_float(s):
 
 
 def parse_ncu_csv(path):
-    """Best-effort: return {metric_name: mean_value} averaged over launches."""
+    """Best-effort: return {metric_name: mean_value} averaged over launches.
+
+    Handles both ncu CSV shapes:
+      * LONG  -- one row per (kernel, metric) with "Metric Name"/"Metric Value"
+                 columns (ncu --csv default / --page details).
+      * WIDE  -- one row per kernel launch, one column per metric (the metric
+                 name IS the column header). This is what `ncu --import
+                 report.ncu-rep --csv --page raw` produces. A units row (with a
+                 blank Kernel Name) and non-numeric attribute columns are simply
+                 skipped because their values don't parse as floats.
+    """
     acc = {}
     cnt = {}
     with open(path, newline="") as f:
         reader = csv.DictReader(f)
-        # ncu columns are typically: ..., "Kernel Name", "Metric Name",
-        # "Metric Unit", "Metric Value"
         fields = reader.fieldnames or []
         name_col = next((c for c in fields if c.strip().lower() == "metric name"), None)
         val_col  = next((c for c in fields if c.strip().lower() == "metric value"), None)
-        if not name_col or not val_col:
-            return {}
-        for row in reader:
-            m = (row.get(name_col) or "").strip()
-            v = _to_float(row.get(val_col))
-            if not m or v is None:
-                continue
-            acc[m] = acc.get(m, 0.0) + v
-            cnt[m] = cnt.get(m, 0) + 1
+        if name_col and val_col:
+            # LONG format.
+            for row in reader:
+                m = (row.get(name_col) or "").strip()
+                v = _to_float(row.get(val_col))
+                if not m or v is None:
+                    continue
+                acc[m] = acc.get(m, 0.0) + v
+                cnt[m] = cnt.get(m, 0) + 1
+        else:
+            # WIDE format: every column whose cells parse as numbers is a metric.
+            for row in reader:
+                for col, cell in row.items():
+                    if not col:
+                        continue
+                    v = _to_float(cell)
+                    if v is None:
+                        continue
+                    acc[col] = acc.get(col, 0.0) + v
+                    cnt[col] = cnt.get(col, 0) + 1
     return {m: acc[m] / cnt[m] for m in acc}
 
 
@@ -229,7 +251,10 @@ def build_md(rows, ncu, have_recall_png, have_thru_png):
             _, occ = pick(m, OCC_KEYS)
             _, dram = pick(m, DRAM_KEYS)
             stalls = top_stalls(m, 2)
-            stall_txt = "; ".join(f"{re.sub(r'.*stalled_', '', name)} ({val:.2f})"
+            def stall_name(n):
+                n = re.sub(r'.*stalled_', '', n)
+                return n.replace('_per_issue_active.ratio', '').replace('_per_issue_active', '')
+            stall_txt = "; ".join(f"{stall_name(name)} ({val:.2f})"
                                   for name, val in stalls) or "—"
             L.append(f"| {K} | {fmt(occ, '{:.1f}')} | {fmt(dram, '{:.1f}')} | {stall_txt} |")
         L.append("")
