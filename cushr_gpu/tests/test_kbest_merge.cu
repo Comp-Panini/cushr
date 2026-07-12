@@ -337,6 +337,80 @@ static void test_k64_diamond() {
     CHECK(g.count[sink]==K, "k64_diamond sink truncated to 64");
 }
 
+// ---- test 8: empty lattice (N=0, no nodes/edges). Must not crash; nothing to
+// compare. Exercises the run() degenerate-size guards. ----
+static void test_empty_lattice() {
+    std::printf("test_empty_lattice (N=0)\n");
+    std::vector<int> irp={0}, ici, iei; std::vector<float> es; std::vector<int> topo;
+    auto g = run(0,0,irp,ici,iei,es,topo,{},8);
+    CHECK(g.count.empty(), "empty lattice has no counts");
+}
+
+// ---- test 9: single node, no edges. The lone node is a source, so its beam is
+// exactly one path (score 0, parent -1). ----
+static void test_single_node() {
+    std::printf("test_single_node (N=1)\n");
+    std::vector<int> irp={0,0}, ici, iei; std::vector<float> es; std::vector<int> topo={0};
+    auto g = run(1,0,irp,ici,iei,es,topo,{{0}},8);
+    auto ref = cpu_reference(1,irp,ici,iei,es,{{0}},8);
+    compare_all("single_node", 1, 8, g, ref);
+    CHECK(g.count[0]==1, "single node is a source with 1 path");
+    CHECK(std::fabs(g.score[0]) < 1e-6f, "single node source score is 0");
+    CHECK(g.pnode[0]==-1, "single node source has no parent");
+}
+
+// ---- test 10: deep lattice — branching factor 20, 100 levels deep. Every node
+// in level L takes all 20 nodes of level L-1 (in-degree 20), so back-pointer
+// chains are 100 hops long and any per-level propagation bug compounds. Run at
+// K=16 and K=32 against the CPU reference. ----
+static void test_deep_stress() {
+    std::printf("test_deep_stress (branching 20, 100 levels; K=16, K=32)\n");
+    const int LEVELS = 100, W = 20;
+    const int N = LEVELS * W + 1;      // +1 sink
+    const int sink = N - 1;
+    const int E = (LEVELS - 1) * W * W + W;   // inter-level fans + sink's in-edges
+
+    std::vector<int> irp(N+1,0), deg(N,0);
+    for (int L = 1; L < LEVELS; ++L)          // levels 1..99: each node in-degree W
+        for (int j = 0; j < W; ++j) deg[L*W + j] = W;
+    deg[sink] = W;                            // sink takes all of the last level
+    for (int v = 0; v < N; ++v) irp[v+1] = irp[v] + deg[v];
+
+    std::vector<int> ici(E), iei(E); std::vector<float> es(E);
+    int w=0, eid=0;
+    for (int L = 1; L < LEVELS; ++L) {
+        for (int j = 0; j < W; ++j) {         // dst node L*W+j takes all of level L-1
+            for (int u = 0; u < W; ++u) {
+                ici[w] = (L-1)*W + u; iei[w] = eid;
+                // distinct-ish weights so the merge has real winners to order.
+                es[eid] = 0.5f + 0.001f*eid + 0.01f*u + 0.007f*j;
+                ++w; ++eid;
+            }
+        }
+    }
+    for (int u = 0; u < W; ++u) {             // sink takes all of level LEVELS-1
+        ici[w] = (LEVELS-1)*W + u; iei[w] = eid; es[eid] = 0.3f + 0.013f*u; ++w; ++eid;
+    }
+
+    std::vector<int> topo(N,0);
+    for (int L = 0; L < LEVELS; ++L)
+        for (int j = 0; j < W; ++j) topo[L*W + j] = L;
+    topo[sink] = LEVELS;
+
+    std::vector<std::vector<int>> levels(LEVELS + 1);
+    for (int L = 0; L < LEVELS; ++L)
+        for (int j = 0; j < W; ++j) levels[L].push_back(L*W + j);
+    levels[LEVELS].push_back(sink);
+
+    for (int K : {16, 32}) {
+        auto g = run(N,E,irp,ici,iei,es,topo,levels,K);
+        auto ref = cpu_reference(N,irp,ici,iei,es,levels,K);
+        compare_all(K==16?"deep_stress_k16":"deep_stress_k32", N, K, g, ref);
+        CHECK(g.count[sink]==K, K==16?"deep_stress_k16 sink saturated"
+                                     :"deep_stress_k32 sink saturated");
+    }
+}
+
 int main() {
     test_k1();
     test_single_edge();
@@ -345,6 +419,9 @@ int main() {
     test_stress();
     test_full_capacity();
     test_k64_diamond();
+    test_empty_lattice();
+    test_single_node();
+    test_deep_stress();
     if (g_failed == 0) { std::printf("\nALL K-BEST TESTS PASSED\n"); return 0; }
     std::printf("\n%d CHECK(S) FAILED\n", g_failed);
     return 1;

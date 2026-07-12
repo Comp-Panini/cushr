@@ -42,8 +42,10 @@ cushr_viterbi_k1: $(GPU_SRC) $(CPU_SRC)
 cushr_viterbi_tests: $(TEST_SRC)
 	$(NVCC) $(NVCCFLAGS) -o $@ $(TEST_SRC) $(LDLIBS)
 
-test: cushr_viterbi_tests
+# Run BOTH the K=1 (viterbi) and K-best unit suites.
+test: cushr_viterbi_tests cushr_kbest_tests
 	./cushr_viterbi_tests
+	./cushr_kbest_tests
 
 # ---- Week-6 K-best (K2) --------------------------------------------------
 # K-best decode driver: runs the warp-level k-best merge over every sentence
