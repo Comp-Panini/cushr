@@ -1,0 +1,281 @@
+#!/usr/bin/env python3
+"""make_benchmark_md.py -- turn the Week-7 benchmark CSVs into KBEST_BENCHMARK.md.
+
+Inputs (all optional except the timing CSV):
+  kbest_bench.csv        written by cushr_kbest --csv (one row per K)
+  ncu_kbest_K<K>.csv     Nsight Compute --csv exports (profile_kbest.slurm)
+
+Outputs (written next to this script):
+  KBEST_BENCHMARK.md     the CP-4 deliverable
+  recall_vs_k.png        top-K recall curve
+  throughput_vs_k.png    sentences/sec vs K
+
+Runs anywhere with Python + numpy + matplotlib -- no GPU needed. The ncu parsing
+is best-effort: if the profiling CSVs are absent or in an unexpected shape, the
+markdown is still generated from the timing CSV and the Nsight section is left
+as a TODO.
+
+Usage:
+  python make_benchmark_md.py                          # defaults, cwd = cushr_gpu/
+  python make_benchmark_md.py --bench kbest_bench.csv --outdir .
+"""
+import argparse
+import csv
+import glob
+import os
+import re
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+
+# ---- timing / recall CSV -------------------------------------------------
+def load_bench(path):
+    """Return list of per-K dicts, sorted by K. recall_at_K may be None (NA)."""
+    rows = []
+    with open(path, newline="") as f:
+        for r in csv.DictReader(f):
+            def num(key, cast=float):
+                v = r.get(key, "").strip()
+                if v == "" or v.upper() == "NA":
+                    return None
+                try:
+                    return cast(v)
+                except ValueError:
+                    return None
+            rows.append({
+                "K": int(r["K"]),
+                "n_sentences": num("n_sentences", int),
+                "n_gold": num("n_gold", int),
+                "recall": num("recall_at_K"),
+                "us_loop": num("us_per_sent_loop"),
+                "us_kernel": num("us_per_sent_kernel"),
+                "sent_per_sec": num("sent_per_sec_kernel"),
+                "table_MB": num("gpu_table_MB"),
+                "used_MB": num("gpu_used_MB"),
+                "score_mismatch": num("score_mismatch", int),
+                "count_mismatch": num("count_mismatch", int),
+            })
+    rows.sort(key=lambda d: d["K"])
+    return rows
+
+
+# ---- Nsight Compute CSV --------------------------------------------------
+# Metric-name substrings we care about (ncu names vary by version, so match loosely).
+OCC_KEYS  = ["sm__warps_active.avg.pct_of_peak_sustained_active", "Achieved Occupancy"]
+DRAM_KEYS = ["dram__throughput.avg.pct_of_peak_sustained_elapsed", "DRAM Throughput"]
+STALL_RE  = re.compile(r"warps_issue_stalled_|stall", re.IGNORECASE)
+
+
+def _to_float(s):
+    try:
+        return float(str(s).replace(",", "").strip())
+    except (ValueError, AttributeError):
+        return None
+
+
+def parse_ncu_csv(path):
+    """Best-effort: return {metric_name: mean_value} averaged over launches."""
+    acc = {}
+    cnt = {}
+    with open(path, newline="") as f:
+        reader = csv.DictReader(f)
+        # ncu columns are typically: ..., "Kernel Name", "Metric Name",
+        # "Metric Unit", "Metric Value"
+        fields = reader.fieldnames or []
+        name_col = next((c for c in fields if c.strip().lower() == "metric name"), None)
+        val_col  = next((c for c in fields if c.strip().lower() == "metric value"), None)
+        if not name_col or not val_col:
+            return {}
+        for row in reader:
+            m = (row.get(name_col) or "").strip()
+            v = _to_float(row.get(val_col))
+            if not m or v is None:
+                continue
+            acc[m] = acc.get(m, 0.0) + v
+            cnt[m] = cnt.get(m, 0) + 1
+    return {m: acc[m] / cnt[m] for m in acc}
+
+
+def pick(metrics, keys):
+    for k in keys:
+        for m in metrics:
+            if k.lower() in m.lower():
+                return m, metrics[m]
+    return None, None
+
+
+def top_stalls(metrics, n=2):
+    stalls = [(m, v) for m, v in metrics.items() if STALL_RE.search(m)]
+    stalls.sort(key=lambda kv: kv[1], reverse=True)
+    return stalls[:n]
+
+
+def load_ncu(outdir):
+    """Return {K: {metric: value}} for every ncu_kbest_K*.csv found."""
+    out = {}
+    for path in glob.glob(os.path.join(outdir, "ncu_kbest_K*.csv")):
+        m = re.search(r"ncu_kbest_K(\d+)\.csv$", os.path.basename(path))
+        if not m:
+            continue
+        parsed = parse_ncu_csv(path)
+        if parsed:
+            out[int(m.group(1))] = parsed
+    return out
+
+
+# ---- plots ---------------------------------------------------------------
+def plot_recall(rows, path):
+    xs = [r["K"] for r in rows if r["recall"] is not None]
+    ys = [r["recall"] for r in rows if r["recall"] is not None]
+    if not xs:
+        return False
+    plt.figure(figsize=(5, 3.2))
+    plt.plot(xs, ys, "o-", color="#2b6cb0")
+    plt.xlabel("K (beam width)")
+    plt.ylabel("Top-K recall vs gold")
+    plt.title("Top-K recall vs K")
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(path, dpi=140)
+    plt.close()
+    return True
+
+
+def plot_throughput(rows, path):
+    xs = [r["K"] for r in rows if r["sent_per_sec"] is not None]
+    ys = [r["sent_per_sec"] for r in rows if r["sent_per_sec"] is not None]
+    if not xs:
+        return False
+    plt.figure(figsize=(5, 3.2))
+    plt.plot(xs, ys, "s-", color="#c05621")
+    plt.xlabel("K (beam width)")
+    plt.ylabel("Sentences / sec (kernel-only)")
+    plt.title("Throughput vs K")
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(path, dpi=140)
+    plt.close()
+    return True
+
+
+# ---- markdown ------------------------------------------------------------
+def fmt(v, spec="{:.3f}", na="—"):
+    return na if v is None else spec.format(v)
+
+
+def build_md(rows, ncu, have_recall_png, have_thru_png):
+    L = []
+    L.append("# cuSHR K-best (K2) Benchmark — Week 7 (CP-4)\n")
+    L.append("Warp-level k-best merge kernel (`kbest_merge_level`) benchmarked over "
+             "the SIGHUM dataset. Kernel-only timing uses CUDA events around each "
+             "per-level merge launch (no H2D / reconstruction overhead). Correctness "
+             "is checked against the Week-3 CPU `TopKDecoder` at the same K.\n")
+
+    # correctness line
+    total_mm = sum((r["score_mismatch"] or 0) for r in rows)
+    n_sent = next((r["n_sentences"] for r in rows if r["n_sentences"]), None)
+    status = "SCORE-EQUIVALENT to CPU at every K" if total_mm == 0 else \
+             f"**{total_mm} score mismatches** — investigate before CP-4 sign-off"
+    L.append(f"**Correctness:** {status} "
+             f"(checked {n_sent if n_sent else '?'} sentences per K).\n")
+
+    # throughput + memory table
+    L.append("## Throughput and memory vs K\n")
+    L.append("| K | sent/sec (kernel) | µs/sent (kernel) | µs/sent (loop) | "
+             "table MB | used MB |")
+    L.append("|---|------------------:|-----------------:|---------------:|"
+             "---------:|--------:|")
+    for r in rows:
+        L.append("| {K} | {sps} | {usk} | {usl} | {tmb} | {umb} |".format(
+            K=r["K"],
+            sps=fmt(r["sent_per_sec"], "{:.0f}"),
+            usk=fmt(r["us_kernel"], "{:.1f}"),
+            usl=fmt(r["us_loop"], "{:.1f}"),
+            tmb=fmt(r["table_MB"], "{:.1f}"),
+            umb=fmt(r["used_MB"], "{:.1f}"),
+        ))
+    L.append("")
+
+    # recall table
+    L.append("## Top-K recall vs gold\n")
+    if any(r["recall"] is not None for r in rows):
+        n_gold = next((r["n_gold"] for r in rows if r["n_gold"]), None)
+        L.append(f"Measured over the {n_gold if n_gold else '?'} sentences that carry a "
+                 "resolved gold path (~50% of the corpus).\n")
+        L.append("| K | recall@K |")
+        L.append("|---|---------:|")
+        for r in rows:
+            L.append(f"| {r['K']} | {fmt(r['recall'], '{:.4f}')} |")
+    else:
+        L.append("_No gold paths were available in the npz, so recall is N/A. "
+                 "Re-run once gold paths are populated._")
+    L.append("")
+
+    # plots
+    if have_recall_png:
+        L.append("![Top-K recall vs K](recall_vs_k.png)\n")
+    if have_thru_png:
+        L.append("![Throughput vs K](throughput_vs_k.png)\n")
+
+    # nsight
+    L.append("## Nsight Compute summary\n")
+    if ncu:
+        L.append("| K | occupancy % | DRAM throughput % | top warp-stall reasons |")
+        L.append("|---|------------:|------------------:|------------------------|")
+        for K in sorted(ncu):
+            m = ncu[K]
+            _, occ = pick(m, OCC_KEYS)
+            _, dram = pick(m, DRAM_KEYS)
+            stalls = top_stalls(m, 2)
+            stall_txt = "; ".join(f"{re.sub(r'.*stalled_', '', name)} ({val:.2f})"
+                                  for name, val in stalls) or "—"
+            L.append(f"| {K} | {fmt(occ, '{:.1f}')} | {fmt(dram, '{:.1f}')} | {stall_txt} |")
+        L.append("")
+        L.append("_Occupancy = `sm__warps_active` % of peak; DRAM % = "
+                 "`dram__throughput` % of peak sustained. Stall values are avg "
+                 "warps stalled per active cycle for that reason._")
+    else:
+        L.append("_Profiling CSVs (`ncu_kbest_K*.csv`) not found. Run "
+                 "`profile_kbest.slurm`, copy the CSVs next to this script, and "
+                 "re-run `make_benchmark_md.py`._ **TODO**")
+    L.append("")
+    return "\n".join(L)
+
+
+def main():
+    here = os.path.dirname(os.path.abspath(__file__))
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--bench", default=os.path.join(here, "kbest_bench.csv"))
+    ap.add_argument("--outdir", default=here)
+    args = ap.parse_args()
+
+    if not os.path.exists(args.bench):
+        raise SystemExit(f"bench CSV not found: {args.bench}\n"
+                         "Run bench_kbest.slurm first (writes kbest_bench.csv).")
+
+    rows = load_bench(args.bench)
+    ncu = load_ncu(args.outdir)
+
+    recall_png = os.path.join(args.outdir, "recall_vs_k.png")
+    thru_png = os.path.join(args.outdir, "throughput_vs_k.png")
+    have_recall = plot_recall(rows, recall_png)
+    have_thru = plot_throughput(rows, thru_png)
+
+    md = build_md(rows, ncu, have_recall, have_thru)
+    md_path = os.path.join(args.outdir, "KBEST_BENCHMARK.md")
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write(md)
+
+    print(f"wrote {md_path}")
+    if have_recall:
+        print(f"wrote {recall_png}")
+    if have_thru:
+        print(f"wrote {thru_png}")
+    if not ncu:
+        print("note: no ncu_kbest_K*.csv found; Nsight section left as TODO")
+
+
+if __name__ == "__main__":
+    main()

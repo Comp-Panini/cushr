@@ -7,6 +7,7 @@
 namespace cushr {
 
 // comparator
+// return true if candidate A higher than candidate B
 __device__ bool better(float sa, int na, int ra, float sb, int nb, int rb) {
     if (sa != sb) return sa > sb; // first, higher score wins
     if (na != nb) return na < nb; // next, smaller parent_node wins
@@ -16,25 +17,38 @@ __device__ bool better(float sa, int na, int ra, float sb, int nb, int rb) {
 // given 2 bitonic arrays with K candidates each, sort it fully ascending.
 // max is a power of 2 and a multiple of 32 in order for algo to work properly
 template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr, int lane) {
-    const int total_combined_elements = 2*max;
-    const int slots_per_lane = total_combined_elements/32;
-    const unsigned mask = 0xffffffffu;
+    const int total_combined_elements = 2*max; // running top-K half and new half
 
-    // Bitonic MERGE of a length-n (=total_combined_elements) bitonic sequence:
-    // compare-exchange distances run n/2, n/4, ..., 1.
+    // each lane holds 2*max/32 elements in its regs which are s,pn,and pr
+    // global index g = slot*32 + lane
+    // ex: for 64, lane0 holds slot 0, slot 32, slot 64, slot 128
+    const int slots_per_lane = total_combined_elements/32; 
+    const unsigned mask = 0xffffffffu; // mask for participating lanes
+
+    // bitonic merge of a length-n (=total_combined_elements) bitonic sequence:
     for (int i = total_combined_elements/2; i > 0; i /= 2) {
+
+        // case: person im comparing with is in this lane, we are at the K=32,K=64 stage
         if (i >= 32) {
-            const int slot_dist = i/32;
+            const int slot_dist = i/32; 
+
+            // for every element in this lane (0,32,64th global idx)
             for (int slot = 0; slot < slots_per_lane; slot++) {
-                const int my_idx = (slot*32) | lane;
-                const int partner_idx = my_idx ^ i;
+                const int my_idx = (slot*32) + lane; // global idx or my_idx
+                const int partner_idx = my_idx ^ i; // find partner idx using XOR
+
+                // if you are the higher idx partner, skip
                 if (partner_idx <= my_idx) {
                     continue;
                 }
 
+                // partner's slot is slot ^ slot_dist since it's in our own register array
                 const int partner_slot = slot ^ slot_dist;
 
+                // find the higher ranked element, me vs partner
                 const bool b_better = better(s[partner_slot], pn[partner_slot], pr[partner_slot], s[slot], pn[slot], pr[slot]);
+                
+                // if partner higher, swap
                 if (b_better) {
                     // swap them
                     float temp_score = s[slot]; 
@@ -49,12 +63,19 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
                 }
             }
         }
+        
+        // case: k < 32, we are doing a smaller comparison across lanes
+        else { 
 
-        else { // exchange cross lane, partner is lane^j, same slot
+            // iterate through each slot in your lane
             for (int slot = 0; slot < slots_per_lane; slot++) {
+
+                // same as above, assigning my global idx and partner global idx.
                 const int my_idx = slot*32 | lane;
                 const int partner_idx = my_idx ^ i;
 
+                // __shfl_xor_sync (mask,val,i) returns value of val held by lane 'lane XOR i'
+                // each lane simultaneously recieves partner candidate
                 const float parent_score = __shfl_xor_sync(mask, s[slot], i);
                 const float parent_node_2 = __shfl_xor_sync(mask, pn[slot], i);
                 const float parent_rank_2 = __shfl_xor_sync(mask, pr[slot], i);
@@ -62,13 +83,20 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
                 const bool idx_is_low = (my_idx < partner_idx);
 
                 bool take_partner;
+
+                // if you are the lower indexed lane "is partner higher than me?"
                 if (idx_is_low) {
+                    // TRUE of my value is lower than partner
                     take_partner = better(parent_score, parent_node_2, parent_rank_2, s[slot], pn[slot], pr[slot]);
                 }
+
+                // if you are higher indexed, "am i higher than partner?"
                 else {
+                    // take partner true IF my value is bigger than what it should be
                     take_partner = better(s[slot], pn[slot], pr[slot], parent_score, parent_node_2, parent_rank_2);
                 }
 
+                // if take_partner is true then the values are incorrectly ordered, so you swap
                 if (take_partner) {
                     s[slot] = parent_score;
                     pn[slot] = parent_node_2;

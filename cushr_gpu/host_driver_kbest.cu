@@ -47,6 +47,38 @@ using namespace cushr;
         }                                                                      \
     } while (0)
 
+// Reconstruct one GPU top-K path by walking the (pnode, prank) back-pointer
+// chain from the sink, mirroring TopKDecoder::reconstruct in decoder.cpp. The
+// per-node table slices (h_pnode/h_prank/h_count) must already hold this
+// sentence's data. Returns node ids in source->sink order, INCLUDING the
+// boundary super-source/super-sink (caller strips them to match Lattice::gold_path).
+static std::vector<int> reconstruct_gpu_path(
+        const std::vector<int>& h_pnode,
+        const std::vector<int>& h_prank,
+        const std::vector<int>& h_count,
+        int K, int sink_node, int rank) {
+    std::vector<int> rev;
+    int v = sink_node;
+    int r = rank;
+    while (v >= 0) {
+        rev.push_back(v);
+        if (r < 0 || r >= h_count[v]) break;   // invalid rank -> reached a source
+        const int pn = h_pnode[(size_t)v * K + r];
+        const int pr = h_prank[(size_t)v * K + r];
+        v = pn;
+        r = pr;
+    }
+    std::reverse(rev.begin(), rev.end());
+    return rev;
+}
+
+// Strip the boundary super-source (front) and super-sink (back) so the sequence
+// lines up with Lattice::gold_path, which excludes both boundary nodes.
+static std::vector<int> strip_boundaries(const std::vector<int>& path) {
+    if (path.size() <= 2) return {};
+    return std::vector<int>(path.begin() + 1, path.end() - 1);
+}
+
 // Same scorer factory as host_driver.cu so GPU edge scores == CPU edge scores.
 static std::unique_ptr<EdgeScorer> make_scorer(const std::string& name,
                                                const Lattice& lat,
@@ -67,8 +99,8 @@ int main(int argc, char** argv) {
     if (argc < 2) {
         std::fprintf(stderr,
             "usage: %s <lattice.npz> [--scorer uniform|length|log_linear]\n"
-            "          [--weights w0,w1,...] [--bias b] [--K 1,8,16,32,64]\n"
-            "          [--limit N]\n", argv[0]);
+            "          [--weights w0,w1,...] [--bias b] [--K 1,5,16,32,64]\n"
+            "          [--limit N | -1 for all] [--csv out.csv]\n", argv[0]);
         return 1;
     }
 
@@ -78,13 +110,15 @@ int main(int argc, char** argv) {
     std::vector<float> weights;
     float bias = 0.0f;
     int   limit = 1000;
-    std::vector<int> Ks = {1, 8, 16, 32};   // default beam widths to check
+    std::string csv_path;                   // when set, append one row per K
+    std::vector<int> Ks = {1, 5, 16, 32, 64};   // default beam widths to check
 
     for (int i = 2; i < argc; ++i) {
         std::string a = argv[i];
         if      (a == "--scorer" && i + 1 < argc) scorer_name = argv[++i];
         else if (a == "--bias"   && i + 1 < argc) bias = std::atof(argv[++i]);
         else if (a == "--limit"  && i + 1 < argc) limit = std::atoi(argv[++i]);
+        else if (a == "--csv"    && i + 1 < argc) csv_path = argv[++i];
         else if (a == "--weights" && i + 1 < argc) {
             char* s = argv[++i];
             for (char* tok = std::strtok(s, ","); tok; tok = std::strtok(nullptr, ","))
@@ -107,6 +141,9 @@ int main(int argc, char** argv) {
 
     auto scorer = make_scorer(scorer_name, lat, weights, bias);
     std::printf("  scorer=%s\n", scorer->name().c_str());
+    if (!lat.has_explicit_gold())
+        std::fprintf(stderr, "  WARNING: npz has no explicit gold paths; "
+                             "recall@K will be reported as NA.\n");
 
     std::vector<float> h_edge_score(E);
     for (int e = 0; e < E; ++e) h_edge_score[e] = scorer->score(lat, e);
@@ -149,13 +186,27 @@ int main(int argc, char** argv) {
 
     int* d_level_nodes = nullptr; int level_cap = 0;
 
+    // Open the CSV once (truncate) and write the header, if requested.
+    FILE* csv = nullptr;
+    if (!csv_path.empty()) {
+        csv = std::fopen(csv_path.c_str(), "w");
+        if (!csv) { std::fprintf(stderr, "cannot open --csv %s\n", csv_path.c_str()); return 1; }
+        std::fprintf(csv,
+            "K,n_sentences,n_gold,recall_at_K,us_per_sent_loop,us_per_sent_kernel,"
+            "sent_per_sec_kernel,gpu_table_MB,gpu_used_MB,score_mismatch,count_mismatch\n");
+    }
+
     // ---- run each K, comparing to the CPU reference at that same K ----------
     for (int K : Ks) {
         // CPU oracle for this K.
         TopKDecoder cpu;
         auto cpu_results = cpu.decode(lat, K, *scorer);
 
-        // Allocate the GPU top-K table for this K.
+        // Allocate the GPU top-K table for this K. Measure device memory used by
+        // the table via cudaMemGetInfo before/after the four allocations.
+        size_t mem_free_before = 0, mem_total = 0;
+        CUDA_CHECK(cudaMemGetInfo(&mem_free_before, &mem_total));
+
         GpuKBest kb{};
         kb.K = K;
         kb.cap = (K <= 32) ? 32 : 64;
@@ -163,6 +214,16 @@ int main(int argc, char** argv) {
         CUDA_CHECK(cudaMalloc(&kb.pnode, sizeof(int)  *(size_t)N*K));
         CUDA_CHECK(cudaMalloc(&kb.prank, sizeof(int)  *(size_t)N*K));
         CUDA_CHECK(cudaMalloc(&kb.count, sizeof(int)  *(size_t)N));
+
+        size_t mem_free_after = 0;
+        CUDA_CHECK(cudaMemGetInfo(&mem_free_after, &mem_total));
+        // Analytic table size (score+pnode+prank are N*K*4 each, count is N*4).
+        const double table_MB = ((double)(size_t)N * K * (4 + 4 + 4)
+                                 + (double)(size_t)N * 4) / (1024.0 * 1024.0);
+        // Actual driver-reported delta (rounds up to allocation granularity).
+        const double used_MB = (mem_free_before >= mem_free_after)
+                             ? (double)(mem_free_before - mem_free_after) / (1024.0 * 1024.0)
+                             : 0.0;
 
         // seed sources.
         {
@@ -176,9 +237,11 @@ int main(int argc, char** argv) {
         std::vector<float> h_score((size_t)N*K);
         std::vector<int>   h_pnode((size_t)N*K), h_prank((size_t)N*K), h_count(N);
 
-        const int n_check = std::min(limit, S);
+        const int n_check = (limit < 0) ? S : std::min(limit, S);
         int   score_mismatch = 0;    // sentences whose top-K score list differs
         int   count_mismatch = 0;    // sentences whose #paths differs
+        long  gold_total = 0;        // sentences with a resolved gold path
+        long  gold_hits  = 0;        // ...where gold appears in the GPU top-K
         double total_us = 0.0;        // wall time of the whole per-sentence level loop
         double total_kernel_ms = 0.0; // GPU-only time inside the merge kernels
 
@@ -266,22 +329,59 @@ int main(int argc, char** argv) {
                                 cpu_scores.empty() ? 0.0f : cpu_scores[0]);
                 ++score_mismatch;
             }
+
+            // ---- top-K recall vs gold (only sentences with a resolved gold) ----
+            if (lat.has_explicit_gold()) {
+                std::vector<int> gold = lat.gold_path(s);
+                if (!gold.empty()) {
+                    ++gold_total;
+                    bool hit = false;
+                    for (int r = 0; r < gpu_cnt && !hit; ++r) {
+                        std::vector<int> pred = strip_boundaries(
+                            reconstruct_gpu_path(h_pnode, h_prank, h_count, K, sink, r));
+                        if (pred == gold) hit = true;
+                    }
+                    if (hit) ++gold_hits;
+                }
+            }
         }
 
         CUDA_CHECK(cudaEventDestroy(ev0));
         CUDA_CHECK(cudaEventDestroy(ev1));
 
+        const double us_loop   = total_us / std::max(1, n_check);
+        const double us_kernel = (total_kernel_ms * 1000.0) / std::max(1, n_check);
+        const double sent_per_sec = us_kernel > 0.0 ? 1e6 / us_kernel : 0.0;
+        const double recall = gold_total > 0 ? (double)gold_hits / (double)gold_total : -1.0;
+
         std::printf("=== K=%2d ===  checked %d sentences: %s"
                     "  (score_mismatch=%d, count_mismatch=%d)"
-                    "  loop %.1f us/sent  kernel %.1f us/sent\n",
+                    "  loop %.1f us/sent  kernel %.1f us/sent"
+                    "  recall@K=%s (%ld/%ld)  table=%.1f MB used=%.1f MB\n",
                     K, n_check,
                     (score_mismatch == 0 ? "SCORE-EQUIVALENT to CPU" : "FAILED"),
-                    score_mismatch, count_mismatch,
-                    total_us / std::max(1, n_check),
-                    (total_kernel_ms * 1000.0) / std::max(1, n_check));
+                    score_mismatch, count_mismatch, us_loop, us_kernel,
+                    (gold_total > 0 ? "" : "NA"), gold_hits, gold_total,
+                    table_MB, used_MB);
+        if (gold_total > 0)
+            std::printf("             recall@%d = %.4f\n", K, recall);
+
+        if (csv) {
+            if (gold_total > 0)
+                std::fprintf(csv, "%d,%d,%ld,%.6f,%.3f,%.3f,%.1f,%.3f,%.3f,%d,%d\n",
+                             K, n_check, gold_total, recall, us_loop, us_kernel,
+                             sent_per_sec, table_MB, used_MB, score_mismatch, count_mismatch);
+            else
+                std::fprintf(csv, "%d,%d,%ld,NA,%.3f,%.3f,%.1f,%.3f,%.3f,%d,%d\n",
+                             K, n_check, gold_total, us_loop, us_kernel,
+                             sent_per_sec, table_MB, used_MB, score_mismatch, count_mismatch);
+            std::fflush(csv);
+        }
 
         cudaFree(kb.score); cudaFree(kb.pnode); cudaFree(kb.prank); cudaFree(kb.count);
     }
+
+    if (csv) std::fclose(csv);
 
     if (d_level_nodes) cudaFree(d_level_nodes);
     cudaFree(d_irp); cudaFree(d_ici); cudaFree(d_iei); cudaFree(d_es); cudaFree(d_topo);

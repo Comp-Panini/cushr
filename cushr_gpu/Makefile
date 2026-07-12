@@ -30,7 +30,7 @@ GPU_SRC  = viterbi_k1.cu host_driver.cu
 # Device + test sources for the unit-test binary.
 TEST_SRC = viterbi_k1.cu tests/test_viterbi_k1.cu
 
-.PHONY: all test test-kbest clean
+.PHONY: all test test-kbest bench clean
 
 all: cushr_viterbi_k1
 
@@ -59,6 +59,18 @@ cushr_kbest_tests: $(KBEST_TEST_SRC)
 
 test-kbest: cushr_kbest_tests
 	./cushr_kbest_tests
+
+# ---- Week-7 benchmarking (CP-4) ------------------------------------------
+# The actual runs happen on the cluster via slurm (nvcc/ncu are not local):
+#   sbatch bench_kbest.slurm      # full-dataset timing+recall -> kbest_bench.csv
+#   sbatch profile_kbest.slurm    # Nsight Compute            -> ncu_kbest_K*.csv
+# Then, anywhere with Python:
+#   python make_benchmark_md.py   # -> KBEST_BENCHMARK.md + plots
+bench: cushr_kbest
+	@echo "Built cushr_kbest. Now submit the benchmark jobs:"
+	@echo "  sbatch bench_kbest.slurm"
+	@echo "  sbatch profile_kbest.slurm"
+	@echo "then: python make_benchmark_md.py"
 
 clean:
 	rm -f cushr_viterbi_k1 cushr_viterbi_tests cushr_kbest cushr_kbest_tests
