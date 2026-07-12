@@ -3,3 +3,17 @@ rm -f cushr_viterbi_k1 cushr_viterbi_tests cushr_kbest cushr_kbest_tests
 nvcc -std=c++17 -O2 -arch=sm_80 -I. -I../cushr_cpu/include -I../cushr_cpu/vendor -o cushr_kbest kbest_merge_warp.cu host_driver_kbest.cu ../cushr_cpu/src/lattice.cpp ../cushr_cpu/src/scorer.cpp ../cushr_cpu/src/decoder.cpp ../cushr_cpu/src/metrics.cpp ../cushr_cpu/vendor/cnpy.cpp -lz   
 
 ==== ncu profile K=32 ====
+loading /scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz ...
+  nodes=4488155 edges=61140552 sentences=119503 feat_dim=43
+  scorer=log_linear
+=== K=32 ===  checked 200 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 3421765.3 us/sent  kernel 3421547.2 us/sent  recall@K= (4/76)  table=1660.7 MB used=1662.0 MB
+             recall@32 = 0.0526
+
+==== ncu profile K=64 ====
+loading /scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz ...
+  nodes=4488155 edges=61140552 sentences=119503 feat_dim=43
+  scorer=log_linear
+=== K=64 ===  checked 200 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 3477132.1 us/sent  kernel 3476909.9 us/sent  recall@K= (6/76)  table=3304.3 MB used=3306.0 MB
+             recall@64 = 0.0789
+
+==== done ====
