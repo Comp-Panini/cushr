@@ -411,6 +411,170 @@ static void test_deep_stress() {
     }
 }
 
+// ---- test 11: NEGATIVE edge weights (log-probs). Every edge score is < 0, so
+// "best" = least-negative and the -inf padding must still sort to the tail. The
+// real LogLinearScorer emits negative scores, so this is the production regime.
+// Same diamond shape as test 3, run at K=8 and K=32. ----
+static void test_negative_weights() {
+    std::printf("test_negative_weights (K=8, K=32)\n");
+    const int N=7, E=4+4+2;
+    std::vector<int> irp(N+1,0);
+    int deg[7]={0,0,0,0,4,4,2};
+    for (int v=0;v<N;++v) irp[v+1]=irp[v]+deg[v];
+    std::vector<int> ici(E), iei(E); std::vector<float> es(E);
+    int w=0, eid=0;
+    for (int u=0;u<4;++u){ici[w]=u;iei[w]=eid;es[eid]=-(1.0f+0.1f*u); ++w;++eid;} // ->4
+    for (int u=0;u<4;++u){ici[w]=u;iei[w]=eid;es[eid]=-(2.0f+0.1f*u); ++w;++eid;} // ->5
+    ici[w]=4;iei[w]=eid;es[eid]=-0.5f;++w;++eid;   // 4->6
+    ici[w]=5;iei[w]=eid;es[eid]=-0.7f;++w;++eid;   // 5->6
+    std::vector<int> topo={0,0,0,0,1,1,2};
+    std::vector<std::vector<int>> levels={{0,1,2,3},{4,5},{6}};
+    for (int K : {8, 32}) {
+        auto g = run(N,E,irp,ici,iei,es,topo,levels,K);
+        auto ref = cpu_reference(N,irp,ici,iei,es,levels,K);
+        compare_all(K==8?"neg_k8":"neg_k32", N, K, g, ref);
+    }
+}
+
+// ---- test 12: tie-break AT THE TRUNCATION BOUNDARY. A sink has P parents that
+// ALL yield the identical score, and K < P, so the beam cut falls in the middle
+// of a fully-tied group. The strict total order (score desc, then parent_node
+// asc, then parent_rank asc) must keep exactly the K smallest parent ids and
+// DROP the rest -- deterministically, matching the CPU. compare_all skips
+// (pnode,prank) when scores tie, so this test asserts the kept parents directly. --
+static void test_tie_break_boundary() {
+    std::printf("test_tie_break_boundary (K cuts a fully-tied group)\n");
+    const int P=10, sink=P, N=P+1, E=P, K=4;
+    std::vector<int> irp(N+1,0); irp[sink+1]=P;
+    std::vector<int> ici(E), iei(E); std::vector<float> es(E);
+    for (int i=0;i<P;++i){ici[i]=i;iei[i]=i;es[i]=5.0f;}   // every parent ties at 5.0
+    std::vector<int> topo(N,0); topo[sink]=1;
+    std::vector<int> pl; for(int i=0;i<P;++i) pl.push_back(i);
+    auto g = run(N,E,irp,ici,iei,es,topo,{pl,{sink}},K);
+    auto ref = cpu_reference(N,irp,ici,iei,es,{pl,{sink}},K);
+    compare_all("tie_boundary", N, K, g, ref);
+    CHECK(g.count[sink]==K, "tie boundary: sink saturated at K");
+    // the K survivors must be exactly the K smallest parent ids, in order.
+    for (int i=0;i<K;++i) {
+        CHECK(std::fabs(g.score[(size_t)sink*K+i]-5.0f) < 1e-5f, "tie boundary: score 5");
+        CHECK(g.pnode[(size_t)sink*K+i]==i, "tie boundary: keeps smallest parent ids in order");
+    }
+}
+
+// ---- test 13: NON-power-of-two K. K in {5, 24, 48} exercises the "emit only the
+// first K" masking for K that is neither a power of two nor the template cap
+// (5,24 -> cap 32; 48 -> cap 64). K=5 is used by the actual benchmark. Sources
+// feed 3 hubs with full beams so the sink truncates 3*K genuine candidates. ----
+static void test_odd_k() {
+    std::printf("test_odd_k (K=5, K=24, K=48)\n");
+    const int SRC=64, HUB=3;
+    const int N = SRC + HUB + 1;
+    const int sink = N - 1;
+    const int E = SRC*HUB + HUB;
+    std::vector<int> irp(N+1,0), deg(N,0);
+    for (int h=0;h<HUB;++h) deg[SRC+h]=SRC;
+    deg[sink]=HUB;
+    for (int v=0;v<N;++v) irp[v+1]=irp[v]+deg[v];
+    std::vector<int> ici(E), iei(E); std::vector<float> es(E);
+    int w=0, eid=0;
+    for (int h=0;h<HUB;++h)
+        for (int u=0;u<SRC;++u){ici[w]=u;iei[w]=eid;es[eid]=1.0f+0.013f*u+0.7f*h;++w;++eid;}
+    for (int h=0;h<HUB;++h){ici[w]=SRC+h;iei[w]=eid;es[eid]=0.31f+0.017f*h;++w;++eid;}
+    std::vector<int> topo(N,0);
+    for (int h=0;h<HUB;++h) topo[SRC+h]=1;
+    topo[sink]=2;
+    std::vector<int> l0; for(int i=0;i<SRC;++i) l0.push_back(i);
+    std::vector<int> l1; for(int h=0;h<HUB;++h) l1.push_back(SRC+h);
+    std::vector<std::vector<int>> levels={l0,l1,{sink}};
+    for (int K : {5, 24, 48}) {
+        auto g = run(N,E,irp,ici,iei,es,topo,levels,K);
+        auto ref = cpu_reference(N,irp,ici,iei,es,levels,K);
+        const char* nm = K==5?"odd_k5":K==24?"odd_k24":"odd_k48";
+        compare_all(nm, N, K, g, ref);
+        CHECK(g.count[sink]==K, "odd_k: sink saturated at K");
+    }
+}
+
+// ---- test 14: pure PROPAGATION chain, in-degree 1 for 50 levels. No merging
+// ever happens; the single beam of size 1 must propagate untouched and the final
+// score must equal the exact sum of edge weights. Isolates the "carry one path
+// forward" path from any truncation logic. ----
+static void test_chain_propagation() {
+    std::printf("test_chain_propagation (in-degree 1, 50 levels)\n");
+    const int L=50, N=L+1, E=L, K=8;
+    std::vector<int> irp(N+1,0), deg(N,0);
+    for (int v=1;v<N;++v) deg[v]=1;              // node v takes only node v-1
+    for (int v=0;v<N;++v) irp[v+1]=irp[v]+deg[v];
+    std::vector<int> ici(E), iei(E); std::vector<float> es(E);
+    double expect=0.0;
+    for (int e=0;e<E;++e){ici[e]=e;iei[e]=e;es[e]=0.1f+0.03f*e; expect+=es[e];}
+    std::vector<int> topo(N,0); for (int v=0;v<N;++v) topo[v]=v;
+    std::vector<std::vector<int>> levels(N);
+    for (int v=0;v<N;++v) levels[v].push_back(v);
+    auto g = run(N,E,irp,ici,iei,es,topo,levels,K);
+    auto ref = cpu_reference(N,irp,ici,iei,es,levels,K);
+    compare_all("chain", N, K, g, ref);
+    CHECK(g.count[L]==1, "chain: sink has exactly one path");
+    CHECK(std::fabs(g.score[(size_t)L*K+0]-(float)expect) < 1e-3f*(1.0f+std::fabs((float)expect)),
+          "chain: sink score == sum of edge weights");
+}
+
+// ---- test 15: INTERLEAVED node ids (id order != topo order). Sink is node 0,
+// hub is node 1, sources are nodes 2,3,4 -- so global node ids run OPPOSITE to
+// topological order. Confirms every kernel index (kb table, reverse-CSR, count)
+// is keyed by global node id, not by any implicit id==level assumption. ----
+static void test_interleaved_levels() {
+    std::printf("test_interleaved_levels (node id order reversed vs topo)\n");
+    const int N=5, K=8;                  // 0=sink, 1=hub, 2,3,4=sources
+    const int E=3+1;                     // hub<-3 sources, sink<-hub
+    std::vector<int> deg(N,0); deg[1]=3; deg[0]=1;
+    std::vector<int> irp(N+1,0);
+    for (int v=0;v<N;++v) irp[v+1]=irp[v]+deg[v];
+    std::vector<int> ici(E), iei(E); std::vector<float> es(E);
+    int w=0, eid=0;
+    // node 0 (sink) <- node 1 (hub)
+    ici[w]=1; iei[w]=eid; es[eid]=0.4f; ++w; ++eid;
+    // node 1 (hub) <- sources 2,3,4
+    for (int u=2;u<=4;++u){ici[w]=u; iei[w]=eid; es[eid]=1.0f+0.2f*(u-2); ++w; ++eid;}
+    std::vector<int> topo(N,0); topo[2]=topo[3]=topo[4]=0; topo[1]=1; topo[0]=2;
+    std::vector<std::vector<int>> levels={{2,3,4},{1},{0}};
+    auto g = run(N,E,irp,ici,iei,es,topo,levels,K);
+    auto ref = cpu_reference(N,irp,ici,iei,es,levels,K);
+    compare_all("interleaved", N, K, g, ref);
+    CHECK(g.count[0]==3, "interleaved: sink beam merges 3 source paths");
+}
+
+// ---- test 16: PARTIAL-WARP level. A single level holds 47 independent sink
+// nodes (47 warps => the last block/warp is partially filled). Exercises the
+// warp_id >= n_nodes_at_level guard and the per-warp count reduction when the
+// launch grid does not tile the node count evenly. Each sink merges 2 parents. --
+static void test_partial_warp_level() {
+    std::printf("test_partial_warp_level (47 sinks in one level)\n");
+    const int M=47, K=8;
+    const int N = 2*M + M;               // 2M sources + M sinks
+    const int E = 2*M;                   // each sink takes 2 sources
+    std::vector<int> deg(N,0);
+    for (int j=0;j<M;++j) deg[2*M+j]=2;
+    std::vector<int> irp(N+1,0);
+    for (int v=0;v<N;++v) irp[v+1]=irp[v]+deg[v];
+    std::vector<int> ici(E), iei(E); std::vector<float> es(E);
+    int w=0, eid=0;
+    for (int j=0;j<M;++j){
+        ici[w]=2*j;   iei[w]=eid; es[eid]=1.0f+0.01f*j;   ++w;++eid;
+        ici[w]=2*j+1; iei[w]=eid; es[eid]=0.5f+0.02f*j;   ++w;++eid;
+    }
+    std::vector<int> topo(N,0);
+    for (int j=0;j<M;++j) topo[2*M+j]=1;
+    std::vector<int> src; for (int u=0;u<2*M;++u) src.push_back(u);
+    std::vector<int> snk; for (int j=0;j<M;++j) snk.push_back(2*M+j);
+    std::vector<std::vector<int>> levels={src, snk};
+    auto g = run(N,E,irp,ici,iei,es,topo,levels,K);
+    auto ref = cpu_reference(N,irp,ici,iei,es,levels,K);
+    compare_all("partial_warp", N, K, g, ref);
+    for (int j=0;j<M;++j)
+        CHECK(g.count[2*M+j]==2, "partial_warp: each sink has 2 paths");
+}
+
 int main() {
     test_k1();
     test_single_edge();
@@ -422,6 +586,12 @@ int main() {
     test_empty_lattice();
     test_single_node();
     test_deep_stress();
+    test_negative_weights();
+    test_tie_break_boundary();
+    test_odd_k();
+    test_chain_propagation();
+    test_interleaved_levels();
+    test_partial_warp_level();
     if (g_failed == 0) { std::printf("\nALL K-BEST TESTS PASSED\n"); return 0; }
     std::printf("\n%d CHECK(S) FAILED\n", g_failed);
     return 1;
