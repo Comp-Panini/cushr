@@ -141,11 +141,15 @@ def top_stalls(metrics, n=2):
     return stalls[:n]
 
 
-def load_ncu(outdir):
-    """Return {K: {metric: value}} for every ncu_kbest_K*.csv found."""
+def load_ncu(outdir, prefix="ncu_kbest"):
+    """Return {K: {metric: value}} for every <prefix>_K*.csv found.
+
+    prefix defaults to the Week-7 K2 files (ncu_kbest_K*.csv); pass
+    prefix="ncu_batched" to pick up the Week-8 batched profiles instead.
+    """
     out = {}
-    for path in glob.glob(os.path.join(outdir, "ncu_kbest_K*.csv")):
-        m = re.search(r"ncu_kbest_K(\d+)\.csv$", os.path.basename(path))
+    for path in glob.glob(os.path.join(outdir, f"{prefix}_K*.csv")):
+        m = re.search(re.escape(prefix) + r"_K(\d+)\.csv$", os.path.basename(path))
         if not m:
             continue
         parsed = parse_ncu_csv(path)
@@ -293,6 +297,9 @@ def main():
                     help="recall plot filename (relative to --outdir)")
     ap.add_argument("--thru-png", default="throughput_vs_k.png",
                     help="throughput plot filename (relative to --outdir)")
+    ap.add_argument("--ncu-prefix", default="ncu_kbest",
+                    help="filename prefix for Nsight CSVs (<prefix>_K*.csv); "
+                         "use ncu_batched for the Week-8 batched profiles")
     args = ap.parse_args()
 
     if not os.path.exists(args.bench):
@@ -301,7 +308,7 @@ def main():
                          "bench_batched.slurm (batched_bench.csv) first.")
 
     rows = load_bench(args.bench)
-    ncu = load_ncu(args.outdir)
+    ncu = load_ncu(args.outdir, prefix=args.ncu_prefix)
 
     recall_png = os.path.join(args.outdir, args.recall_png)
     thru_png = os.path.join(args.outdir, args.thru_png)

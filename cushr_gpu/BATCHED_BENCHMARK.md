@@ -14,16 +14,18 @@ Source seeding uses a new additive kernel `init_kbest_seed` (only touches a chun
 
 ```bash
 make cushr_batched
-sbatch bench_batched.slurm     # sweeps --batch 256/1024/4096/-1, writes batched_bench*.csv
+sbatch bench_batched.slurm      # throughput/memory/recall -> batched_bench*.csv
+sbatch profile_batched.slurm    # Nsight Compute counters   -> ncu_batched_K*.csv
 
-# Generate the auto tables + batched plots WITHOUT touching any Week-7 artifact.
-# Note the distinct --md target (BATCHED_RESULTS.md), so this narrative file
-# (BATCHED_BENCHMARK.md) is NOT overwritten either:
+# Generate the auto tables + batched plots + Nsight section WITHOUT touching any
+# Week-7 artifact. Note the distinct --md target (BATCHED_RESULTS.md), so this
+# narrative file (BATCHED_BENCHMARK.md) is NOT overwritten either:
 python make_benchmark_md.py --bench batched_bench.csv \
     --title "cuSHR Batched (K3 + K5) Results — Week 8" \
     --md BATCHED_RESULTS.md \
     --recall-png batched_recall_vs_k.png \
-    --thru-png   batched_throughput_vs_k.png
+    --thru-png   batched_throughput_vs_k.png \
+    --ncu-prefix ncu_batched
 ```
 
 Every batched output uses a distinct filename from the Week-7 ones, so no previous numbers are lost:
@@ -34,6 +36,7 @@ Every batched output uses a distinct filename from the Week-7 ones, so no previo
 | auto-generated tables | `KBEST_BENCHMARK.md` | `BATCHED_RESULTS.md` |
 | recall plot | `recall_vs_k.png` | `batched_recall_vs_k.png` |
 | throughput plot | `throughput_vs_k.png` | `batched_throughput_vs_k.png` |
+| Nsight CSV / report | `ncu_kbest_K*.csv`, `*.ncu-rep` | `ncu_batched_K*.csv`, `*.ncu-rep` |
 | hand-written narrative | — | `BATCHED_BENCHMARK.md` (this file) |
 
 **Correctness:** the batched sweep is checked `SCORE-EQUIVALENT` against the Week-3 CPU `TopKDecoder` over the first `--check` sentences at every K; `--batch` chunking must not change results (a chunked run and `--batch -1` agree sentence-for-sentence).
