@@ -7,7 +7,8 @@
 #
 # Submit:   sbatch test_kbest.slurm
 # Watch:    squeue -u $USER
-# Output:   kbest_tests.o<jobid>
+# Output:   kbest_tests.o<jobid>   (full slurm log)
+#           kbest_tests_results.txt (just the unit-test output; overwritten each run)
 #----------------------------------------------------------------------
 #SBATCH -J kbest_tests
 #SBATCH -o kbest_tests.o%j
@@ -37,7 +38,14 @@ make cushr_kbest_tests
 echo
 
 echo "==== run: k-best merge unit tests ===="
-./cushr_kbest_tests    # returns 0 = ALL PASSED, 1 = a CHECK failed
+# Tee the unit-test output to a .txt file AND the slurm log. PIPESTATUS[0]
+# preserves the test binary's exit code (tee would otherwise mask it under
+# `set -e`), so the job still fails if any CHECK fails.
+RESULTS=kbest_tests_results.txt
+./cushr_kbest_tests | tee "$RESULTS"    # 0 = ALL PASSED, 1 = a CHECK failed
+status=${PIPESTATUS[0]}
 
 echo
+echo "==== results written to $RESULTS (exit $status) ===="
 echo "==== done ===="
+exit $status
