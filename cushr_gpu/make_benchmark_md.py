@@ -16,8 +16,15 @@ markdown is still generated from the timing CSV and the Nsight section is left
 as a TODO.
 
 Usage:
+  # Week-7 per-sentence (K2): writes KBEST_BENCHMARK.md + recall_vs_k.png + throughput_vs_k.png
   python make_benchmark_md.py                          # defaults, cwd = cushr_gpu/
   python make_benchmark_md.py --bench kbest_bench.csv --outdir .
+
+  # Week-8 batched (K3+K5): separate outputs, leaves the Week-7 files untouched
+  python make_benchmark_md.py --bench batched_bench.csv \
+      --title "cuSHR Batched (K3 + K5) Benchmark — Week 8" \
+      --md BATCHED_BENCHMARK.md \
+      --recall-png batched_recall_vs_k.png --thru-png batched_throughput_vs_k.png
 """
 import argparse
 import csv
@@ -187,9 +194,11 @@ def fmt(v, spec="{:.3f}", na="—"):
     return na if v is None else spec.format(v)
 
 
-def build_md(rows, ncu, have_recall_png, have_thru_png):
+def build_md(rows, ncu, have_recall_png, have_thru_png,
+             title="cuSHR K-best (K2) Benchmark — Week 7 (CP-4)",
+             recall_png="recall_vs_k.png", thru_png="throughput_vs_k.png"):
     L = []
-    L.append("# cuSHR K-best (K2) Benchmark — Week 7 (CP-4)\n")
+    L.append(f"# {title}\n")
     L.append("Warp-level k-best merge kernel (`kbest_merge_level`) benchmarked over "
              "the SIGHUM dataset. Kernel-only timing uses CUDA events around each "
              "per-level merge launch (no H2D / reconstruction overhead). Correctness "
@@ -237,9 +246,9 @@ def build_md(rows, ncu, have_recall_png, have_thru_png):
 
     # plots
     if have_recall_png:
-        L.append("![Top-K recall vs K](recall_vs_k.png)\n")
+        L.append(f"![Top-K recall vs K]({os.path.basename(recall_png)})\n")
     if have_thru_png:
-        L.append("![Throughput vs K](throughput_vs_k.png)\n")
+        L.append(f"![Throughput vs K]({os.path.basename(thru_png)})\n")
 
     # nsight
     L.append("## Nsight Compute summary\n")
@@ -274,22 +283,34 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bench", default=os.path.join(here, "kbest_bench.csv"))
     ap.add_argument("--outdir", default=here)
+    # Output names are configurable so the batched (Week-8) run can write to
+    # separate files and NOT overwrite the frozen Week-7 artifacts.
+    ap.add_argument("--md", default="KBEST_BENCHMARK.md",
+                    help="output markdown filename (relative to --outdir)")
+    ap.add_argument("--title", default="cuSHR K-best (K2) Benchmark — Week 7 (CP-4)",
+                    help="H1 title for the generated markdown")
+    ap.add_argument("--recall-png", default="recall_vs_k.png",
+                    help="recall plot filename (relative to --outdir)")
+    ap.add_argument("--thru-png", default="throughput_vs_k.png",
+                    help="throughput plot filename (relative to --outdir)")
     args = ap.parse_args()
 
     if not os.path.exists(args.bench):
         raise SystemExit(f"bench CSV not found: {args.bench}\n"
-                         "Run bench_kbest.slurm first (writes kbest_bench.csv).")
+                         "Run bench_kbest.slurm (kbest_bench.csv) or "
+                         "bench_batched.slurm (batched_bench.csv) first.")
 
     rows = load_bench(args.bench)
     ncu = load_ncu(args.outdir)
 
-    recall_png = os.path.join(args.outdir, "recall_vs_k.png")
-    thru_png = os.path.join(args.outdir, "throughput_vs_k.png")
+    recall_png = os.path.join(args.outdir, args.recall_png)
+    thru_png = os.path.join(args.outdir, args.thru_png)
     have_recall = plot_recall(rows, recall_png)
     have_thru = plot_throughput(rows, thru_png)
 
-    md = build_md(rows, ncu, have_recall, have_thru)
-    md_path = os.path.join(args.outdir, "KBEST_BENCHMARK.md")
+    md = build_md(rows, ncu, have_recall, have_thru,
+                  title=args.title, recall_png=recall_png, thru_png=thru_png)
+    md_path = os.path.join(args.outdir, args.md)
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(md)
 

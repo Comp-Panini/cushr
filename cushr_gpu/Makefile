@@ -62,6 +62,13 @@ cushr_kbest_tests: $(KBEST_TEST_SRC)
 test-kbest: cushr_kbest_tests
 	./cushr_kbest_tests
 
+# ---- Week-8 batched (K3 sweep + K5 paths) --------------------------------
+# Batched decode driver: one global topo sweep over memory-bounded sentence
+# chunks (--batch N), with top-K path reconstruction and CPU score-equivalence.
+BATCHED_SRC = kbest_merge_warp.cu host_driver_batched.cu
+cushr_batched: $(BATCHED_SRC) $(CPU_SRC)
+	$(NVCC) $(NVCCFLAGS) -o $@ $(BATCHED_SRC) $(CPU_SRC) $(LDLIBS)
+
 # ---- Week-7 benchmarking (CP-4) ------------------------------------------
 # The actual runs happen on the cluster via slurm (nvcc/ncu are not local):
 #   sbatch bench_kbest.slurm      # full-dataset timing+recall -> kbest_bench.csv
@@ -75,4 +82,4 @@ bench: cushr_kbest
 	@echo "then: python make_benchmark_md.py"
 
 clean:
-	rm -f cushr_viterbi_k1 cushr_viterbi_tests cushr_kbest cushr_kbest_tests
+	rm -f cushr_viterbi_k1 cushr_viterbi_tests cushr_kbest cushr_kbest_tests cushr_batched

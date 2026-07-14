@@ -131,6 +131,22 @@ __global__ void init_kbest(GpuLattice lat, GpuKBest kb) {
     }
 }
 
+// Seed a chunk's sources only (global-node-indexed), for the batched driver.
+// The whole-graph init_kbest scans [0, num_nodes) and would touch nodes outside
+// a chunk's (pointer-offset) table. Here each thread handles one listed global
+// source node v and writes the same one-path seed init_kbest does. Non-source
+// (merged) nodes are zeroed on the host side before the sweep, so we only touch
+// the sources here.
+__global__ void init_kbest_seed(GpuKBest kb, const int* src_nodes, int n) {
+    const int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    const int v = src_nodes[i];
+    kb.score[(size_t)v*kb.K + 0] = 0.0f;
+    kb.pnode[(size_t)v*kb.K + 0] = -1;
+    kb.prank[(size_t)v*kb.K + 0] = -1;
+    kb.count[v] = 1;
+}
+
 // relax every node who is at this topo level
 // clear running top-K, load parents beam as new chunk, ad edge score, resort
 // write topK entries

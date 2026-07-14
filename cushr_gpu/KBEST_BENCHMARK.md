@@ -38,3 +38,5 @@ Measured over the 59092 sentences that carry a resolved gold path (~50% of the c
 | 64 | 4.5 | 0.0 | wait (3.31); long_scoreboard (1.26) |
 
 _Occupancy = `sm__warps_active` % of peak; DRAM % = `dram__throughput` % of peak sustained. Stall values are avg warps stalled per active cycle for that reason._
+
+> **Note:** These are the frozen Week-7 per-sentence (K2) numbers. The Week-8 batched (K3+K5) results are kept **separately** in `BATCHED_BENCHMARK.md` so the two can be compared side by side — this file is never overwritten by the batched benchmark.
