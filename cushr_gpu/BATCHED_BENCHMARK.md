@@ -28,6 +28,22 @@ python make_benchmark_md.py --bench batched_bench.csv \
     --ncu-prefix ncu_batched
 ```
 
+### Measuring the K2 → K3/K5 improvement
+
+Run the K2 job (`bench_kbest.slurm` → `kbest_bench.csv`) and the batched job (`bench_batched.slurm` → `batched_bench*.csv`), then:
+
+```bash
+python compare_k2_k3.py     # -> COMPARISON.md + comparison_throughput.png + comparison_memory.png
+```
+
+This joins both CSVs on K and reports the improvement two ways:
+
+- **Wall-clock throughput** (`us_per_sent_loop`) — the headline. K2 pays per-sentence launch/sync/memcpy overhead; K3 amortizes it across the batch. This is where the big speedup lives.
+- **Kernel-only throughput** (`us_per_sent_kernel`) — also improves, for a *different* reason: K2 launches one tiny grid per sentence (~4.7% A100 occupancy in the Week-7 profile), while K3's cross-sentence launches saturate the GPU.
+- **Memory** — K2 always allocates the full-corpus table; K3's `--batch N` sizes it to one chunk, so `gpu_used_MB` scales down with batch (the `batched_bench_b*.csv` sweep), plotted against K2's fixed baseline.
+
+> Note: do **not** compare kernel-only numbers alone and conclude batching did nothing — the launch-overhead win is invisible there by construction. Lead with wall clock.
+
 Every batched output uses a distinct filename from the Week-7 ones, so no previous numbers are lost:
 
 | purpose | Week-7 (frozen) | Week-8 batched |
