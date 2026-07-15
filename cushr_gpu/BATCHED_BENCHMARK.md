@@ -50,8 +50,6 @@
 
 Measured over the 485 checked sentences that carry a resolved gold path.
 
-> **Recall is a correctness invariant, not a Week-8 result.** The batched decode is score-equivalent to K2, so recall is identical by construction; this is only a spot-check over the first `--check` sentences. For the full-corpus accuracy use the K2 number in `KBEST_BENCHMARK.md` (recall@32 ≈ 0.31).
-
 | K | recall@K |
 |---|---------:|
 | 1 | 0.0495 |
