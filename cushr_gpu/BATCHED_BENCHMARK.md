@@ -4,7 +4,7 @@
 
 <!-- BEGIN AUTO-GENERATED RESULTS (make_benchmark_md.py --inject) -->
 
-**Correctness:** SCORE-EQUIVALENT to CPU at every K (checked 119503 sentences per K).
+**Correctness:** SCORE-EQUIVALENT to CPU at every K (spot-checked on the first 1000 of 119503 sentences per K).
 
 ## Throughput and memory vs K
 
@@ -15,6 +15,18 @@
 | 16 | 979102 | 1.0 | 1.0 | 838.9 | 840.0 |
 | 32 | 954268 | 1.0 | 1.0 | 1660.7 | 1662.0 |
 | 64 | 465990 | 2.1 | 2.1 | 3304.3 | 3306.0 |
+
+## Launch count (batched sweep)
+
+One `kbest_merge_level` launch per topo level per chunk, covering that level's nodes across *all* sentences in the chunk. Launches therefore scale with depth and chunk count, not with sentence count (119503 sentences).
+
+| K | chunks | launches | sentences / launch |
+|---|-------:|---------:|-------------------:|
+| 1 | 1 | 50 | 2390 |
+| 5 | 1 | 50 | 2390 |
+| 16 | 1 | 50 | 2390 |
+| 32 | 1 | 50 | 2390 |
+| 64 | 1 | 50 | 2390 |
 
 ## Top-K recall vs gold
 
