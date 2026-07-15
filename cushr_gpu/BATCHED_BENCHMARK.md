@@ -1,20 +1,21 @@
 # cuSHR Batched (K3 + K5) Benchmark — Week 8
 
+A100 (Lonestar6), whole SIGHUM corpus: 119,503 sentences / 4,488,155 nodes.
+Job `batched_full.o3297178`.
+
 ## Results
 
-<!-- BEGIN AUTO-GENERATED RESULTS (make_benchmark_md.py --inject) -->
-
-**Correctness:** SCORE-EQUIVALENT to CPU at every K (spot-checked on the first 1000 of 119503 sentences per K).
+**Correctness:** SCORE-EQUIVALENT to CPU at every K, checked on all 119,503 sentences.
 
 ## Throughput and memory vs K
 
 | K | sent/sec (kernel) | µs/sent (kernel) | µs/sent (loop) | table MB | used MB |
 |---|------------------:|-----------------:|---------------:|---------:|--------:|
-| 1 | 939934 | 1.1 | 1.1 | 68.5 | 72.0 |
-| 5 | 898524 | 1.1 | 1.1 | 273.9 | 276.0 |
-| 16 | 979102 | 1.0 | 1.0 | 838.9 | 840.0 |
-| 32 | 954268 | 1.0 | 1.0 | 1660.7 | 1662.0 |
-| 64 | 465990 | 2.1 | 2.1 | 3304.3 | 3306.0 |
+| 1 | 936194 | 1.1 | 1.1 | 68.5 | 72.0 |
+| 5 | 897267 | 1.1 | 1.1 | 273.9 | 276.0 |
+| 16 | 944192 | 1.1 | 1.1 | 838.9 | 840.0 |
+| 32 | 977700 | 1.0 | 1.0 | 1660.7 | 1662.0 |
+| 64 | 443596 | 2.3 | 2.3 | 3304.3 | 3306.0 |
 
 ## Launch count (batched sweep)
 
@@ -25,6 +26,9 @@
 | 16 | 1 | 50 | 2390 |
 | 32 | 1 | 50 | 2390 |
 | 64 | 1 | 50 | 2390 |
+
+K2 launches the same kernel **1,205,796** times for the same corpus (one launch per
+non-source level per sentence). K3 does it in **50** — a 24,116x reduction.
 
 ## Batch-size sweep (memory vs speed)
 
@@ -41,24 +45,24 @@
 
 | batch | chunks | launches | K=1 | K=5 | K=16 | K=32 | K=64 |
 |---|-------:|---------:|------:|------:|------:|------:|------:|
-| 256 | 467 | 10126 | 76446 | 75147 | 77500 | 78327 | 31993 |
-| 1024 | 117 | 3139 | 173535 | 170815 | 184688 | 180257 | 76045 |
-| 4096 | 30 | 1003 | 342212 | 345362 | 356706 | 357327 | 162726 |
-| -1 (whole corpus) | 1 | 50 | 939934 | 898524 | 979102 | 954268 | 465990 |
+| 256 | 467 | 10126 | 78114 | 74664 | 77347 | 80332 | 32147 |
+| 1024 | 117 | 3139 | 170719 | 169379 | 180651 | 177572 | 74903 |
+| 4096 | 30 | 1003 | 331754 | 323681 | 357029 | 364633 | 162631 |
+| -1 (whole corpus) | 1 | 50 | 936194 | 897267 | 944192 | 977700 | 443596 |
 
 ## Top-K recall vs gold
 
-Measured over the 485 checked sentences that carry a resolved gold path.
+All 119,503 sentences checked; 59,092 carry a resolved gold path.
+Identical to K2 at every K, as required by score-equivalence.
 
-| K | recall@K |
-|---|---------:|
-| 1 | 0.0495 |
-| 5 | 0.0969 |
-| 16 | 0.1588 |
-| 32 | 0.2268 |
-| 64 | 0.3072 |
+| K | K3/K5 recall@K | K2 recall@K |
+|---|---------------:|------------:|
+| 1 | 0.083125 | 0.083125 |
+| 5 | 0.166283 | 0.166283 |
+| 16 | 0.252894 | 0.252894 |
+| 32 | 0.310448 | 0.310448 |
+| 64 | 0.367867 | 0.367867 |
 
 ![Top-K recall vs K](batched_recall_vs_k.png)
 
 ![Throughput vs K](batched_throughput_vs_k.png)
-

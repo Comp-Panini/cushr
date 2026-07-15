@@ -193,10 +193,13 @@ int main(int argc, char** argv) {
     if (!csv_path.empty()) {
         csv = std::fopen(csv_path.c_str(), "w");
         if (!csv) { std::fprintf(stderr, "cannot open --csv %s\n", csv_path.c_str()); return 1; }
-        // Same header the K2 driver emits, so make_benchmark_md.py parses it.
+        // The K2 driver's header, plus batched-only columns appended at the end
+        // (n_check/n_chunks/n_launches). make_benchmark_md.py looks columns up by
+        // name and tolerates missing ones, so the frozen K2 CSV still parses.
         std::fprintf(csv,
             "K,n_sentences,n_gold,recall_at_K,us_per_sent_loop,us_per_sent_kernel,"
-            "sent_per_sec_kernel,gpu_table_MB,gpu_used_MB,score_mismatch,count_mismatch\n");
+            "sent_per_sec_kernel,gpu_table_MB,gpu_used_MB,score_mismatch,count_mismatch,"
+            "n_check,n_chunks,n_launches\n");
     }
 
 
@@ -431,14 +434,19 @@ int main(int argc, char** argv) {
 
 
         if (csv) {
+            // n_sentences is S (the throughput denominator: every sentence is
+            // swept); n_check is how many were verified against the CPU decoder.
+            // They are different numbers -- do not report S as "checked".
             if (gold_total > 0)
-                std::fprintf(csv, "%d,%d,%ld,%.6f,%.3f,%.3f,%.1f,%.3f,%.3f,%d,%d\n",
+                std::fprintf(csv, "%d,%d,%ld,%.6f,%.3f,%.3f,%.1f,%.3f,%.3f,%d,%d,%d,%d,%d\n",
                              K, S, gold_total, recall, us_loop, us_kernel,
-                             sent_per_sec, max_table_MB, max_used_MB, score_mismatch, count_mismatch);
+                             sent_per_sec, max_table_MB, max_used_MB, score_mismatch, count_mismatch,
+                             n_check, n_chunks, total_launches);
             else
-                std::fprintf(csv, "%d,%d,%ld,NA,%.3f,%.3f,%.1f,%.3f,%.3f,%d,%d\n",
+                std::fprintf(csv, "%d,%d,%ld,NA,%.3f,%.3f,%.1f,%.3f,%.3f,%d,%d,%d,%d,%d\n",
                              K, S, gold_total, us_loop, us_kernel,
-                             sent_per_sec, max_table_MB, max_used_MB, score_mismatch, count_mismatch);
+                             sent_per_sec, max_table_MB, max_used_MB, score_mismatch, count_mismatch,
+                             n_check, n_chunks, total_launches);
             std::fflush(csv);
         }
     }
