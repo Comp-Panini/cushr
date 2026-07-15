@@ -1,0 +1,49 @@
+==== node / gpu ====
+v330-018.ls6.tacc.utexas.edu
+Tue Jul 14 18:26:09 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 570.195.03             Driver Version: 570.195.03     CUDA Version: 12.8     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-PCIE-40GB          On  |   00000000:06:00.0 Off |                    0 |
+| N/A   31C    P0             34W /  250W |       0MiB /  40960MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+
+==== build ====
+rm -f cushr_viterbi_k1 cushr_viterbi_tests cushr_kbest cushr_kbest_tests cushr_batched
+nvcc -std=c++17 -O2 -arch=sm_80 -I. -I../cushr_cpu/include -I../cushr_cpu/vendor -o cushr_kbest_tests kbest_merge_warp.cu tests/test_kbest_merge.cu -lz   
+
+==== run: k-best merge unit tests ====
+test_k1 (K=1 == argmax)
+test_single_edge
+test_diamond_k8
+test_tie_break
+test_stress (K=16, K=32)
+test_full_capacity (K=32, K=64)
+test_k64_diamond (K=64)
+test_empty_lattice (N=0)
+test_single_node (N=1)
+test_deep_stress (branching 20, 100 levels; K=16, K=32)
+test_negative_weights (K=8, K=32)
+test_tie_break_boundary (K cuts a fully-tied group)
+test_odd_k (K=5, K=24, K=48)
+test_chain_propagation (in-degree 1, 50 levels)
+test_interleaved_levels (node id order reversed vs topo)
+test_partial_warp_level (47 sinks in one level)
+
+ALL K-BEST TESTS PASSED
+
+==== results written to kbest_tests_results.txt (exit 0) ====
+==== done ====

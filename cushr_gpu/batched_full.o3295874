@@ -1,0 +1,116 @@
+==== node / gpu ====
+v330-018.ls6.tacc.utexas.edu
+Tue Jul 14 18:18:34 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 570.195.03             Driver Version: 570.195.03     CUDA Version: 12.8     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-PCIE-40GB          On  |   00000000:06:00.0 Off |                    0 |
+| N/A   48C    P0             39W /  250W |       0MiB /  40960MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+
+==== build ====
+rm -f cushr_viterbi_k1 cushr_viterbi_tests cushr_kbest cushr_kbest_tests cushr_batched
+nvcc -std=c++17 -O2 -arch=sm_80 -I. -I../cushr_cpu/include -I../cushr_cpu/vendor -o cushr_batched kbest_merge_warp.cu host_driver_batched.cu ../cushr_cpu/src/lattice.cpp ../cushr_cpu/src/scorer.cpp ../cushr_cpu/src/decoder.cpp ../cushr_cpu/src/metrics.cpp ../cushr_cpu/vendor/cnpy.cpp -lz   
+
+==== smoke: batch=1024, check 2000 ====
+loading /scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz ...
+  nodes=4488155 edges=61140552 sentences=119503 feat_dim=43
+  scorer=log_linear
+  batch=1024  chunks=117  (whole-corpus sweep = batch<=0)
+=== K= 1 ===  117 chunks, 3139 launches, sweep 700.97 ms  5.87 us/sent (kernel)  170481 sent/sec  table=0.7 MB used=2.0 MB  check(2000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@1 = 0.0461 (42/911)
+=== K= 5 ===  117 chunks, 3139 launches, sweep 686.96 ms  5.75 us/sent (kernel)  173960 sent/sec  table=2.7 MB used=4.0 MB  check(2000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@5 = 0.0933 (85/911)
+=== K=16 ===  117 chunks, 3139 launches, sweep 677.72 ms  5.67 us/sent (kernel)  176331 sent/sec  table=8.3 MB used=14.0 MB  check(2000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@16 = 0.1647 (150/911)
+=== K=32 ===  117 chunks, 3139 launches, sweep 644.50 ms  5.39 us/sent (kernel)  185421 sent/sec  table=16.5 MB used=20.0 MB  check(2000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@32 = 0.2261 (206/911)
+=== K=64 ===  117 chunks, 3139 launches, sweep 1580.20 ms  13.22 us/sent (kernel)  75625 sent/sec  table=32.7 MB used=38.0 MB  check(2000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@64 = 0.2931 (267/911)
+
+==== full run: batch=256 ====
+loading /scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz ...
+  nodes=4488155 edges=61140552 sentences=119503 feat_dim=43
+  scorer=log_linear
+  batch=256  chunks=467  (whole-corpus sweep = batch<=0)
+=== K= 1 ===  467 chunks, 10126 launches, sweep 1563.23 ms  13.08 us/sent (kernel)  76446 sent/sec  table=0.2 MB used=2.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@1 = 0.0495 (24/485)
+=== K= 5 ===  467 chunks, 10126 launches, sweep 1590.26 ms  13.31 us/sent (kernel)  75147 sent/sec  table=0.8 MB used=2.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@5 = 0.0969 (47/485)
+=== K=16 ===  467 chunks, 10126 launches, sweep 1541.97 ms  12.90 us/sent (kernel)  77500 sent/sec  table=2.4 MB used=4.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@16 = 0.1588 (77/485)
+=== K=32 ===  467 chunks, 10126 launches, sweep 1525.69 ms  12.77 us/sent (kernel)  78327 sent/sec  table=4.7 MB used=6.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@32 = 0.2268 (110/485)
+=== K=64 ===  467 chunks, 10126 launches, sweep 3735.28 ms  31.26 us/sent (kernel)  31993 sent/sec  table=9.3 MB used=14.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@64 = 0.3072 (149/485)
+
+==== full run: batch=1024 ====
+loading /scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz ...
+  nodes=4488155 edges=61140552 sentences=119503 feat_dim=43
+  scorer=log_linear
+  batch=1024  chunks=117  (whole-corpus sweep = batch<=0)
+=== K= 1 ===  117 chunks, 3139 launches, sweep 688.64 ms  5.76 us/sent (kernel)  173535 sent/sec  table=0.7 MB used=2.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@1 = 0.0495 (24/485)
+=== K= 5 ===  117 chunks, 3139 launches, sweep 699.60 ms  5.85 us/sent (kernel)  170815 sent/sec  table=2.7 MB used=4.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@5 = 0.0969 (47/485)
+=== K=16 ===  117 chunks, 3139 launches, sweep 647.05 ms  5.41 us/sent (kernel)  184688 sent/sec  table=8.3 MB used=14.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@16 = 0.1588 (77/485)
+=== K=32 ===  117 chunks, 3139 launches, sweep 662.96 ms  5.55 us/sent (kernel)  180257 sent/sec  table=16.5 MB used=20.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@32 = 0.2268 (110/485)
+=== K=64 ===  117 chunks, 3139 launches, sweep 1571.48 ms  13.15 us/sent (kernel)  76045 sent/sec  table=32.7 MB used=38.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@64 = 0.3072 (149/485)
+
+==== full run: batch=4096 ====
+loading /scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz ...
+  nodes=4488155 edges=61140552 sentences=119503 feat_dim=43
+  scorer=log_linear
+  batch=4096  chunks=30  (whole-corpus sweep = batch<=0)
+=== K= 1 ===  30 chunks, 1003 launches, sweep 349.21 ms  2.92 us/sent (kernel)  342212 sent/sec  table=2.5 MB used=4.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@1 = 0.0495 (24/485)
+=== K= 5 ===  30 chunks, 1003 launches, sweep 346.02 ms  2.90 us/sent (kernel)  345363 sent/sec  table=10.1 MB used=14.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@5 = 0.0969 (47/485)
+=== K=16 ===  30 chunks, 1003 launches, sweep 335.02 ms  2.80 us/sent (kernel)  356706 sent/sec  table=30.8 MB used=38.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@16 = 0.1588 (77/485)
+=== K=32 ===  30 chunks, 1003 launches, sweep 334.44 ms  2.80 us/sent (kernel)  357327 sent/sec  table=61.1 MB used=68.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@32 = 0.2268 (110/485)
+=== K=64 ===  30 chunks, 1003 launches, sweep 734.38 ms  6.15 us/sent (kernel)  162726 sent/sec  table=121.5 MB used=128.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@64 = 0.3072 (149/485)
+
+==== full run: batch=-1 (whole corpus) ====
+loading /scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz ...
+  nodes=4488155 edges=61140552 sentences=119503 feat_dim=43
+  scorer=log_linear
+  batch=119503  chunks=1  (whole-corpus sweep = batch<=0)
+=== K= 1 ===  1 chunks, 50 launches, sweep 127.14 ms  1.06 us/sent (kernel)  939934 sent/sec  table=68.5 MB used=72.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@1 = 0.0495 (24/485)
+=== K= 5 ===  1 chunks, 50 launches, sweep 133.00 ms  1.11 us/sent (kernel)  898524 sent/sec  table=273.9 MB used=276.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@5 = 0.0969 (47/485)
+=== K=16 ===  1 chunks, 50 launches, sweep 122.05 ms  1.02 us/sent (kernel)  979102 sent/sec  table=838.9 MB used=840.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@16 = 0.1588 (77/485)
+=== K=32 ===  1 chunks, 50 launches, sweep 125.23 ms  1.05 us/sent (kernel)  954268 sent/sec  table=1660.7 MB used=1662.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@32 = 0.2268 (110/485)
+=== K=64 ===  1 chunks, 50 launches, sweep 256.45 ms  2.15 us/sent (kernel)  465990 sent/sec  table=3304.3 MB used=3306.0 MB  check(1000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@64 = 0.3072 (149/485)
+
+==== batched_bench.csv ====
+K,n_sentences,n_gold,recall_at_K,us_per_sent_loop,us_per_sent_kernel,sent_per_sec_kernel,gpu_table_MB,gpu_used_MB,score_mismatch,count_mismatch
+1,119503,485,0.049485,1.065,1.064,939933.5,68.484,72.000,0,0
+5,119503,485,0.096907,1.114,1.113,898524.5,273.935,276.000,0,0
+16,119503,485,0.158763,1.023,1.021,979102.3,838.927,840.000,0,0
+32,119503,485,0.226804,1.049,1.048,954267.5,1660.732,1662.000,0,0
+64,119503,485,0.307216,2.147,2.146,465990.3,3304.344,3306.000,0,0
+
+==== done ====

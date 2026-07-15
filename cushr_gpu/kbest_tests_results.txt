@@ -1,0 +1,18 @@
+test_k1 (K=1 == argmax)
+test_single_edge
+test_diamond_k8
+test_tie_break
+test_stress (K=16, K=32)
+test_full_capacity (K=32, K=64)
+test_k64_diamond (K=64)
+test_empty_lattice (N=0)
+test_single_node (N=1)
+test_deep_stress (branching 20, 100 levels; K=16, K=32)
+test_negative_weights (K=8, K=32)
+test_tie_break_boundary (K cuts a fully-tied group)
+test_odd_k (K=5, K=24, K=48)
+test_chain_propagation (in-degree 1, 50 levels)
+test_interleaved_levels (node id order reversed vs topo)
+test_partial_warp_level (47 sinks in one level)
+
+ALL K-BEST TESTS PASSED

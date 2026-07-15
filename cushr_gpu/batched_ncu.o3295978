@@ -1,0 +1,24 @@
+==== build ====
+rm -f cushr_viterbi_k1 cushr_viterbi_tests cushr_kbest cushr_kbest_tests cushr_batched
+nvcc -std=c++17 -O2 -arch=sm_80 -I. -I../cushr_cpu/include -I../cushr_cpu/vendor -o cushr_batched kbest_merge_warp.cu host_driver_batched.cu ../cushr_cpu/src/lattice.cpp ../cushr_cpu/src/scorer.cpp ../cushr_cpu/src/decoder.cpp ../cushr_cpu/src/metrics.cpp ../cushr_cpu/vendor/cnpy.cpp -lz   
+
+==== ncu profile K=32 (batched) ====
+loading /scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz ...
+  nodes=4488155 edges=61140552 sentences=119503 feat_dim=43
+  scorer=log_linear
+  batch=1024  chunks=117  (whole-corpus sweep = batch<=0)
+=== K=32 ===  117 chunks, 3139 launches, sweep 694936.85 ms  5815.23 us/sent (kernel)  172 sent/sec  table=16.5 MB used=20.0 MB  check(0): skipped (score_mm=0 count_mm=0)  recall@K=NA
+
+==== ncu profile K=64 (batched) ====
+loading /scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz ...
+  nodes=4488155 edges=61140552 sentences=119503 feat_dim=43
+  scorer=log_linear
+  batch=1024  chunks=117  (whole-corpus sweep = batch<=0)
+=== K=64 ===  117 chunks, 3139 launches, sweep 715761.46 ms  5989.49 us/sent (kernel)  167 sent/sec  table=32.7 MB used=38.0 MB  check(0): skipped (score_mm=0 count_mm=0)  recall@K=NA
+
+==== done ====
+Fold these into BATCHED_RESULTS.md with:
+  python make_benchmark_md.py --bench batched_bench.csv \
+      --title "cuSHR Batched (K3 + K5) Results — Week 8" --md BATCHED_RESULTS.md \
+      --recall-png batched_recall_vs_k.png --thru-png batched_throughput_vs_k.png \
+      --ncu-prefix ncu_batched
