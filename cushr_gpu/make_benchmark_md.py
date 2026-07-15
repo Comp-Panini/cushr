@@ -202,10 +202,55 @@ def fmt(v, spec="{:.3f}", na="—"):
     return na if v is None else spec.format(v)
 
 
+def build_sweep_md(sweeps):
+    """Batch-size comparison tables. `sweeps` is [(label, rows), ...], one entry
+    per --batch value benchmarked. Memory and throughput are both per-K, so each
+    is a batch x K matrix. chunks/launches are constant across K within a run, so
+    they collapse into single columns."""
+    if not sweeps:
+        return []
+    Ks = sorted({r["K"] for _, rows in sweeps for r in rows})
+    n_sent = next((r["n_sentences"] for _, rows in sweeps for r in rows
+                   if r["n_sentences"]), None)
+
+    def matrix(heading, note, field, spec):
+        L = [f"### {heading}\n", note, ""]
+        L.append("| batch | chunks | launches | "
+                 + " | ".join(f"K={K}" for K in Ks) + " |")
+        L.append("|---|-------:|---------:|"
+                 + "".join("------:|" for _ in Ks))
+        for label, rows in sweeps:
+            by_K = {r["K"]: r for r in rows}
+            first = rows[0] if rows else {}
+            cells = [fmt(by_K[K][field], spec) if K in by_K else "—" for K in Ks]
+            L.append(f"| {label} | {fmt(first.get('n_chunks'), '{:d}')} | "
+                     f"{fmt(first.get('n_launches'), '{:d}')} | "
+                     + " | ".join(cells) + " |")
+        L.append("")
+        return L
+
+    L = ["## Batch-size sweep (memory vs speed)\n"]
+    L.append("`--batch N` sizes each chunk's k-best table to that chunk's node span "
+             "instead of the whole corpus, so peak device memory scales with N. "
+             "Smaller chunks cost more launches (each chunk repeats the level loop) "
+             "and lose cross-sentence parallelism per launch"
+             + (f". Throughput is over all {n_sent} sentences in every row." if n_sent else "."))
+    L.append("")
+    L += matrix("Peak device memory (used MB)",
+                "Whole-corpus (`--batch -1`) allocates the full table; this is the "
+                "column the K2 driver has no answer to.",
+                "used_MB", "{:.0f}")
+    L += matrix("Throughput (sent/sec, kernel)",
+                "Same total work in every row — only the chunking differs.",
+                "sent_per_sec", "{:.0f}")
+    return L
+
+
 def build_md(rows, ncu, have_recall_png, have_thru_png,
              title="cuSHR K-best (K2) Benchmark — Week 7 (CP-4)",
              recall_png="recall_vs_k.png", thru_png="throughput_vs_k.png",
-             body_only=False, recall_note="", ncu_prefix="ncu_kbest"):
+             body_only=False, recall_note="", ncu_prefix="ncu_kbest",
+             sweeps=None):
     # body_only=True skips the H1 title + intro paragraph, so the tables can be
     # INJECTED into an existing narrative file (e.g. BATCHED_BENCHMARK.md)
     # between markers without duplicating its heading.
@@ -271,6 +316,8 @@ def build_md(rows, ncu, have_recall_png, have_thru_png,
                 spl=fmt(spl, "{:.0f}"),
             ))
         L.append("")
+
+    L += build_sweep_md(sweeps or [])
 
     # recall table
     L.append("## Top-K recall vs gold\n")
@@ -345,6 +392,10 @@ def main():
     ap.add_argument("--recall-note", default="",
                     help="extra caption under the recall heading, e.g. to note "
                          "that batched recall is an invariant spot-check vs K2")
+    ap.add_argument("--sweep", action="append", default=[], metavar="LABEL=CSV",
+                    help="add a row to the batch-size sweep tables, e.g. "
+                         "--sweep 256=batched_bench_b256.csv . Repeatable; rows "
+                         "appear in the order given. Omit for no sweep section.")
     ap.add_argument("--inject", action="store_true",
                     help="inject the generated tables between the AUTO-GENERATED "
                          "markers in --md (preserving the rest of that file) "
@@ -358,6 +409,17 @@ def main():
 
     rows = load_bench(args.bench)
     ncu = load_ncu(args.outdir, prefix=args.ncu_prefix)
+
+    sweeps = []
+    for spec in args.sweep:
+        if "=" not in spec:
+            raise SystemExit(f"--sweep needs LABEL=CSV, got: {spec}")
+        label, path = spec.split("=", 1)
+        if not os.path.isabs(path):
+            path = os.path.join(args.outdir, path)
+        if not os.path.exists(path):
+            raise SystemExit(f"--sweep CSV not found: {path}")
+        sweeps.append((label, load_bench(path)))
 
     recall_png = os.path.join(args.outdir, args.recall_png)
     thru_png = os.path.join(args.outdir, args.thru_png)
@@ -379,7 +441,8 @@ def main():
                              f"  {BEGIN}\n  ...\n  {END}")
         body = build_md(rows, ncu, have_recall, have_thru, title=args.title,
                         recall_png=recall_png, thru_png=thru_png, body_only=True,
-                        recall_note=args.recall_note, ncu_prefix=args.ncu_prefix)
+                        recall_note=args.recall_note, ncu_prefix=args.ncu_prefix,
+                        sweeps=sweeps)
         after_begin = text.index("\n", bi) + 1        # keep the BEGIN marker line
         new_text = text[:after_begin] + "\n" + body + "\n" + text[ei:]
         with open(md_path, "w", encoding="utf-8") as f:
@@ -388,7 +451,8 @@ def main():
     else:
         md = build_md(rows, ncu, have_recall, have_thru,
                       title=args.title, recall_png=recall_png, thru_png=thru_png,
-                      recall_note=args.recall_note, ncu_prefix=args.ncu_prefix)
+                      recall_note=args.recall_note, ncu_prefix=args.ncu_prefix,
+                      sweeps=sweeps)
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(md)
         print(f"wrote {md_path}")

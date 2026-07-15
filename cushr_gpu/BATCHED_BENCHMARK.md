@@ -28,6 +28,32 @@ One `kbest_merge_level` launch per topo level per chunk, covering that level's n
 | 32 | 1 | 50 | 2390 |
 | 64 | 1 | 50 | 2390 |
 
+## Batch-size sweep (memory vs speed)
+
+`--batch N` sizes each chunk's k-best table to that chunk's node span instead of the whole corpus, so peak device memory scales with N. Smaller chunks cost more launches (each chunk repeats the level loop) and lose cross-sentence parallelism per launch. Throughput is over all 119503 sentences in every row.
+
+### Peak device memory (used MB)
+
+Whole-corpus (`--batch -1`) allocates the full table; this is the column the K2 driver has no answer to.
+
+| batch | chunks | launches | K=1 | K=5 | K=16 | K=32 | K=64 |
+|---|-------:|---------:|------:|------:|------:|------:|------:|
+| 256 | 467 | 10126 | 2 | 2 | 4 | 6 | 14 |
+| 1024 | 117 | 3139 | 2 | 4 | 14 | 20 | 38 |
+| 4096 | 30 | 1003 | 4 | 14 | 38 | 68 | 128 |
+| -1 (whole corpus) | 1 | 50 | 72 | 276 | 840 | 1662 | 3306 |
+
+### Throughput (sent/sec, kernel)
+
+Same total work in every row — only the chunking differs.
+
+| batch | chunks | launches | K=1 | K=5 | K=16 | K=32 | K=64 |
+|---|-------:|---------:|------:|------:|------:|------:|------:|
+| 256 | 467 | 10126 | 76446 | 75147 | 77500 | 78327 | 31993 |
+| 1024 | 117 | 3139 | 173535 | 170815 | 184688 | 180257 | 76045 |
+| 4096 | 30 | 1003 | 342212 | 345362 | 356706 | 357327 | 162726 |
+| -1 (whole corpus) | 1 | 50 | 939934 | 898524 | 979102 | 954268 | 465990 |
+
 ## Top-K recall vs gold
 
 Measured over the 485 checked sentences that carry a resolved gold path.
