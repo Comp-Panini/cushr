@@ -344,6 +344,7 @@ int main(int argc, char** argv) {
 
 
             //  copy back the chunk table + K5 reconstruct / verify 
+            
             const int chk_lo = std::max(s0, 0);
             const int chk_hi = std::min(s1, n_check);
             if (chk_hi > chk_lo) {
