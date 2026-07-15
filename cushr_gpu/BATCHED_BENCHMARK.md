@@ -62,8 +62,3 @@ Measured over the 485 checked sentences that carry a resolved gold path.
 
 ![Throughput vs K](batched_throughput_vs_k.png)
 
-## Nsight Compute summary
-
-_Profiling CSVs (`ncu_batched_K*.csv`) not found. Run `profile_batched.slurm`, copy the CSVs next to this script, and re-run `make_benchmark_md.py`._ **TODO**
-
-<!-- END AUTO-GENERATED RESULTS -->

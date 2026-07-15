@@ -46,16 +46,29 @@ echo
 # --check 0 skips the CPU oracle (we only want kernel counters here), and
 # --batch 1024 bounds device memory. --launch-count caps how many kernel
 # launches ncu instruments so the heavy profiling finishes quickly.
+#
+# NB: -o sends the results to the .ncu-rep binary and SUPPRESSES the console
+# report, so `--csv --log-file X.csv` here would capture only ncu's "==PROF=="
+# status chatter, not a single metric (this is how the first run produced
+# 213-byte CSVs). Profile to the report, then export the CSV from it below.
 for K in 32 64; do
     echo "==== ncu profile K=$K (batched) ===="
     ncu --set full \
         --launch-count 200 \
         --kernel-name-base demangled \
         --kernel-name "regex:kbest_merge_level" \
-        --csv --log-file "ncu_batched_K${K}.csv" \
         -o "ncu_batched_K${K}" -f \
         ./cushr_batched "$DATA" --scorer log_linear --K "$K" --batch 1024 --check 0
     echo
+done
+
+# Export each report to the WIDE csv shape make_benchmark_md.py parses (one row
+# per launch, metric names as column headers). Re-runnable on a login node
+# against existing .ncu-rep files -- no GPU or re-profiling needed.
+for K in 32 64; do
+    echo "==== export K=$K -> ncu_batched_K${K}.csv ===="
+    ncu --import "ncu_batched_K${K}.ncu-rep" --csv --page raw > "ncu_batched_K${K}.csv"
+    wc -l "ncu_batched_K${K}.csv"
 done
 
 echo "==== done ===="
