@@ -87,7 +87,9 @@ int main(int argc, char** argv) {
             "          [--weights w0,w1,...] [--bias b] [--K 1,5,16,32,64]\n"
             "          [--batch N] [--check M] [--csv out.csv]\n"
             "  --batch N : sentences per memory-bounded chunk (<=0: whole corpus)\n"
-            "  --check M : verify the first M sentences against the CPU decoder\n",
+            "  --check M : verify the first M sentences against the CPU decoder\n"
+            "              (-1: all sentences -- full-corpus recall, comparable to\n"
+            "               the K2 number; 0: skip verification entirely)\n",
             argv[0]);
         return 1;
     }
@@ -200,11 +202,12 @@ int main(int argc, char** argv) {
 
     //  per K: chunked batched sweep over the whole corpus 
     for (int K : Ks) {
-        // CPU oracle for the checked sentences (decodes all S; we only read the
-        // first `check`). Skip entirely when --check 0.
+        // CPU oracle for the checked sentences. decode() always does all S, so
+        // --check only bounds the comparison loop below, not this cost: raising
+        // --check to S is nearly free. Skip entirely when --check 0.
         std::vector<std::vector<DecodedPath>> cpu_results;
-        if (check > 0) { TopKDecoder cpu; cpu_results = cpu.decode(lat, K, *scorer); }
-        const int n_check = std::min(check, S);
+        if (check != 0) { TopKDecoder cpu; cpu_results = cpu.decode(lat, K, *scorer); }
+        const int n_check = (check < 0) ? S : std::min(check, S);   // --check -1 => all
 
 
         // cross-chunk accumulators

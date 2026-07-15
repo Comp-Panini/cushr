@@ -72,9 +72,13 @@ for B in 256 1024 4096; do
 done
 
 # Whole-corpus single sweep (max batch) = headline throughput number.
-echo "==== full run: batch=-1 (whole corpus) ===="
+# --check -1 verifies EVERY sentence, so recall@K here is the full-corpus number
+# and is directly comparable to the K2 recall in KBEST_BENCHMARK.md (they must be
+# identical: the batched decode is score-equivalent). The CPU oracle already
+# decodes all S regardless of --check, so this costs only the compare loop.
+echo "==== full run: batch=-1 (whole corpus), check ALL ===="
 ./cushr_batched "$DATA" --scorer log_linear --weights "$WEIGHTS" \
-    --K 1,5,16,32,64 --batch -1 --check 1000 --csv batched_bench.csv
+    --K 1,5,16,32,64 --batch -1 --check -1 --csv batched_bench.csv
 
 echo
 echo "==== batched_bench.csv ===="
