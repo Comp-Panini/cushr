@@ -201,7 +201,7 @@ def fmt(v, spec="{:.3f}", na="—"):
 def build_md(rows, ncu, have_recall_png, have_thru_png,
              title="cuSHR K-best (K2) Benchmark — Week 7 (CP-4)",
              recall_png="recall_vs_k.png", thru_png="throughput_vs_k.png",
-             body_only=False):
+             body_only=False, recall_note="", ncu_prefix="ncu_kbest"):
     # body_only=True skips the H1 title + intro paragraph, so the tables can be
     # INJECTED into an existing narrative file (e.g. BATCHED_BENCHMARK.md)
     # between markers without duplicating its heading.
@@ -242,8 +242,10 @@ def build_md(rows, ncu, have_recall_png, have_thru_png,
     L.append("## Top-K recall vs gold\n")
     if any(r["recall"] is not None for r in rows):
         n_gold = next((r["n_gold"] for r in rows if r["n_gold"]), None)
-        L.append(f"Measured over the {n_gold if n_gold else '?'} sentences that carry a "
-                 "resolved gold path (~50% of the corpus).\n")
+        L.append(f"Measured over the {n_gold if n_gold else '?'} checked sentences that "
+                 "carry a resolved gold path.\n")
+        if recall_note:
+            L.append(recall_note + "\n")
         L.append("| K | recall@K |")
         L.append("|---|---------:|")
         for r in rows:
@@ -280,8 +282,9 @@ def build_md(rows, ncu, have_recall_png, have_thru_png,
                  "`dram__throughput` % of peak sustained. Stall values are avg "
                  "warps stalled per active cycle for that reason._")
     else:
-        L.append("_Profiling CSVs (`ncu_kbest_K*.csv`) not found. Run "
-                 "`profile_kbest.slurm`, copy the CSVs next to this script, and "
+        prof_job = "profile_batched.slurm" if ncu_prefix == "ncu_batched" else "profile_kbest.slurm"
+        L.append(f"_Profiling CSVs (`{ncu_prefix}_K*.csv`) not found. Run "
+                 f"`{prof_job}`, copy the CSVs next to this script, and "
                  "re-run `make_benchmark_md.py`._ **TODO**")
     L.append("")
     return "\n".join(L)
@@ -305,6 +308,9 @@ def main():
     ap.add_argument("--ncu-prefix", default="ncu_kbest",
                     help="filename prefix for Nsight CSVs (<prefix>_K*.csv); "
                          "use ncu_batched for the Week-8 batched profiles")
+    ap.add_argument("--recall-note", default="",
+                    help="extra caption under the recall heading, e.g. to note "
+                         "that batched recall is an invariant spot-check vs K2")
     ap.add_argument("--inject", action="store_true",
                     help="inject the generated tables between the AUTO-GENERATED "
                          "markers in --md (preserving the rest of that file) "
@@ -338,7 +344,8 @@ def main():
             raise SystemExit(f"markers not found in {md_path}. Add:\n"
                              f"  {BEGIN}\n  ...\n  {END}")
         body = build_md(rows, ncu, have_recall, have_thru, title=args.title,
-                        recall_png=recall_png, thru_png=thru_png, body_only=True)
+                        recall_png=recall_png, thru_png=thru_png, body_only=True,
+                        recall_note=args.recall_note, ncu_prefix=args.ncu_prefix)
         after_begin = text.index("\n", bi) + 1        # keep the BEGIN marker line
         new_text = text[:after_begin] + "\n" + body + "\n" + text[ei:]
         with open(md_path, "w", encoding="utf-8") as f:
@@ -346,7 +353,8 @@ def main():
         print(f"injected results into {md_path} (between markers)")
     else:
         md = build_md(rows, ncu, have_recall, have_thru,
-                      title=args.title, recall_png=recall_png, thru_png=thru_png)
+                      title=args.title, recall_png=recall_png, thru_png=thru_png,
+                      recall_note=args.recall_note, ncu_prefix=args.ncu_prefix)
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(md)
         print(f"wrote {md_path}")

@@ -25,8 +25,11 @@ python make_benchmark_md.py --bench batched_bench.csv \
     --md BATCHED_BENCHMARK.md --inject \
     --recall-png batched_recall_vs_k.png \
     --thru-png   batched_throughput_vs_k.png \
-    --ncu-prefix ncu_batched
+    --ncu-prefix ncu_batched \
+    --recall-note "> **Recall is a correctness invariant, not a Week-8 result.** The batched decode is score-equivalent to K2, so recall is identical by construction; this is only a spot-check over the first \`--check\` sentences. For the full-corpus accuracy use the K2 number in \`KBEST_BENCHMARK.md\` (recall@32 ≈ 0.31)."
 ```
+
+> On **PowerShell** put the whole command on one line (backtick `` ` `` for continuations, not `\`).
 
 ### Measuring the K2 → K3/K5 improvement
 
@@ -83,7 +86,9 @@ For the K2 → K3/K5 improvement (speedup + memory-vs-batch), run `compare_k2_k3
 
 ## Top-K recall vs gold
 
-Measured over the 485 sentences that carry a resolved gold path (~50% of the corpus).
+Measured over the 485 checked sentences that carry a resolved gold path.
+
+> **Recall is a correctness invariant, not a Week-8 result.** The batched decode is score-equivalent to K2, so recall is identical by construction; this is only a spot-check over the first `--check` sentences. For the full-corpus accuracy use the K2 number in `KBEST_BENCHMARK.md` (recall@32 ≈ 0.31).
 
 | K | recall@K |
 |---|---------:|
@@ -99,6 +104,6 @@ Measured over the 485 sentences that carry a resolved gold path (~50% of the cor
 
 ## Nsight Compute summary
 
-_Profiling CSVs (`ncu_kbest_K*.csv`) not found. Run `profile_kbest.slurm`, copy the CSVs next to this script, and re-run `make_benchmark_md.py`._ **TODO**
+_Profiling CSVs (`ncu_batched_K*.csv`) not found. Run `profile_batched.slurm`, copy the CSVs next to this script, and re-run `make_benchmark_md.py`._ **TODO**
 
 <!-- END AUTO-GENERATED RESULTS -->
