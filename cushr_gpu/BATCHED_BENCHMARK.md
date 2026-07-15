@@ -17,12 +17,12 @@ make cushr_batched
 sbatch bench_batched.slurm      # throughput/memory/recall -> batched_bench*.csv
 sbatch profile_batched.slurm    # Nsight Compute counters   -> ncu_batched_K*.csv
 
-# Generate the auto tables + batched plots + Nsight section WITHOUT touching any
-# Week-7 artifact. Note the distinct --md target (BATCHED_RESULTS.md), so this
-# narrative file (BATCHED_BENCHMARK.md) is NOT overwritten either:
+# Inject the generated tables + plots + Nsight section INTO this file, between the
+# AUTO-GENERATED markers in the Results section below. The rest of this narrative
+# is preserved, and no Week-7 artifact is touched.
 python make_benchmark_md.py --bench batched_bench.csv \
     --title "cuSHR Batched (K3 + K5) Results — Week 8" \
-    --md BATCHED_RESULTS.md \
+    --md BATCHED_BENCHMARK.md --inject \
     --recall-png batched_recall_vs_k.png \
     --thru-png   batched_throughput_vs_k.png \
     --ncu-prefix ncu_batched
@@ -49,7 +49,7 @@ Every batched output uses a distinct filename from the Week-7 ones, so no previo
 | purpose | Week-7 (frozen) | Week-8 batched |
 |---|---|---|
 | raw CSV | `kbest_bench.csv` | `batched_bench.csv`, `batched_bench_b<N>.csv` |
-| auto-generated tables | `KBEST_BENCHMARK.md` | `BATCHED_RESULTS.md` |
+| tables (auto) | `KBEST_BENCHMARK.md` (whole file) | injected into `BATCHED_BENCHMARK.md` (this file) |
 | recall plot | `recall_vs_k.png` | `batched_recall_vs_k.png` |
 | throughput plot | `throughput_vs_k.png` | `batched_throughput_vs_k.png` |
 | Nsight CSV / report | `ncu_kbest_K*.csv`, `*.ncu-rep` | `ncu_batched_K*.csv`, `*.ncu-rep` |
@@ -59,20 +59,46 @@ Every batched output uses a distinct filename from the Week-7 ones, so no previo
 
 ## Results
 
-_Pending the A100 run (`bench_batched.slurm`)._ Expected: throughput ≫ the Week-7 per-sentence numbers (plan target up to ~50k sent/sec at K=32), with peak memory bounded by `--batch` (~4 GB envelope at 1,024 sentences / K=32). Populate from `batched_bench*.csv`:
+The tables, plots, and Nsight summary below are filled in automatically by the
+`make_benchmark_md.py --inject` command in the Reproduce section. Everything
+between the two markers is regenerated on each run; text outside them (this whole
+narrative) is preserved. Until the first A100 run, the block is empty.
 
-| K | batch | sent/sec (kernel) | µs/sent (kernel) | table MB | used MB | recall@K | check |
-|---|------:|------------------:|-----------------:|---------:|--------:|---------:|-------|
-| _TODO — populate from batched_bench*.csv_ | | | | | | | |
+For the K2 → K3/K5 improvement (speedup + memory-vs-batch), run `compare_k2_k3.py`
+→ `COMPARISON.md`.
 
-### Batched vs per-sentence (headline comparison)
+<!-- BEGIN AUTO-GENERATED RESULTS (make_benchmark_md.py --inject) -->
 
-Fill this in from `batched_bench.csv` (whole-corpus sweep) against the Week-7 table in `KBEST_BENCHMARK.md`:
+**Correctness:** SCORE-EQUIVALENT to CPU at every K (checked 119503 sentences per K).
 
-| K | K2 sent/sec (Week 7) | K3 batched sent/sec (Week 8) | speedup |
-|---|---------------------:|-----------------------------:|--------:|
-| 1  | 2730 | _TODO_ | _TODO_ |
-| 5  | 2698 | _TODO_ | _TODO_ |
-| 16 | 2730 | _TODO_ | _TODO_ |
-| 32 | 2775 | _TODO_ | _TODO_ |
-| 64 | 1210 | _TODO_ | _TODO_ |
+## Throughput and memory vs K
+
+| K | sent/sec (kernel) | µs/sent (kernel) | µs/sent (loop) | table MB | used MB |
+|---|------------------:|-----------------:|---------------:|---------:|--------:|
+| 1 | 939934 | 1.1 | 1.1 | 68.5 | 72.0 |
+| 5 | 898524 | 1.1 | 1.1 | 273.9 | 276.0 |
+| 16 | 979102 | 1.0 | 1.0 | 838.9 | 840.0 |
+| 32 | 954268 | 1.0 | 1.0 | 1660.7 | 1662.0 |
+| 64 | 465990 | 2.1 | 2.1 | 3304.3 | 3306.0 |
+
+## Top-K recall vs gold
+
+Measured over the 485 sentences that carry a resolved gold path (~50% of the corpus).
+
+| K | recall@K |
+|---|---------:|
+| 1 | 0.0495 |
+| 5 | 0.0969 |
+| 16 | 0.1588 |
+| 32 | 0.2268 |
+| 64 | 0.3072 |
+
+![Top-K recall vs K](batched_recall_vs_k.png)
+
+![Throughput vs K](batched_throughput_vs_k.png)
+
+## Nsight Compute summary
+
+_Profiling CSVs (`ncu_kbest_K*.csv`) not found. Run `profile_kbest.slurm`, copy the CSVs next to this script, and re-run `make_benchmark_md.py`._ **TODO**
+
+<!-- END AUTO-GENERATED RESULTS -->

@@ -200,13 +200,18 @@ def fmt(v, spec="{:.3f}", na="—"):
 
 def build_md(rows, ncu, have_recall_png, have_thru_png,
              title="cuSHR K-best (K2) Benchmark — Week 7 (CP-4)",
-             recall_png="recall_vs_k.png", thru_png="throughput_vs_k.png"):
+             recall_png="recall_vs_k.png", thru_png="throughput_vs_k.png",
+             body_only=False):
+    # body_only=True skips the H1 title + intro paragraph, so the tables can be
+    # INJECTED into an existing narrative file (e.g. BATCHED_BENCHMARK.md)
+    # between markers without duplicating its heading.
     L = []
-    L.append(f"# {title}\n")
-    L.append("Warp-level k-best merge kernel (`kbest_merge_level`) benchmarked over "
-             "the SIGHUM dataset. Kernel-only timing uses CUDA events around each "
-             "per-level merge launch (no H2D / reconstruction overhead). Correctness "
-             "is checked against the Week-3 CPU `TopKDecoder` at the same K.\n")
+    if not body_only:
+        L.append(f"# {title}\n")
+        L.append("Warp-level k-best merge kernel (`kbest_merge_level`) benchmarked over "
+                 "the SIGHUM dataset. Kernel-only timing uses CUDA events around each "
+                 "per-level merge launch (no H2D / reconstruction overhead). Correctness "
+                 "is checked against the Week-3 CPU `TopKDecoder` at the same K.\n")
 
     # correctness line
     total_mm = sum((r["score_mismatch"] or 0) for r in rows)
@@ -300,6 +305,10 @@ def main():
     ap.add_argument("--ncu-prefix", default="ncu_kbest",
                     help="filename prefix for Nsight CSVs (<prefix>_K*.csv); "
                          "use ncu_batched for the Week-8 batched profiles")
+    ap.add_argument("--inject", action="store_true",
+                    help="inject the generated tables between the AUTO-GENERATED "
+                         "markers in --md (preserving the rest of that file) "
+                         "instead of overwriting the whole file")
     args = ap.parse_args()
 
     if not os.path.exists(args.bench):
@@ -315,19 +324,39 @@ def main():
     have_recall = plot_recall(rows, recall_png)
     have_thru = plot_throughput(rows, thru_png)
 
-    md = build_md(rows, ncu, have_recall, have_thru,
-                  title=args.title, recall_png=recall_png, thru_png=thru_png)
     md_path = os.path.join(args.outdir, args.md)
-    with open(md_path, "w", encoding="utf-8") as f:
-        f.write(md)
+    BEGIN = "<!-- BEGIN AUTO-GENERATED RESULTS (make_benchmark_md.py --inject) -->"
+    END   = "<!-- END AUTO-GENERATED RESULTS -->"
 
-    print(f"wrote {md_path}")
+    if args.inject:
+        if not os.path.exists(md_path):
+            raise SystemExit(f"--inject needs an existing {md_path} with the "
+                             f"markers:\n  {BEGIN}\n  {END}")
+        text = open(md_path, encoding="utf-8").read()
+        bi, ei = text.find(BEGIN), text.find(END)
+        if bi == -1 or ei == -1 or ei < bi:
+            raise SystemExit(f"markers not found in {md_path}. Add:\n"
+                             f"  {BEGIN}\n  ...\n  {END}")
+        body = build_md(rows, ncu, have_recall, have_thru, title=args.title,
+                        recall_png=recall_png, thru_png=thru_png, body_only=True)
+        after_begin = text.index("\n", bi) + 1        # keep the BEGIN marker line
+        new_text = text[:after_begin] + "\n" + body + "\n" + text[ei:]
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write(new_text)
+        print(f"injected results into {md_path} (between markers)")
+    else:
+        md = build_md(rows, ncu, have_recall, have_thru,
+                      title=args.title, recall_png=recall_png, thru_png=thru_png)
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write(md)
+        print(f"wrote {md_path}")
+
     if have_recall:
         print(f"wrote {recall_png}")
     if have_thru:
         print(f"wrote {thru_png}")
     if not ncu:
-        print("note: no ncu_kbest_K*.csv found; Nsight section left as TODO")
+        print(f"note: no {args.ncu_prefix}_K*.csv found; Nsight section left as TODO")
 
 
 if __name__ == "__main__":

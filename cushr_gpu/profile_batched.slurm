@@ -9,7 +9,7 @@
 #   - ncu_batched_K32.csv / ncu_batched_K64.csv  (parsed by make_benchmark_md.py)
 #   - ncu_batched_K32.ncu-rep / K64.ncu-rep      (open in the Nsight Compute GUI)
 #
-# Metrics of interest for BATCHED_RESULTS.md:
+# Metrics of interest (injected into BATCHED_BENCHMARK.md):
 #   sm__warps_active.avg.pct_of_peak_sustained_active            (occupancy)
 #   smsp__average_warps_issue_stalled_*                          (warp stalls)
 #   dram__throughput.avg.pct_of_peak_sustained_elapsed           (memory BW)
@@ -59,8 +59,9 @@ for K in 32 64; do
 done
 
 echo "==== done ===="
-echo "Fold these into BATCHED_RESULTS.md with:"
+echo "Fold these into BATCHED_BENCHMARK.md with:"
 echo "  python make_benchmark_md.py --bench batched_bench.csv \\"
-echo "      --title \"cuSHR Batched (K3 + K5) Results — Week 8\" --md BATCHED_RESULTS.md \\"
+echo "      --title \"cuSHR Batched (K3 + K5) Results — Week 8\" \\"
+echo "      --md BATCHED_BENCHMARK.md --inject \\"
 echo "      --recall-png batched_recall_vs_k.png --thru-png batched_throughput_vs_k.png \\"
 echo "      --ncu-prefix ncu_batched"

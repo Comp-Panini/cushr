@@ -16,7 +16,8 @@
 # Week-7 files (kbest_bench.csv, KBEST_BENCHMARK.md, *_vs_k.png) are never
 # overwritten. Turn the CSV into tables/plots with:
 #   python make_benchmark_md.py --bench batched_bench.csv \
-#       --title "cuSHR Batched (K3 + K5) Results — Week 8" --md BATCHED_RESULTS.md \
+#       --title "cuSHR Batched (K3 + K5) Results — Week 8" \
+#       --md BATCHED_BENCHMARK.md --inject \
 #       --recall-png batched_recall_vs_k.png --thru-png batched_throughput_vs_k.png
 #
 # Submit:  sbatch bench_batched.slurm
