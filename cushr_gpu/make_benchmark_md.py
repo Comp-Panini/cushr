@@ -63,6 +63,10 @@ def load_bench(path):
                 "used_MB": num("gpu_used_MB"),
                 "score_mismatch": num("score_mismatch", int),
                 "count_mismatch": num("count_mismatch", int),
+                # batched-only; None for the frozen K2 CSV, which lacks them.
+                "n_check": num("n_check", int),
+                "n_chunks": num("n_chunks", int),
+                "n_launches": num("n_launches", int),
             })
     rows.sort(key=lambda d: d["K"])
     return rows
@@ -213,13 +217,20 @@ def build_md(rows, ncu, have_recall_png, have_thru_png,
                  "per-level merge launch (no H2D / reconstruction overhead). Correctness "
                  "is checked against the Week-3 CPU `TopKDecoder` at the same K.\n")
 
-    # correctness line
+    # correctness line. NB: n_sentences is the corpus size / throughput
+    # denominator, NOT the verified count -- reporting it here overstated the
+    # check by ~120x. The verified count is n_check (the driver's --check).
     total_mm = sum((r["score_mismatch"] or 0) for r in rows)
-    n_sent = next((r["n_sentences"] for r in rows if r["n_sentences"]), None)
+    n_sent  = next((r["n_sentences"] for r in rows if r["n_sentences"]), None)
+    n_check = next((r["n_check"] for r in rows if r["n_check"] is not None), None)
     status = "SCORE-EQUIVALENT to CPU at every K" if total_mm == 0 else \
              f"**{total_mm} score mismatches** — investigate before CP-4 sign-off"
-    L.append(f"**Correctness:** {status} "
-             f"(checked {n_sent if n_sent else '?'} sentences per K).\n")
+    if n_check is not None:
+        scope = f"spot-checked on the first {n_check} of {n_sent} sentences per K" \
+                if n_sent else f"spot-checked on {n_check} sentences per K"
+    else:
+        scope = "checked sentence count not recorded in this CSV"
+    L.append(f"**Correctness:** {status} ({scope}).\n")
 
     # throughput + memory table
     L.append("## Throughput and memory vs K\n")
@@ -237,6 +248,29 @@ def build_md(rows, ncu, have_recall_png, have_thru_png,
             umb=fmt(r["used_MB"], "{:.1f}"),
         ))
     L.append("")
+
+    # batched launch table: the K3 result in one number. Skipped for the K2 CSV,
+    # which has no n_launches column.
+    if any(r["n_launches"] is not None for r in rows):
+        n_sent_l = next((r["n_sentences"] for r in rows if r["n_sentences"]), None)
+        L.append("## Launch count (batched sweep)\n")
+        L.append("One `kbest_merge_level` launch per topo level per chunk, covering that "
+                 "level's nodes across *all* sentences in the chunk. Launches therefore "
+                 "scale with depth and chunk count, not with sentence count"
+                 + (f" ({n_sent_l} sentences)." if n_sent_l else "."))
+        L.append("")
+        L.append("| K | chunks | launches | sentences / launch |")
+        L.append("|---|-------:|---------:|-------------------:|")
+        for r in rows:
+            spl = (n_sent_l / r["n_launches"]
+                   if n_sent_l and r["n_launches"] else None)
+            L.append("| {K} | {ch} | {la} | {spl} |".format(
+                K=r["K"],
+                ch=fmt(r["n_chunks"], "{:d}"),
+                la=fmt(r["n_launches"], "{:d}"),
+                spl=fmt(spl, "{:.0f}"),
+            ))
+        L.append("")
 
     # recall table
     L.append("## Top-K recall vs gold\n")
