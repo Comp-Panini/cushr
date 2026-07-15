@@ -18,8 +18,6 @@
 
 ## Launch count (batched sweep)
 
-One `kbest_merge_level` launch per topo level per chunk, covering that level's nodes across *all* sentences in the chunk. Launches therefore scale with depth and chunk count, not with sentence count (119503 sentences).
-
 | K | chunks | launches | sentences / launch |
 |---|-------:|---------:|-------------------:|
 | 1 | 1 | 50 | 2390 |
@@ -30,11 +28,7 @@ One `kbest_merge_level` launch per topo level per chunk, covering that level's n
 
 ## Batch-size sweep (memory vs speed)
 
-`--batch N` sizes each chunk's k-best table to that chunk's node span instead of the whole corpus, so peak device memory scales with N. Smaller chunks cost more launches (each chunk repeats the level loop) and lose cross-sentence parallelism per launch. Throughput is over all 119503 sentences in every row.
-
 ### Peak device memory (used MB)
-
-Whole-corpus (`--batch -1`) allocates the full table; this is the column the K2 driver has no answer to.
 
 | batch | chunks | launches | K=1 | K=5 | K=16 | K=32 | K=64 |
 |---|-------:|---------:|------:|------:|------:|------:|------:|
@@ -44,8 +38,6 @@ Whole-corpus (`--batch -1`) allocates the full table; this is the column the K2 
 | -1 (whole corpus) | 1 | 50 | 72 | 276 | 840 | 1662 | 3306 |
 
 ### Throughput (sent/sec, kernel)
-
-Same total work in every row — only the chunking differs.
 
 | batch | chunks | launches | K=1 | K=5 | K=16 | K=32 | K=64 |
 |---|-------:|---------:|------:|------:|------:|------:|------:|
