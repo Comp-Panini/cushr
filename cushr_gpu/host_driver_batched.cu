@@ -41,7 +41,7 @@ using namespace cushr;
 // K5: reconstruct one GPU topK path by walking (pnode,prank) back-pointers from the sink
 // Copied from host_driver_kbest.cu
 // mirrors TopKDecoder::reconstruct
-// Returns node ids source->sink INCLUDING boundaries.
+// Returns node ids source->sink including boundaries.
 static std::vector<int> reconstruct_gpu_path(const std::vector<int>& h_pnode, const std::vector<int>& h_prank, 
     const std::vector<int>& h_count, int K, int sink_node, int rank) {
     std::vector<int> rev;
@@ -49,7 +49,7 @@ static std::vector<int> reconstruct_gpu_path(const std::vector<int>& h_pnode, co
     int r = rank;
     while (v >= 0) {
         rev.push_back(v);
-        if (r < 0 || r >= h_count[v]) break;   // invalid rank -> reached a source
+        if (r < 0 || r >= h_count[v]) break;   // invalid rank means reached a source
         const int pn = h_pnode[(size_t)v * K + r];
         const int pr = h_prank[(size_t)v * K + r];
         v = pn;
