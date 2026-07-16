@@ -26,19 +26,24 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
     const int slots_per_lane = total_combined_elements/32; 
     const unsigned mask = 0xffffffffu; // mask for participating lanes
 
-    // bitonic merge of a length-n (=total_combined_elements) bitonic sequence:
+    // bitonic merge of a length-n (=total_combined_elements) bitonic sequence.
+    // Bounds are compile-time constants (slots_per_lane in {1,2,4}, the i-loop is
+    // static per template), so unroll to delete loop back-branches.
+    #pragma unroll
     for (int i = total_combined_elements/2; i > 0; i /= 2) {
 
         // case: person im comparing with is in this lane, we are at the K=32,K=64 stage
         if (i >= 32) {
-            const int slot_dist = i/32; 
+            const int slot_dist = i/32;
 
             // for every element in this lane (0,32,64th global idx)
+            #pragma unroll
             for (int slot = 0; slot < slots_per_lane; slot++) {
                 const int my_idx = (slot*32) + lane; // global idx or my_idx
                 const int partner_idx = my_idx ^ i; // find partner idx using XOR
 
-                // if you are the higher idx partner, skip
+                // only the lower-index partner does the compare-exchange (lane/slot
+                // dependent, uniform across data -> not a divergence source)
                 if (partner_idx <= my_idx) {
                     continue;
                 }
@@ -47,28 +52,29 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
                 const int partner_slot = slot ^ slot_dist;
 
                 // find the higher ranked element, me vs partner
-                const bool b_better = better(s[partner_slot], pn[partner_slot], pr[partner_slot], s[slot], pn[slot], pr[slot]);
-                
-                // if partner higher, swap
-                if (b_better) {
-                    // swap them
-                    float temp_score = s[slot]; 
-                    s[slot] = s[partner_slot];
-                    s[partner_slot] = temp_score;
-                    float temp_parent_node = pn[slot]; 
-                    pn[slot] = pn[partner_slot];
-                    pn[partner_slot] = temp_parent_node;
-                    float temp_rank = pr[slot]; 
-                    pr[slot] = pr[partner_slot];
-                    pr[partner_slot] = temp_rank;
-                }
+                const bool sw = better(s[partner_slot], pn[partner_slot], pr[partner_slot], s[slot], pn[slot], pr[slot]);
+
+                // branchless compare-exchange where every lane runs the same selects
+                const float s_lo = sw ? s[partner_slot] : s[slot];
+                const float s_hi = sw ? s[slot] : s[partner_slot];
+                const int pn_lo = sw ? pn[partner_slot] : pn[slot];
+                const int pn_hi = sw ? pn[slot] : pn[partner_slot];
+                const int pr_lo = sw ? pr[partner_slot] : pr[slot];
+                const int pr_hi = sw ? pr[slot] : pr[partner_slot];
+                s[slot] = s_lo; 
+                s[partner_slot] = s_hi;
+                pn[slot] = pn_lo; 
+                pn[partner_slot] = pn_hi;
+                pr[slot] = pr_lo; 
+                pr[partner_slot] = pr_hi;
             }
         }
-        
+
         // case: k < 32, we are doing a smaller comparison across lanes
-        else { 
+        else {
 
             // iterate through each slot in your lane
+            #pragma unroll
             for (int slot = 0; slot < slots_per_lane; slot++) {
 
                 // same as above, assigning my global idx and partner global idx.
@@ -78,31 +84,22 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
                 // __shfl_xor_sync (mask,val,i) returns value of val held by lane 'lane XOR i'
                 // each lane simultaneously recieves partner candidate
                 const float parent_score = __shfl_xor_sync(mask, s[slot], i);
-                const float parent_node_2 = __shfl_xor_sync(mask, pn[slot], i);
-                const float parent_rank_2 = __shfl_xor_sync(mask, pr[slot], i);
+                const int parent_node_2 = __shfl_xor_sync(mask, pn[slot], i);
+                const int parent_rank_2 = __shfl_xor_sync(mask, pr[slot], i);
 
                 const bool idx_is_low = (my_idx < partner_idx);
 
-                bool take_partner;
+                // Lower-index lane keeps the better of (partner, me); higher-index
+                // lane keeps the worse. Fold the idx_is_low branch into the argument
+                // order via a single flag, then one branchless select decides the
+                // write. No data-dependent bra -> no warp divergence here.
+                const bool take_partner = idx_is_low
+                    ? better(parent_score, parent_node_2, parent_rank_2, s[slot], pn[slot], pr[slot])
+                    : better(s[slot], pn[slot], pr[slot], parent_score, parent_node_2, parent_rank_2);
 
-                // if you are the lower indexed lane "is partner higher than me?"
-                if (idx_is_low) {
-                    // TRUE of my value is lower than partner
-                    take_partner = better(parent_score, parent_node_2, parent_rank_2, s[slot], pn[slot], pr[slot]);
-                }
-
-                // if you are higher indexed, "am i higher than partner?"
-                else {
-                    // take partner true IF my value is bigger than what it should be
-                    take_partner = better(s[slot], pn[slot], pr[slot], parent_score, parent_node_2, parent_rank_2);
-                }
-
-                // if take_partner is true then the values are incorrectly ordered, so you swap
-                if (take_partner) {
-                    s[slot] = parent_score;
-                    pn[slot] = parent_node_2;
-                    pr[slot] = parent_rank_2;
-                }
+                s[slot] = take_partner ? parent_score  : s[slot];
+                pn[slot] = take_partner ? parent_node_2 : pn[slot];
+                pr[slot] = take_partner ? parent_rank_2 : pr[slot];
             }
 
         }
