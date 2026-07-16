@@ -8,10 +8,11 @@ namespace cushr {
 
 // comparator
 // return true if candidate A higher than candidate B
-__device__ bool better(float sa, int na, int ra, float sb, int nb, int rb) {
-    if (sa != sb) return sa > sb; // first, higher score wins
-    if (na != nb) return na < nb; // next, smaller parent_node wins
-    return ra < rb; // finally, smaller parent_rank wins
+__device__ __forceinline__ bool better(float sa, int na, int ra,
+                                        float sb, int nb, int rb) {
+    return (sa > sb)                                   // higher score wins
+        || (sa == sb && na < nb)                       // tie: smaller parent_node
+        || (sa == sb && na == nb && ra < rb);          // tie: smaller parent_rank
 }
 
 // given 2 bitonic arrays with K candidates each, sort it fully ascending.
