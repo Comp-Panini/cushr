@@ -31,7 +31,9 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
 
     // bitonic merge of a length-n (=total_combined_elements) bitonic sequence.
     // Bounds are compile-time constants (slots_per_lane in {1,2,4}, the i-loop is
-    // static per template), so unroll to delete loop back-branches.
+    // static per template), so unroll to make every s[]/pn[]/pr[] index a
+    // compile-time constant -- that keeps the candidate arrays in registers
+    // instead of spilling to local memory (kills K=64's 48-byte spill).
     #pragma unroll
     for (int i = total_combined_elements/2; i > 0; i /= 2) {
 
@@ -45,8 +47,7 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
                 const int my_idx = (slot*32) + lane; // global idx or my_idx
                 const int partner_idx = my_idx ^ i; // find partner idx using XOR
 
-                // only the lower-index partner does the compare-exchange (lane/slot
-                // dependent, uniform across data -> not a divergence source)
+                // if you are the higher idx partner, skip
                 if (partner_idx <= my_idx) {
                     continue;
                 }
@@ -55,26 +56,26 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
                 const int partner_slot = slot ^ slot_dist;
 
                 // find the higher ranked element, me vs partner
-                const bool sw = better(s[partner_slot], pn[partner_slot], pr[partner_slot], s[slot], pn[slot], pr[slot]);
-
-                // branchless compare-exchange where every lane runs the same selects
-                const float s_lo = sw ? s[partner_slot] : s[slot];
-                const float s_hi = sw ? s[slot] : s[partner_slot];
-                const int pn_lo = sw ? pn[partner_slot] : pn[slot];
-                const int pn_hi = sw ? pn[slot] : pn[partner_slot];
-                const int pr_lo = sw ? pr[partner_slot] : pr[slot];
-                const int pr_hi = sw ? pr[slot] : pr[partner_slot];
-                s[slot] = s_lo; 
-                s[partner_slot] = s_hi;
-                pn[slot] = pn_lo; 
-                pn[partner_slot] = pn_hi;
-                pr[slot] = pr_lo; 
-                pr[partner_slot] = pr_hi;
+                const bool b_better = better(s[partner_slot], pn[partner_slot], pr[partner_slot], s[slot], pn[slot], pr[slot]);
+                
+                // if partner higher, swap
+                if (b_better) {
+                    // swap them
+                    float temp_score = s[slot]; 
+                    s[slot] = s[partner_slot];
+                    s[partner_slot] = temp_score;
+                    float temp_parent_node = pn[slot]; 
+                    pn[slot] = pn[partner_slot];
+                    pn[partner_slot] = temp_parent_node;
+                    float temp_rank = pr[slot]; 
+                    pr[slot] = pr[partner_slot];
+                    pr[partner_slot] = temp_rank;
+                }
             }
         }
-
+        
         // case: k < 32, we are doing a smaller comparison across lanes
-        else {
+        else { 
 
             // iterate through each slot in your lane
             #pragma unroll
@@ -87,22 +88,31 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
                 // __shfl_xor_sync (mask,val,i) returns value of val held by lane 'lane XOR i'
                 // each lane simultaneously recieves partner candidate
                 const float parent_score = __shfl_xor_sync(mask, s[slot], i);
-                const int parent_node_2 = __shfl_xor_sync(mask, pn[slot], i);
-                const int parent_rank_2 = __shfl_xor_sync(mask, pr[slot], i);
+                const float parent_node_2 = __shfl_xor_sync(mask, pn[slot], i);
+                const float parent_rank_2 = __shfl_xor_sync(mask, pr[slot], i);
 
                 const bool idx_is_low = (my_idx < partner_idx);
 
-                // Lower-index lane keeps the better of (partner, me); higher-index
-                // lane keeps the worse. Fold the idx_is_low branch into the argument
-                // order via a single flag, then one branchless select decides the
-                // write. No data-dependent bra -> no warp divergence here.
-                const bool take_partner = idx_is_low
-                    ? better(parent_score, parent_node_2, parent_rank_2, s[slot], pn[slot], pr[slot])
-                    : better(s[slot], pn[slot], pr[slot], parent_score, parent_node_2, parent_rank_2);
+                bool take_partner;
 
-                s[slot] = take_partner ? parent_score  : s[slot];
-                pn[slot] = take_partner ? parent_node_2 : pn[slot];
-                pr[slot] = take_partner ? parent_rank_2 : pr[slot];
+                // if you are the lower indexed lane "is partner higher than me?"
+                if (idx_is_low) {
+                    // TRUE of my value is lower than partner
+                    take_partner = better(parent_score, parent_node_2, parent_rank_2, s[slot], pn[slot], pr[slot]);
+                }
+
+                // if you are higher indexed, "am i higher than partner?"
+                else {
+                    // take partner true IF my value is bigger than what it should be
+                    take_partner = better(s[slot], pn[slot], pr[slot], parent_score, parent_node_2, parent_rank_2);
+                }
+
+                // if take_partner is true then the values are incorrectly ordered, so you swap
+                if (take_partner) {
+                    s[slot] = parent_score;
+                    pn[slot] = parent_node_2;
+                    pr[slot] = parent_rank_2;
+                }
             }
 
         }
@@ -194,17 +204,12 @@ template<int max> __global__ void kbest_merge_level(GpuLattice lat, GpuKBest kb,
             const int cslot = slots_per_lane_each_half + t;                 // destination slot in the chunk half
             const int g = (cslot << 5) | lane;      // global index in [max, 2*max)
             const int r = (2 * max - 1) - g;        // reversed parent rank in [0, max)
-            // Keep the branch here: the unconditional-load + ternary variant kept
-            // all candidate values live at once and blew K=64 up from 30 to 61
-            // regs (4 slots/lane), halving its occupancy. The comparator fix above
-            // already removes the bulk of the merge-body branches, so this guard
-            // staying a branch costs little.
             if (r < cu) {
                 s[cslot] = kb.score[u * kb.K + r] + es;  // extend the parent path
                 pn[cslot] = u;                            // candidate's parent node
                 pr[cslot] = r;                            // candidate's parent rank
-            }
-
+            } 
+            
             else {
                 s[cslot] = CUSHR_NEG_INF;
                 pn[cslot] = -1;
