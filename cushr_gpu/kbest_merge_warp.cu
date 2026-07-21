@@ -10,9 +10,12 @@ namespace cushr {
 // return true if candidate A higher than candidate B
 __device__ __forceinline__ bool better(float sa, int na, int ra,
                                         float sb, int nb, int rb) {
+    // bitwise (non-short-circuit) so this stays straight-line: short-circuit
+    // || / && emit data-dependent branches, bitwise operators fold to selp.
+    const bool eq_s = (sa == sb);
     return (sa > sb)                                   // higher score wins
-        || (sa == sb && na < nb)                       // tie: smaller parent_node
-        || (sa == sb && na == nb && ra < rb);          // tie: smaller parent_rank
+         | (eq_s & (na < nb))                          // tie: smaller parent_node
+         | (eq_s & (na == nb) & (ra < rb));            // tie: smaller parent_rank
 }
 
 // given 2 bitonic arrays with K candidates each, sort it fully ascending.
@@ -191,17 +194,14 @@ template<int max> __global__ void kbest_merge_level(GpuLattice lat, GpuKBest kb,
             const int cslot = slots_per_lane_each_half + t;                 // destination slot in the chunk half
             const int g = (cslot << 5) | lane;      // global index in [max, 2*max)
             const int r = (2 * max - 1) - g;        // reversed parent rank in [0, max)
-            if (r < cu) {
-                s[cslot] = kb.score[u * kb.K + r] + es;  // extend the parent path
-                pn[cslot] = u;                            // candidate's parent node
-                pr[cslot] = r;                            // candidate's parent rank
-            } 
-            
-            else {
-                s[cslot] = CUSHR_NEG_INF;
-                pn[cslot] = -1;
-                pr[cslot] = -1;
-            }
+            // r in [0, max) and max <= K, so kb.score[u*kb.K + r] is always in
+            // bounds -- the guard only picks the value, not safety. Load
+            // unconditionally and select, dropping a data-dependent branch.
+            const bool valid = (r < cu);
+            const float sv = kb.score[u * kb.K + r] + es;   // extend the parent path
+            s[cslot]  = valid ? sv : CUSHR_NEG_INF;
+            pn[cslot] = valid ? u  : -1;                     // candidate's parent node
+            pr[cslot] = valid ? r  : -1;                     // candidate's parent rank
         }
 
         // Merge the bitonic 2*max array; the top max land ascending in slots
