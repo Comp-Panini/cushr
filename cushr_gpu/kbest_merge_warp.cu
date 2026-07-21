@@ -194,14 +194,22 @@ template<int max> __global__ void kbest_merge_level(GpuLattice lat, GpuKBest kb,
             const int cslot = slots_per_lane_each_half + t;                 // destination slot in the chunk half
             const int g = (cslot << 5) | lane;      // global index in [max, 2*max)
             const int r = (2 * max - 1) - g;        // reversed parent rank in [0, max)
-            // r in [0, max) and max <= K, so kb.score[u*kb.K + r] is always in
-            // bounds -- the guard only picks the value, not safety. Load
-            // unconditionally and select, dropping a data-dependent branch.
-            const bool valid = (r < cu);
-            const float sv = kb.score[u * kb.K + r] + es;   // extend the parent path
-            s[cslot]  = valid ? sv : CUSHR_NEG_INF;
-            pn[cslot] = valid ? u  : -1;                     // candidate's parent node
-            pr[cslot] = valid ? r  : -1;                     // candidate's parent rank
+            // Keep the branch here: the unconditional-load + ternary variant kept
+            // all candidate values live at once and blew K=64 up from 30 to 61
+            // regs (4 slots/lane), halving its occupancy. The comparator fix above
+            // already removes the bulk of the merge-body branches, so this guard
+            // staying a branch costs little.
+            if (r < cu) {
+                s[cslot] = kb.score[u * kb.K + r] + es;  // extend the parent path
+                pn[cslot] = u;                            // candidate's parent node
+                pr[cslot] = r;                            // candidate's parent rank
+            }
+
+            else {
+                s[cslot] = CUSHR_NEG_INF;
+                pn[cslot] = -1;
+                pr[cslot] = -1;
+            }
         }
 
         // Merge the bitonic 2*max array; the top max land ascending in slots
