@@ -29,15 +29,6 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
     const int slots_per_lane = total_combined_elements/32; 
     const unsigned mask = 0xffffffffu; // mask for participating lanes
 
-    // bitonic merge of a length-n (=total_combined_elements) bitonic sequence.
-    // Bounds are compile-time constants (slots_per_lane in {1,2,4}, the i-loop is
-    // static per template), so unroll to make every s[]/pn[]/pr[] index a
-    // compile-time constant -- that keeps the candidate arrays in registers
-    // instead of spilling to local memory (kills K=32's spill). Unroll ONLY for
-    // K<=32: for K=64 unrolling keeps all 4 slots live -> 79 regs / 37.5% occ,
-    // whereas the branchy, non-unrolled K=64 keeps 30 regs / 100% occ with a
-    // tiny L1-cached 48B spill that full occupancy hides. So gate the unroll on
-    // the template size (factor 1 = no unroll).
     #pragma unroll (max <= 32 ? 32 : 1)
     for (int i = total_combined_elements/2; i > 0; i /= 2) {
 
