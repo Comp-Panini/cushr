@@ -33,8 +33,12 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
     // Bounds are compile-time constants (slots_per_lane in {1,2,4}, the i-loop is
     // static per template), so unroll to make every s[]/pn[]/pr[] index a
     // compile-time constant -- that keeps the candidate arrays in registers
-    // instead of spilling to local memory (kills K=64's 48-byte spill).
-    #pragma unroll
+    // instead of spilling to local memory (kills K=32's spill). Unroll ONLY for
+    // K<=32: for K=64 unrolling keeps all 4 slots live -> 79 regs / 37.5% occ,
+    // whereas the branchy, non-unrolled K=64 keeps 30 regs / 100% occ with a
+    // tiny L1-cached 48B spill that full occupancy hides. So gate the unroll on
+    // the template size (factor 1 = no unroll).
+    #pragma unroll (max <= 32 ? 32 : 1)
     for (int i = total_combined_elements/2; i > 0; i /= 2) {
 
         // case: person im comparing with is in this lane, we are at the K=32,K=64 stage
@@ -42,7 +46,7 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
             const int slot_dist = i/32;
 
             // for every element in this lane (0,32,64th global idx)
-            #pragma unroll
+            #pragma unroll (max <= 32 ? 32 : 1)
             for (int slot = 0; slot < slots_per_lane; slot++) {
                 const int my_idx = (slot*32) + lane; // global idx or my_idx
                 const int partner_idx = my_idx ^ i; // find partner idx using XOR
@@ -78,7 +82,7 @@ template<int max> __device__ void warp_bitonic_merge(float* s, int* pn, int* pr,
         else { 
 
             // iterate through each slot in your lane
-            #pragma unroll
+            #pragma unroll (max <= 32 ? 32 : 1)
             for (int slot = 0; slot < slots_per_lane; slot++) {
 
                 // same as above, assigning my global idx and partner global idx.
