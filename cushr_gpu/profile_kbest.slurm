@@ -34,6 +34,11 @@ cd "$SLURM_SUBMIT_DIR"
 
 DATA=/scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz
 
+# Output tag so a new run does not clobber previous profiles. Override on submit
+# with:  sbatch --export=ALL,TAG=mylabel profile_kbest.slurm
+# Defaults to a timestamp (e.g. ncu_kbest_K64_20260721_1830.csv).
+TAG="${TAG:-$(date +%Y%m%d_%H%M)}"
+
 echo "==== build ===="
 make clean
 make cushr_kbest
@@ -47,8 +52,8 @@ for K in 32 64; do
         --launch-count 200 \
         --kernel-name-base demangled \
         --kernel-name "regex:kbest_merge_level" \
-        --csv --log-file "ncu_kbest_K${K}.csv" \
-        -o "ncu_kbest_K${K}" -f \
+        --csv --log-file "ncu_kbest_K${K}_${TAG}.csv" \
+        -o "ncu_kbest_K${K}_${TAG}" -f \
         ./cushr_kbest "$DATA" --scorer log_linear --K "$K" --limit 200
     echo
 done
