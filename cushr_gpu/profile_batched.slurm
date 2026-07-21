@@ -38,6 +38,12 @@ cd "$SLURM_SUBMIT_DIR"
 
 DATA=/scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz
 
+# Output tag so a new run does not clobber previous profiles (e.g. the July-14
+# pre-branchless baseline in ncu_batched_K*.ncu-rep). Override on submit with:
+#   sbatch --export=ALL,TAG=branchless profile_batched.slurm
+# Defaults to a timestamp (e.g. ncu_batched_K64_20260721_1830.csv).
+TAG="${TAG:-$(date +%Y%m%d_%H%M)}"
+
 echo "==== build ===="
 make clean
 make cushr_batched
@@ -57,7 +63,7 @@ for K in 32 64; do
         --launch-count 200 \
         --kernel-name-base demangled \
         --kernel-name "regex:kbest_merge_level" \
-        -o "ncu_batched_K${K}" -f \
+        -o "ncu_batched_K${K}_${TAG}" -f \
         ./cushr_batched "$DATA" --scorer log_linear --K "$K" --batch 1024 --check 0
     echo
 done
@@ -66,9 +72,9 @@ done
 # per launch, metric names as column headers). Re-runnable on a login node
 # against existing .ncu-rep files -- no GPU or re-profiling needed.
 for K in 32 64; do
-    echo "==== export K=$K -> ncu_batched_K${K}.csv ===="
-    ncu --import "ncu_batched_K${K}.ncu-rep" --csv --page raw > "ncu_batched_K${K}.csv"
-    wc -l "ncu_batched_K${K}.csv"
+    echo "==== export K=$K -> ncu_batched_K${K}_${TAG}.csv ===="
+    ncu --import "ncu_batched_K${K}_${TAG}.ncu-rep" --csv --page raw > "ncu_batched_K${K}_${TAG}.csv"
+    wc -l "ncu_batched_K${K}_${TAG}.csv"
 done
 
 echo "==== done ===="

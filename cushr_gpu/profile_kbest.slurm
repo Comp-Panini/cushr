@@ -48,13 +48,18 @@ echo
 # caps how many kernel launches are profiled.
 for K in 32 64; do
     echo "==== ncu profile K=$K ===="
+    # Profile into a binary report (.ncu-rep) for the GUI. With -o present, ncu
+    # does NOT emit CSV to stdout, so we export the CSV in a second step below.
     ncu --set full \
         --launch-count 200 \
         --kernel-name-base demangled \
         --kernel-name "regex:kbest_merge_level" \
-        --csv --log-file "ncu_kbest_K${K}_${TAG}.csv" \
         -o "ncu_kbest_K${K}_${TAG}" -f \
         ./cushr_kbest "$DATA" --scorer log_linear --K "$K" --limit 200
+
+    # Export the same report to CSV (re-reads the .ncu-rep, no re-run/GPU needed).
+    ncu --import "ncu_kbest_K${K}_${TAG}.ncu-rep" --csv --page raw \
+        > "ncu_kbest_K${K}_${TAG}.csv"
     echo
 done
 
