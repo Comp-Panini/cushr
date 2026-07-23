@@ -50,16 +50,26 @@ make clean
 make cushr_kbest
 echo
 
+# K=24 and 48 added to match bench_batched.slurm, so the K2-vs-K3 comparison
+# plot has both curves defined at every K. They need no kernel change: the
+# bitonic network is templated on the capacity (32 / 64) and K only bounds the
+# write-back, so 24 runs the cap-32 network and 48 the cap-64 one.
+#
+# NOTE: rerunning this overwrites kbest_bench.csv, the Week-7 "frozen" result.
+# The 1/5/16/32/64 rows should come back identical -- if they do not, something
+# changed underneath and that is worth knowing before the numbers go in a paper.
+KLIST=1,5,16,24,32,48,64
+
 # Fast smoke first (2000 sentences) so a broken run fails in ~1 min, not 4 h.
 # Comment this out once you trust the pipeline.
 echo "==== smoke: 2000 sentences ===="
 ./cushr_kbest "$DATA" --scorer log_linear --weights "$WEIGHTS" \
-    --K 1,5,16,32,64 --limit 2000 --csv kbest_bench_smoke.csv
+    --K "$KLIST" --limit 2000 --csv kbest_bench_smoke.csv
 echo
 
 echo "==== full run: all sentences, writing kbest_bench.csv ===="
 ./cushr_kbest "$DATA" --scorer log_linear --weights "$WEIGHTS" \
-    --K 1,5,16,32,64 --limit -1 --csv kbest_bench.csv
+    --K "$KLIST" --limit -1 --csv kbest_bench.csv
 
 echo
 echo "==== kbest_bench.csv ===="

@@ -63,6 +63,7 @@ def load_bench(path):
                 "sent_per_sec": _num(r.get("sent_per_sec_kernel")),
                 "used_MB":      _num(r.get("gpu_used_MB")),
                 "table_MB":     _num(r.get("gpu_table_MB")),
+                "n_sentences":  _num(r.get("n_sentences"), int),
             }
     return out
 
@@ -212,11 +213,15 @@ def load_mem_sweep(outdir, k_target=32):
         rows = load_bench(path)
         if k_target in rows and rows[k_target]["used_MB"] is not None:
             pts.append((int(m.group(1)), rows[k_target]["used_MB"]))
-    # whole-corpus run = the largest batch point.
+    # The batch=-1 run is one chunk covering every sentence, so its x is the
+    # corpus size (119,503) -- not a made-up multiple of the largest --batch,
+    # which is what this used to plot and which moves whenever the sweep grows.
     whole = load_bench(os.path.join(outdir, "batched_bench.csv"))
     if k_target in whole and whole[k_target]["used_MB"] is not None:
-        pts.append((max((b for b, _ in pts), default=0) * 4 or 999999,
-                    whole[k_target]["used_MB"]))
+        n_sent = whole[k_target].get("n_sentences")
+        if n_sent is None:
+            n_sent = max((b for b, _ in pts), default=1) * 2
+        pts.append((int(n_sent), whole[k_target]["used_MB"]))
     pts.sort()
     return pts
 

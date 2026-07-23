@@ -45,7 +45,7 @@ Shows the chunked footprint shrinking as `--batch` drops, against K2's fixed ful
 | 256 | 6.0 |
 | 1024 | 20.0 |
 | 4096 | 68.0 |
-| 16384 | 1662.0 |
+| 119503 | 1662.0 |
 
 ![Throughput K2 vs K3](comparison_throughput.png)
 
