@@ -46,7 +46,9 @@ nvidia-smi
 echo
 
 echo "==== build ===="
-make clean
+# NO `make clean` here -- it rm's every binary in the shared submit dir, including
+# cushr_batched, which killed a concurrently-running bench_batched.slurm (job
+# 3312687). `make cushr_kbest` rebuilds from sources on its own.
 make cushr_kbest
 echo
 

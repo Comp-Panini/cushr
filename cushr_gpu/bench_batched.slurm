@@ -57,7 +57,11 @@ nvidia-smi
 echo
 
 echo "==== build ===="
-make clean
+# NO `make clean` here. Every job in this directory shares $SLURM_SUBMIT_DIR, and
+# the clean target rm's *all* binaries including cushr_batched -- so a second job
+# (e.g. bench_kbest.slurm) starting while this one runs would delete the binary
+# mid-sweep. That is exactly what killed job 3312687. `make cushr_batched`
+# depends directly on its sources, so it already rebuilds when they change.
 make cushr_batched
 echo
 
