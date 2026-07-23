@@ -173,6 +173,9 @@ def plot_recall(rows, path):
     plt.xlabel("K (beam width)")
     plt.ylabel("Top-K recall vs gold")
     plt.title("Top-K recall vs K")
+    # Anchor at 0 so the curve's height is readable as its actual value.
+    # Autoscaling zooms into the spread and makes a small gain look huge.
+    plt.ylim(0.0, 1.02)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(path, dpi=140)
@@ -190,6 +193,7 @@ def plot_throughput(rows, path):
     plt.xlabel("K (beam width)")
     plt.ylabel("Sentences / sec (kernel-only)")
     plt.title("Throughput vs K")
+    plt.ylim(0.0, max(ys) * 1.08)
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(path, dpi=140)

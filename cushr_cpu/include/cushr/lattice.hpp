@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -70,8 +71,15 @@ public:
     int out_edge_end(int v) const { 
         return row_ptr_[v + 1]; 
     }
-    int edge_dst(int e) const { 
-        return col_idx_[e]; 
+    int edge_dst(int e) const {
+        return col_idx_[e];
+    }
+    // Source node of forward edge e. The CSR does not store it, so we binary
+    // search row_ptr_. Only the biaffine scorer needs this; the decoder always
+    // has u in hand already.
+    int edge_src(int e) const {
+        return (int)(std::upper_bound(row_ptr_.begin(), row_ptr_.end(), e)
+                     - row_ptr_.begin()) - 1;
     }
 
     // reverse CSR: incoming edges of v are [in_row_ptr_[v], in_row_ptr_[v+1])

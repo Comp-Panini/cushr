@@ -46,8 +46,8 @@ std::vector<float> parse_csv_floats(const std::string& s) {
 
 void usage(const char* prog) {
     std::fprintf(stderr,
-        "Usage: %s <lattice.npz> [--scorer uniform|length|log_linear]\n"
-        "           [--weights w0,w1,...] [--bias b]\n"
+        "Usage: %s <lattice.npz> [--scorer uniform|length|log_linear|biaffine]\n"
+        "           [--weights w0,w1,...] [--bias b] [--model model.bin]\n"
         "           [--K 10] [--golden out.json] [--golden-n 500]\n"
         "           [--keep-report keep_report.csv]\n", prog);
 }
@@ -60,6 +60,7 @@ int main(int argc, char** argv) {
     std::string npz_path  = argv[1];
     std::string scorer_kind = "log_linear";
     std::string weights_csv;
+    std::string model_bin;
     float bias = 0.0f;
     int   K    = 10;
     std::string golden_path;
@@ -76,6 +77,7 @@ int main(int argc, char** argv) {
             return argv[++i];
         };
         if (a == "--scorer")        scorer_kind = need("--scorer");
+        else if (a == "--model")    model_bin = need("--model");
         else if (a == "--weights")  weights_csv = need("--weights");
         else if (a == "--bias")     bias = std::stof(need("--bias"));
         else if (a == "--K")        K = std::stoi(need("--K"));
@@ -114,6 +116,17 @@ int main(int argc, char** argv) {
             if (!w.empty()) w[0] = 1.0f;
         }
         scorer = std::make_unique<cushr::LogLinearScorer>(std::move(w), bias);
+    } else if (scorer_kind == "biaffine") {
+        if (model_bin.empty()) {
+            std::fprintf(stderr,
+                "--scorer biaffine requires --model <model_biaffine.bin>\n"
+                "  (produced by cushr_train/export_weights.py --bin)\n");
+            return 1;
+        }
+        auto b = cushr::BiaffineScorer::load(model_bin);
+        std::cout << "  loaded biaffine: feat_dim=" << b.feat_dim()
+                  << " hidden=" << b.hidden() << "\n";
+        scorer = std::make_unique<cushr::BiaffineScorer>(std::move(b));
     } else {
         std::fprintf(stderr, "unknown scorer: %s\n", scorer_kind.c_str());
         return 1;

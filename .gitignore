@@ -10,6 +10,11 @@ viz/cushr_viz.db
 *.o
 cushr_cpu/cushr_tests
 
+# Week-9 training cache (extracted .npy mirrors of the npz, ~1 GB) and the
+# precomputed per-edge score table (~244 MB)
+cushr_train/cache/
+cushr_train/edge_score*.npy
+
 # Python bytecode
 __pycache__/
 *.pyc

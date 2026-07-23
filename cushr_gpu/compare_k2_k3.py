@@ -168,6 +168,11 @@ def plot_throughput(k2, k3, path):
     plt.xlabel("K (beam width)")
     plt.ylabel("Sentences / sec (wall clock)")
     plt.title("Throughput: K2 vs K3 (batched)")
+    # Anchor at 0: the point of this plot is the *size* of the batched win, and
+    # an autoscaled baseline understates how close to the axis the K2 curve is.
+    vals = [v for v in series(k2) + series(k3) if v is not None]
+    if vals:
+        plt.ylim(0.0, max(vals) * 1.08)
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -188,6 +193,8 @@ def plot_memory(mem_sweep, k2_used_k32, path):
     plt.xlabel("--batch (sentences per chunk)")
     plt.ylabel("GPU used MB")
     plt.title("Device memory vs batch size (K=32)")
+    top = max(ys + ([k2_used_k32] if k2_used_k32 is not None else []))
+    plt.ylim(0.0, top * 1.08)
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
