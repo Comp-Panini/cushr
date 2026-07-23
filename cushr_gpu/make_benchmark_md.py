@@ -145,15 +145,23 @@ def top_stalls(metrics, n=2):
     return stalls[:n]
 
 
-def load_ncu(outdir, prefix="ncu_kbest"):
-    """Return {K: {metric: value}} for every <prefix>_K*.csv found.
+def load_ncu(outdir, prefix="ncu_kbest", tag=""):
+    """Return {K: {metric: value}} for every <prefix>_K<N>[_<tag>].csv found.
 
     prefix defaults to the Week-7 K2 files (ncu_kbest_K*.csv); pass
     prefix="ncu_batched" to pick up the Week-8 batched profiles instead.
+
+    profile_batched.slurm tags each run (TAG=baseline, TAG=branchless, or a
+    timestamp) so several profiles of different kernel revisions can coexist.
+    Pass tag="branchless" to select one explicitly -- without it only the
+    untagged <prefix>_K<N>.csv is read, so a stale profile can never sneak into
+    a report just because it happens to sort first.
     """
+    suffix = f"_{tag}" if tag else ""
     out = {}
-    for path in glob.glob(os.path.join(outdir, f"{prefix}_K*.csv")):
-        m = re.search(re.escape(prefix) + r"_K(\d+)\.csv$", os.path.basename(path))
+    for path in glob.glob(os.path.join(outdir, f"{prefix}_K*{suffix}.csv")):
+        m = re.search(re.escape(prefix) + r"_K(\d+)" + re.escape(suffix) + r"\.csv$",
+                      os.path.basename(path))
         if not m:
             continue
         parsed = parse_ncu_csv(path)
@@ -396,6 +404,11 @@ def main():
     ap.add_argument("--recall-note", default="",
                     help="extra caption under the recall heading, e.g. to note "
                          "that batched recall is an invariant spot-check vs K2")
+    ap.add_argument("--ncu-tag", default="", metavar="TAG",
+                    help="select tagged profile CSVs written by "
+                         "profile_batched.slurm, i.e. <prefix>_K<N>_<TAG>.csv "
+                         "(e.g. --ncu-tag branchless). Default reads only the "
+                         "untagged <prefix>_K<N>.csv.")
     ap.add_argument("--sweep", action="append", default=[], metavar="LABEL=CSV",
                     help="add a row to the batch-size sweep tables, e.g. "
                          "--sweep 256=batched_bench_b256.csv . Repeatable; rows "
@@ -412,7 +425,7 @@ def main():
                          "bench_batched.slurm (batched_bench.csv) first.")
 
     rows = load_bench(args.bench)
-    ncu = load_ncu(args.outdir, prefix=args.ncu_prefix)
+    ncu = load_ncu(args.outdir, prefix=args.ncu_prefix, tag=args.ncu_tag)
 
     sweeps = []
     for spec in args.sweep:

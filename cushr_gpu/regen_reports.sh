@@ -9,6 +9,11 @@
 #   ./regen_reports.sh              # batched (week 8) + comparison
 #   ./regen_reports.sh --with-k2    # also rebuild the week-7 K2 report
 #
+# NCU_TAG selects which profile_batched.slurm run feeds the Nsight section, e.g.
+#   NCU_TAG=branchless ./regen_reports.sh
+# Leave it unset unless the tagged profile matches the kernel the benchmark CSVs
+# were produced with -- a mismatched profile is worse than an empty section.
+#
 # The --sweep list is built from whatever batched_bench_b<N>.csv files exist, so
 # adding batch sizes to bench_batched.slurm needs no change here.
 #----------------------------------------------------------------------
@@ -17,6 +22,9 @@ cd "$(dirname "$0")"
 
 WITH_K2=0
 [ "${1:-}" = "--with-k2" ] && WITH_K2=1
+
+NCU_ARGS=()
+[ -n "${NCU_TAG:-}" ] && NCU_ARGS+=(--ncu-tag "$NCU_TAG")
 
 # --- batch-sweep args, numerically sorted, whole-corpus row last -------------
 SWEEP_ARGS=()
@@ -36,7 +44,7 @@ if [ -f batched_bench.csv ]; then
         --bench batched_bench.csv \
         --title "cuSHR Batched (K3 + K5) Results — Week 8" \
         --md BATCHED_BENCHMARK.md --inject \
-        --ncu-prefix ncu_batched \
+        --ncu-prefix ncu_batched ${NCU_ARGS[@]+"${NCU_ARGS[@]}"} \
         --recall-png batched_recall_vs_k.png \
         --thru-png batched_throughput_vs_k.png \
         "${SWEEP_ARGS[@]}"
