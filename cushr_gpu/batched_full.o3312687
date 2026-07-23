@@ -1,0 +1,48 @@
+==== node / gpu ====
+v330-001.ls6.tacc.utexas.edu
+Wed Jul 22 20:50:23 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 570.195.03             Driver Version: 570.195.03     CUDA Version: 12.8     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-PCIE-40GB          On  |   00000000:06:00.0 Off |                    0 |
+| N/A   25C    P0             33W /  250W |       0MiB /  40960MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+
+==== build ====
+rm -f cushr_viterbi_k1 cushr_viterbi_tests cushr_kbest cushr_kbest_tests cushr_batched
+nvcc -std=c++17 -O2 -arch=sm_80 -I. -I../cushr_cpu/include -I../cushr_cpu/vendor -o cushr_batched kbest_merge_warp.cu host_driver_batched.cu ../cushr_cpu/src/lattice.cpp ../cushr_cpu/src/scorer.cpp ../cushr_cpu/src/decoder.cpp ../cushr_cpu/src/metrics.cpp ../cushr_cpu/vendor/cnpy.cpp -lz   
+
+==== smoke: batch=8192, check 2000 ====
+loading /scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz ...
+  nodes=4488155 edges=61140552 sentences=119503 feat_dim=43
+  scorer=log_linear
+  batch=8192  chunks=15  (whole-corpus sweep = batch<=0)
+=== K= 1 ===  15 chunks, 568 launches, sweep 197.11 ms  1.65 us/sent (kernel)  606289 sent/sec  table=5.0 MB used=8.0 MB  check(2000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@1 = 0.0461 (42/911)
+=== K= 5 ===  15 chunks, 568 launches, sweep 171.08 ms  1.43 us/sent (kernel)  698531 sent/sec  table=19.8 MB used=26.0 MB  check(2000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@5 = 0.0933 (85/911)
+=== K=16 ===  15 chunks, 568 launches, sweep 172.29 ms  1.44 us/sent (kernel)  693599 sent/sec  table=60.7 MB used=62.0 MB  check(2000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@16 = 0.1647 (150/911)
+=== K=24 ===  15 chunks, 568 launches, sweep 182.88 ms  1.53 us/sent (kernel)  653442 sent/sec  table=90.5 MB used=92.0 MB  check(2000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@24 = 0.2064 (188/911)
+=== K=32 ===  15 chunks, 568 launches, sweep 167.07 ms  1.40 us/sent (kernel)  715266 sent/sec  table=120.2 MB used=122.0 MB  check(2000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@32 = 0.2261 (206/911)
+=== K=48 ===  15 chunks, 568 launches, sweep 524.91 ms  4.39 us/sent (kernel)  227664 sent/sec  table=179.7 MB used=182.0 MB  check(2000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@48 = 0.2678 (244/911)
+=== K=64 ===  15 chunks, 568 launches, sweep 520.43 ms  4.35 us/sent (kernel)  229624 sent/sec  table=239.1 MB used=242.0 MB  check(2000): SCORE-EQUIVALENT (score_mm=0 count_mm=0)  recall@K=
+             recall@64 = 0.2931 (267/911)
+
+==== full run: batch=256 (throughput/memory only) ====

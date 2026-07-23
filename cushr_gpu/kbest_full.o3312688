@@ -1,0 +1,76 @@
+==== node / gpu ====
+v330-015.ls6.tacc.utexas.edu
+Wed Jul 22 20:50:53 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 570.195.03             Driver Version: 570.195.03     CUDA Version: 12.8     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-PCIE-40GB          On  |   00000000:06:00.0 Off |                    0 |
+| N/A   26C    P0             34W /  250W |       0MiB /  40960MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+
+==== build ====
+rm -f cushr_viterbi_k1 cushr_viterbi_tests cushr_kbest cushr_kbest_tests cushr_batched
+nvcc -std=c++17 -O2 -arch=sm_80 -I. -I../cushr_cpu/include -I../cushr_cpu/vendor -o cushr_kbest kbest_merge_warp.cu host_driver_kbest.cu ../cushr_cpu/src/lattice.cpp ../cushr_cpu/src/scorer.cpp ../cushr_cpu/src/decoder.cpp ../cushr_cpu/src/metrics.cpp ../cushr_cpu/vendor/cnpy.cpp -lz   
+
+==== smoke: 2000 sentences ====
+loading /scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz ...
+  nodes=4488155 edges=61140552 sentences=119503 feat_dim=43
+  scorer=log_linear
+=== K= 1 ===  checked 2000 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 385.6 us/sent  kernel 246.1 us/sent  recall@K= (42/911)  table=68.5 MB used=72.0 MB
+             recall@1 = 0.0461
+=== K= 5 ===  checked 2000 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 388.1 us/sent  kernel 248.2 us/sent  recall@K= (85/911)  table=273.9 MB used=276.0 MB
+             recall@5 = 0.0933
+=== K=16 ===  checked 2000 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 395.9 us/sent  kernel 254.6 us/sent  recall@K= (150/911)  table=838.9 MB used=840.0 MB
+             recall@16 = 0.1647
+=== K=24 ===  checked 2000 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 387.3 us/sent  kernel 247.5 us/sent  recall@K= (188/911)  table=1249.8 MB used=1254.0 MB
+             recall@24 = 0.2064
+=== K=32 ===  checked 2000 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 382.5 us/sent  kernel 244.6 us/sent  recall@K= (206/911)  table=1660.7 MB used=1662.0 MB
+             recall@32 = 0.2261
+=== K=48 ===  checked 2000 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 884.9 us/sent  kernel 750.4 us/sent  recall@K= (244/911)  table=2482.5 MB used=2484.0 MB
+             recall@48 = 0.2678
+=== K=64 ===  checked 2000 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 891.7 us/sent  kernel 757.7 us/sent  recall@K= (267/911)  table=3304.3 MB used=3306.0 MB
+             recall@64 = 0.2931
+
+==== full run: all sentences, writing kbest_bench.csv ====
+loading /scratch/11503/njhavar/cushr/data/new_cushr_data_fixed_USE_THIS.npz ...
+  nodes=4488155 edges=61140552 sentences=119503 feat_dim=43
+  scorer=log_linear
+=== K= 1 ===  checked 119503 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 341.0 us/sent  kernel 212.8 us/sent  recall@K= (4912/59092)  table=68.5 MB used=72.0 MB
+             recall@1 = 0.0831
+=== K= 5 ===  checked 119503 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 342.4 us/sent  kernel 213.9 us/sent  recall@K= (9826/59092)  table=273.9 MB used=276.0 MB
+             recall@5 = 0.1663
+=== K=16 ===  checked 119503 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 343.0 us/sent  kernel 214.9 us/sent  recall@K= (14944/59092)  table=838.9 MB used=840.0 MB
+             recall@16 = 0.2529
+=== K=24 ===  checked 119503 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 343.9 us/sent  kernel 215.2 us/sent  recall@K= (17089/59092)  table=1249.8 MB used=1254.0 MB
+             recall@24 = 0.2892
+=== K=32 ===  checked 119503 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 342.3 us/sent  kernel 214.8 us/sent  recall@K= (18345/59092)  table=1660.7 MB used=1662.0 MB
+             recall@32 = 0.3104
+=== K=48 ===  checked 119503 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 845.6 us/sent  kernel 717.3 us/sent  recall@K= (20397/59092)  table=2482.5 MB used=2484.0 MB
+             recall@48 = 0.3452
+=== K=64 ===  checked 119503 sentences: SCORE-EQUIVALENT to CPU  (score_mismatch=0, count_mismatch=0)  loop 844.3 us/sent  kernel 716.4 us/sent  recall@K= (21738/59092)  table=3304.3 MB used=3306.0 MB
+             recall@64 = 0.3679
+
+==== kbest_bench.csv ====
+K,n_sentences,n_gold,recall_at_K,us_per_sent_loop,us_per_sent_kernel,sent_per_sec_kernel,gpu_table_MB,gpu_used_MB,score_mismatch,count_mismatch
+1,119503,59092,0.083125,340.992,212.833,4698.5,68.484,72.000,0,0
+5,119503,59092,0.166283,342.399,213.942,4674.2,273.935,276.000,0,0
+16,119503,59092,0.252894,343.014,214.919,4652.9,838.927,840.000,0,0
+24,119503,59092,0.289193,343.862,215.183,4647.2,1249.830,1254.000,0,0
+32,119503,59092,0.310448,342.269,214.834,4654.8,1660.732,1662.000,0,0
+48,119503,59092,0.345174,845.581,717.347,1394.0,2482.538,2484.000,0,0
+64,119503,59092,0.367867,844.252,716.384,1395.9,3304.344,3306.000,0,0
+
+==== done ====
