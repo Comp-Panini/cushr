@@ -7,7 +7,7 @@ import itertools
 
 import numpy as np
 
-from dataset import LatticeStore, collate, FEAT_DIM
+from dataset import LatticeStore, collate
 
 NEG_INF = -1e30
 
@@ -59,7 +59,8 @@ def main():
 
     store = LatticeStore(args.cache)
     print(f"store: {store.meta['num_sentences']} sentences, "
-          f"{store.meta['num_with_gold']} with gold, FEAT_DIM={FEAT_DIM}")
+          f"{store.meta['num_with_gold']} with gold, "
+          f"feat_dim={store.feat_dim} ({store.featurizer_name})")
 
     train = store.trainable("train")
     print(f"trainable(train) = {len(train)} "

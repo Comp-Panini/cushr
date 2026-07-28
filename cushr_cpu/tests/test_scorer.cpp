@@ -69,9 +69,9 @@ namespace {
 std::string write_test_model(const std::string& path,
                              int feat_dim, int hidden, float bias,
                              const std::vector<float>& src,
-                             const std::vector<float>& dst) {
+                             const std::vector<float>& dst,
+                             int32_t magic = 0x43534233) {  // 'CSB3'
     std::ofstream out(path, std::ios::binary);
-    int32_t magic = 0x43534232;
     out.write(reinterpret_cast<const char*>(&magic), 4);
     out.write(reinterpret_cast<const char*>(&feat_dim), 4);
     out.write(reinterpret_cast<const char*>(&hidden), 4);
@@ -84,7 +84,8 @@ std::string write_test_model(const std::string& path,
 }  // namespace
 
 TEST_CASE("biaffine scorer matches the hand-computed bilinear form") {
-    // 2 nodes, lattice feat_dim = 3, so model feat_dim = 4 (3 + log1p(len)).
+    // 2 nodes, lattice feat_dim = 3. The model's feat_dim must equal it
+    // exactly: the featurizer emits every column and the scorer appends none.
     std::vector<int> row_ptr = {0, 1, 1};
     std::vector<int> col_idx = {1};
     std::vector<int> topo    = {0, 1};
@@ -95,22 +96,55 @@ TEST_CASE("biaffine scorer matches the hand-computed bilinear form") {
     };
     Lattice lat(row_ptr, col_idx, topo, off, feats, 3);
 
-    // hidden = 2, feat_dim = 4 (last column multiplies log1p(0) = 0)
-    std::vector<float> src = {1.0f, 0.0f, 0.5f, 7.0f,
-                              0.0f, 1.0f, 0.0f, 7.0f};
-    std::vector<float> dst = {2.0f, 0.0f, 1.0f, 9.0f,
-                              0.0f, 1.0f, 1.0f, 9.0f};
+    // hidden = 2, feat_dim = 3
+    std::vector<float> src = {1.0f, 0.0f, 0.5f,
+                              0.0f, 1.0f, 0.0f};
+    std::vector<float> dst = {2.0f, 0.0f, 1.0f,
+                              0.0f, 1.0f, 1.0f};
     const std::string path = "test_model_biaffine.bin";
-    write_test_model(path, 4, 2, /*bias=*/0.5f, src, dst);
+    write_test_model(path, 3, 2, /*bias=*/0.5f, src, dst);
 
     auto s = BiaffineScorer::load(path);
-    CHECK(s.feat_dim() == 4);
+    CHECK(s.feat_dim() == 3);
     CHECK(s.hidden() == 2);
 
-    // x_u = [1,0,2,0] -> W_s x_u = [1*1 + 0.5*2, 0] = [2, 0]
-    // x_v = [0,3,1,0] -> W_d x_v = [1*1, 3*1 + 1*1] = [1, 4]
+    // x_u = [1,0,2] -> W_s x_u = [1*1 + 0.5*2, 0] = [2, 0]
+    // x_v = [0,3,1] -> W_d x_v = [1*1, 3*1 + 1*1] = [1, 4]
     // <[2,0],[1,4]> + 0.5 = 2.5
     CHECK(s.score(lat, 0) == doctest::Approx(2.5f));
+    std::remove(path.c_str());
+}
+
+TEST_CASE("biaffine scorer rejects a stale CSB2 weight file") {
+    // CSB2 weights assume the scorer appends log1p(word_length) itself. Loading
+    // them against a CSB3 scorer would not fail on shape -- it would quietly
+    // score every edge with the wrong feature vector -- so the version check
+    // has to be the thing that catches it.
+    std::vector<float> src = {1.0f, 0.0f, 0.5f, 7.0f};
+    std::vector<float> dst = {2.0f, 0.0f, 1.0f, 9.0f};
+    const std::string path = "test_model_csb2.bin";
+    write_test_model(path, 4, 1, /*bias=*/0.0f, src, dst, /*magic=*/0x43534232);
+    CHECK_THROWS(BiaffineScorer::load(path));
+    std::remove(path.c_str());
+}
+
+TEST_CASE("biaffine scorer rejects a feat_dim that disagrees with the lattice") {
+    // The featurizer that built the .npz and the one the model was trained on
+    // must be the same; a width mismatch is the cheapest detectable symptom.
+    std::vector<int> row_ptr = {0, 1, 1};
+    std::vector<int> col_idx = {1};
+    std::vector<int> topo    = {0, 1};
+    std::vector<int> off     = {0, 2};
+    std::vector<float> feats = {1.0f, 0.0f, 2.0f,
+                                0.0f, 3.0f, 1.0f};
+    Lattice lat(row_ptr, col_idx, topo, off, feats, 3);
+
+    std::vector<float> src = {1.0f, 0.0f, 0.5f, 7.0f};
+    std::vector<float> dst = {2.0f, 0.0f, 1.0f, 9.0f};
+    const std::string path = "test_model_widthmismatch.bin";
+    write_test_model(path, 4, 1, /*bias=*/0.0f, src, dst);
+    auto s = BiaffineScorer::load(path);
+    CHECK_THROWS(s.score(lat, 0));
     std::remove(path.c_str());
 }
 

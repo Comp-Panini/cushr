@@ -25,7 +25,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from dataset import LatticeStore, collate, FEAT_DIM
+from dataset import LatticeStore, collate
 from model import BiaffineEdgeScorer
 from train import to_torch, batches
 from viterbi import viterbi, path_score, gold_score

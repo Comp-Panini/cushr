@@ -5,7 +5,46 @@ import glob
 import sys
 import json
 import pickle
+from array import array
 from collections import defaultdict
+
+import surface
+
+
+# ---------------------------------------------------------------------------
+# Accumulators
+# ---------------------------------------------------------------------------
+# The corpus has ~4.5M nodes and ~61M edges. Accumulating those as Python lists
+# of int costs ~36 bytes per element (28-byte int object + 8-byte list slot),
+# so the edge list alone runs to ~2.5 GB and the whole ingest peaks around 4 GB
+# -- more than this machine has free. array.array stores raw C ints instead, at
+# 4 bytes each, which brings the same data under 500 MB and lets np.frombuffer
+# wrap it at the end with no copy.
+def _i32():
+    a = array('i')
+    if a.itemsize != 4:
+        raise RuntimeError(f"array('i') is {a.itemsize} bytes here, expected 4")
+    return a
+
+
+def _i8():
+    return array('b')
+
+
+def _append_boundary_raw(positions, chunks, forms, lemmas, preverbs, char_starts):
+    """Emit the raw-field row for a super-source / super-sink node.
+
+    Boundary nodes have no surface realisation at all. They get vocabulary id 0
+    (the reserved empty slot) and position/chunk/offset -1, which is the signal
+    every featurizer uses to leave them out of corpus statistics and to zero
+    their feature row.
+    """
+    positions.append(-1)
+    chunks.append(-1)
+    forms.append(0)
+    lemmas.append(0)
+    preverbs.append(0)
+    char_starts.append(-1)
 
 
 # ---------------------------------------------------------------------------
@@ -19,6 +58,38 @@ class DCS(object):
 
 
 sys.modules['__main__'].DCS = DCS
+
+
+class _DCSUnpickler(pickle.Unpickler):
+    """Resolve the pickled DCS class regardless of which module it claims.
+
+    The .p files name their class as `__main__.DCS`. Patching sys.modules is
+    enough in a single process, but under multiprocessing's spawn start method
+    (the default on Windows) the main module is imported as `__mp_main__` and
+    pickle resolves against *that* name instead -- so every worker fails to
+    load every gold file. That failure is silent in aggregate, because an
+    unreadable .p is indistinguishable from a missing one, and the corpus comes
+    out with zero gold paths.
+
+    Overriding find_class removes the dependency on module naming entirely.
+    """
+
+    def find_class(self, module, name):
+        if name == "DCS":
+            return DCS
+        return super().find_class(module, name)
+
+
+def _write_vocab(path, vocab):
+    """Persist an interned vocabulary as `id\\tstring` in id order.
+
+    These files are versioned artifacts: featurizers and any future embedding
+    table index into them, so re-ingesting with a different corpus order
+    renumbers ids and invalidates trained weights.
+    """
+    with open(path, "w", encoding="utf-8") as f:
+        for token, token_id in sorted(vocab.items(), key=lambda x: x[1]):
+            f.write(f"{token_id}\t{token}\n")
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +254,7 @@ def load_gold_entries(p_filepath):
         return None
     try:
         with open(p_filepath, 'rb') as f:
-            dcs = pickle.load(f, encoding='utf-8')
+            dcs = _DCSUnpickler(f, encoding='utf-8').load()
     except Exception as e:
         print(f"  warning: failed to load {p_filepath}: {e}")
         return None
@@ -281,29 +352,62 @@ def reconstruct_gold_path(gold_entries, triple_idx, succ, sources, sinks):
 # Main ingest
 # ---------------------------------------------------------------------------
 def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gold.npz",
-                   index_filename="sentence_index.json"):
+                   index_filename="sentence_index.json", limit=0, filepaths=None,
+                   progress_every=1000, vocab_prefix=""):
+    """Ingest a corpus into one .npz archive.
+
+    `filepaths` overrides the directory scan with an explicit, already-ordered
+    file list. parallel_ingest.py uses it to hand each worker one shard of the
+    corpus; everything else about the per-sentence logic is unchanged, so a
+    sharded run and a single sequential run do the same work.
+    """
     print(f"scanning graphml directory: {graphml_dir}")
     print(f"scanning gold-path directory: {p_dir}")
-    filepaths = sorted(glob.glob(os.path.join(graphml_dir, "*.graphml")))
+    if filepaths is None:
+        filepaths = sorted(glob.glob(os.path.join(graphml_dir, "*.graphml")))
 
     if not filepaths:
         print("error: no .graphml files found, check directory path")
         sys.exit(1)
 
+    # `limit` exists so the whole ingest -> featurize -> train chain can be
+    # smoke-tested in seconds instead of over the full corpus.
+    if limit:
+        filepaths = filepaths[:limit]
+        print(f"limit={limit}: ingesting a subset only")
+
     print(f"found {len(filepaths)} sentences, beginning ingest process...")
 
     # global arrays
-    global_node_features = []        # morph tag id per node
-    global_node_length = []          # surface char length per node (0 for boundary)
-    global_rowptr = [0]
-    global_colidx = []
-    global_topolevel = []
-    global_goldpathmask = []
+    global_node_features = _i32()    # morph tag id per node
+    global_node_length = _i32()      # surface char length per node (0 for boundary)
+    global_rowptr = _i32()
+    global_rowptr.append(0)
+    global_colidx = _i32()
+    global_topolevel = _i32()
+    global_goldpathmask = _i8()
     sentence_offsets = [0]
     current_global_node_index = 0
 
+    # ---- raw per-node fields consumed by cushr_train/featurizers.py ----
+    # Ingest deliberately stores identifiers and offsets, never float features:
+    # which float vector a node becomes is a featurizer's decision, made later
+    # and made reproducibly from these columns. Boundary (super-source/sink)
+    # nodes take id 0 / position -1 / chunk -1 and must be excluded from every
+    # corpus statistic.
+    global_node_position = _i32()    # start offset within the node's chunk
+    global_node_chunk = _i32()       # graphml chunk_no (1-indexed), -1 boundary
+    global_node_form = _i32()        # interned surface form (`word`)
+    global_node_lemma = _i32()       # interned lemma
+    global_node_preverb = _i32()     # interned upasarga (`pre_verb`)
+    global_node_char_start = _i32()  # start offset within the sentence surface
+
+    # per-sentence reconstructed surface text (see ingest/surface.py)
+    surface_text_parts = []
+    surface_text_offsets = [0]
+
     # explicit gold path (flat node ids + per-sentence CSR offsets)
-    gold_path_flat = []
+    gold_path_flat = _i32()
     gold_path_offsets = [0]
 
     # npz sentence index -> graphml filename stem (sorted glob order)
@@ -314,15 +418,25 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
     morph_vocab["UNKNOWN"] = 0
     BOUNDARY_ID = morph_vocab["BOUNDARY"]   # feature-less super source/sink tag
 
+    # Same interning pattern for the remaining categorical fields. Index 0 is
+    # reserved as the boundary/absent slot in each, so a downstream embedding
+    # table can use padding_idx=0 without a remap.
+    form_vocab = defaultdict(lambda: len(form_vocab))
+    form_vocab[""] = 0
+    lemma_vocab = defaultdict(lambda: len(lemma_vocab))
+    lemma_vocab[""] = 0
+    preverb_vocab = defaultdict(lambda: len(preverb_vocab))
+    preverb_vocab[""] = 0
+
     # gold-path bookkeeping
     n_with_pfile = 0
     n_without_pfile = 0
     resolved_sentences = 0
 
     for idx, filepath in enumerate(filepaths):
-        if idx % 1000 == 0 and idx > 0:
+        if progress_every and idx % progress_every == 0 and idx > 0:
             print(f"processed {idx} / {len(filepaths)} sentences  "
-                  f"(gold paths resolved so far: {resolved_sentences})")
+                  f"(gold paths resolved so far: {resolved_sentences})", flush=True)
 
         stem = os.path.splitext(os.path.basename(filepath))[0]
         sentence_index.append(stem)
@@ -428,27 +542,79 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
         for g in gold_set:
             local_gold_mask[g] = 1
 
+        # ----- reconstruct this sentence's surface text -----
+        # Chunks are laid out in chunk_no order and joined with a single space,
+        # matching the whitespace segmentation the chunk numbering came from.
+        # chunk_start then converts a node's in-chunk `position` into an offset
+        # into the sentence string, so a node's surface span is directly
+        # sliceable later without re-parsing graphml.
+        chunk_texts = surface.reconstruct_chunks(node_attrs)
+        chunk_start = {}
+        cursor = 0
+        pieces = []
+        for chunk_no in sorted(chunk_texts):
+            chunk_start[chunk_no] = cursor
+            pieces.append(chunk_texts[chunk_no])
+            cursor += len(chunk_texts[chunk_no]) + 1      # +1 for the space
+        sentence_surface = " ".join(pieces)
+        # node_char_start indexes characters, surface_text stores bytes. SLP1 is
+        # pure ASCII so the two coincide -- assert it rather than assume it,
+        # because a stray non-ASCII character would shift every offset after it
+        # and corrupt the n-gram featurizer silently.
+        encoded = sentence_surface.encode("utf-8")
+        if len(encoded) != len(sentence_surface):
+            raise ValueError(
+                f"non-ASCII surface text in {filepath}: character and byte "
+                f"offsets disagree ({len(sentence_surface)} vs {len(encoded)})")
+        surface_text_parts.append(sentence_surface)
+        surface_text_offsets.append(surface_text_offsets[-1] + len(encoded))
+
         # super-source
         global_node_features.append(BOUNDARY_ID)
         global_node_length.append(0)
         global_topolevel.append(0)
         global_goldpathmask.append(0)
+        _append_boundary_raw(global_node_position, global_node_chunk,
+                             global_node_form, global_node_lemma,
+                             global_node_preverb, global_node_char_start)
         # words
         for i, n in enumerate(node_list):
-            raw_morph = node_attrs[i].get('morph', 'UNKNOWN')
+            attrs = node_attrs[i]
+            raw_morph = attrs.get('morph', 'UNKNOWN')
             global_node_features.append(morph_vocab[raw_morph])
             try:
-                wlen = int(node_attrs[i].get('length_word', 0))
+                wlen = int(attrs.get('length_word', 0))
             except (TypeError, ValueError):
                 wlen = 0
             global_node_length.append(wlen)
             global_topolevel.append(word_topo[n] + 1)
             global_goldpathmask.append(local_gold_mask[i + 1])
+
+            try:
+                position = int(attrs.get('position'))
+            except (TypeError, ValueError):
+                position = -1
+            try:
+                chunk_no = int(attrs.get('chunk_no'))
+            except (TypeError, ValueError):
+                chunk_no = -1
+            global_node_position.append(position)
+            global_node_chunk.append(chunk_no)
+            global_node_form.append(form_vocab[attrs.get('word') or ""])
+            global_node_lemma.append(lemma_vocab[attrs.get('lemma') or ""])
+            global_node_preverb.append(preverb_vocab[attrs.get('pre_verb') or ""])
+            if position >= 0 and chunk_no in chunk_start:
+                global_node_char_start.append(chunk_start[chunk_no] + position)
+            else:
+                global_node_char_start.append(-1)
         # super-sink
         global_node_features.append(BOUNDARY_ID)
         global_node_length.append(0)
         global_topolevel.append(max_word_level + 2)
         global_goldpathmask.append(0)
+        _append_boundary_raw(global_node_position, global_node_chunk,
+                             global_node_form, global_node_lemma,
+                             global_node_preverb, global_node_char_start)
 
         # ----- edges (local), with super-source / super-sink wiring -----
         # adjacency: super-source -> every original source word
@@ -486,22 +652,49 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
     # write archive
     # -----------------------------------------------------------------------
     print("\nextraction complete! packaging into NumPy archive...")
+    # np.frombuffer wraps each array.array's storage without copying, so peak
+    # memory here stays at roughly the size of the data itself rather than
+    # doubling it.
+    n_gold_nodes = len(gold_path_flat)
+    gold_mask_np = np.frombuffer(global_goldpathmask, dtype=np.int8)
     np.savez_compressed(
         output_filename,
-        node_features=np.array(global_node_features, dtype=np.int32),
-        node_length=np.array(global_node_length, dtype=np.int32),
-        rowptr=np.array(global_rowptr, dtype=np.int32),
-        colidx=np.array(global_colidx, dtype=np.int32),
-        topolevel=np.array(global_topolevel, dtype=np.int32),
+        node_features=np.frombuffer(global_node_features, dtype=np.int32),
+        node_length=np.frombuffer(global_node_length, dtype=np.int32),
+        rowptr=np.frombuffer(global_rowptr, dtype=np.int32),
+        colidx=np.frombuffer(global_colidx, dtype=np.int32),
+        topolevel=np.frombuffer(global_topolevel, dtype=np.int32),
         sentenceoffsets=np.array(sentence_offsets[:-1], dtype=np.int32),
-        goldpathmask=np.array(global_goldpathmask, dtype=np.int8),
-        gold_path_nodes=np.array(gold_path_flat, dtype=np.int32),
+        goldpathmask=gold_mask_np,
+        gold_path_nodes=np.frombuffer(gold_path_flat, dtype=np.int32),
         gold_path_offsets=np.array(gold_path_offsets, dtype=np.int32),
+        # raw per-node fields for the featurizer registry
+        node_position=np.frombuffer(global_node_position, dtype=np.int32),
+        node_chunk=np.frombuffer(global_node_chunk, dtype=np.int32),
+        node_form_id=np.frombuffer(global_node_form, dtype=np.int32),
+        node_lemma_id=np.frombuffer(global_node_lemma, dtype=np.int32),
+        node_preverb_id=np.frombuffer(global_node_preverb, dtype=np.int32),
+        node_char_start=np.frombuffer(global_node_char_start, dtype=np.int32),
+        # reconstructed surface text, concatenated; sentence s occupies
+        # surface_text[surface_text_offsets[s]:surface_text_offsets[s+1]]
+        surface_text=np.frombuffer(
+            "".join(surface_text_parts).encode("utf-8"), dtype=np.uint8),
+        surface_text_offsets=np.array(surface_text_offsets, dtype=np.int64),
     )
 
-    with open("morph_vocabulary.txt", "w", encoding="utf-8") as f:
-        for tag, tag_id in sorted(morph_vocab.items(), key=lambda x: x[1]):
-            f.write(f"{tag_id}\t{tag}\n")
+    # Vocabularies live beside the archive they index into, not in the current
+    # working directory. A subset run therefore cannot silently overwrite the
+    # full corpus vocabulary and leave trained weights pointing at renumbered
+    # ids.
+    # `vocab_prefix` lets parallel shards write to distinct filenames in a
+    # shared directory instead of overwriting each other.
+    vocab_dir = os.path.dirname(os.path.abspath(output_filename))
+    def vpath(name):
+        return os.path.join(vocab_dir, vocab_prefix + name)
+    _write_vocab(vpath("morph_vocabulary.txt"), morph_vocab)
+    _write_vocab(vpath("form_vocabulary.txt"), form_vocab)
+    _write_vocab(vpath("lemma_vocabulary.txt"), lemma_vocab)
+    _write_vocab(vpath("preverb_vocabulary.txt"), preverb_vocab)
 
     with open(index_filename, "w", encoding="utf-8") as f:
         json.dump(sentence_index, f)
@@ -522,7 +715,7 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
     rate = 100.0 * resolved_sentences / n_sent if n_sent else 0.0
     print(f"sentences with a fully resolved gold path: "
           f"{resolved_sentences:,} / {n_sent:,}  ({rate:.2f}%)")
-    print(f"total gold nodes flagged: {int(np.sum(global_goldpathmask)):,}")
+    print(f"total gold nodes flagged: {int(gold_mask_np.sum()):,}")
     print(f"wrote sentence index map: {index_filename}")
 
 

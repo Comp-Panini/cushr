@@ -6,7 +6,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-FEAT_DIM = 44
+# Every featurizer emits this width (cushr_train/featurizers.py, OUT_DIM).
+# It is a default only -- the real value is read from the featurized archive,
+# so a model always matches the data it was trained on rather than a constant
+# that has to be kept in sync by hand.
+FEAT_DIM = 64
 HIDDEN = 128
 
 

@@ -65,9 +65,15 @@ private:
 };
 
 // Week-9 trained scorer:  score(u -> v) = <W_s x_u, W_d x_v> + b, where
-//   x(v) = [ node_features[v] (43 morph one-hots), log1p(word_length[v]) ]
-// so feat_dim is lattice.feat_dim() + 1. Weights come from
-// cushr_train/export_weights.py --bin.
+//   x(v) = node_features[v], verbatim
+// so feat_dim must equal lattice.feat_dim() exactly. Weights come from
+// cushr_train/export_weights.py --bin ('CSB3' format).
+//
+// This scorer used to build x(v) itself by appending log1p(word_length[v]) to
+// the 43 morph one-hots. It no longer does: which columns exist is decided by
+// the featurizer named in cushr_train/featurizers.py that produced the .npz,
+// and this class just consumes them. That keeps a single definition of the
+// feature vector rather than one here and one in Python that must agree.
 //
 // Projections are cached lazily per node: a node is the source of ~14 edges on
 // average, so projecting on every score() call would redo that work 14 times.

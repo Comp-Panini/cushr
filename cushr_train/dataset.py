@@ -8,8 +8,6 @@ import os
 
 import numpy as np
 
-FEAT_DIM = 44
-
 # this class opens .npy files, caches gold path results, saves them to disk
 class LatticeStore:
 
@@ -31,9 +29,16 @@ class LatticeStore:
         self.splits = {k: np.asarray(v, dtype=np.int64)
                        for k, v in blob["splits"].items()}
 
-        self.raw_feat_dim = self.node_features.shape[1]
-        assert self.raw_feat_dim + 1 == FEAT_DIM, \
-            f"cache has {self.raw_feat_dim} raw features, FEAT_DIM={FEAT_DIM}"
+        # The featurizer owns every column now, including the length feature
+        # that this class used to append. feat_dim is whatever the data says.
+        self.feat_dim = int(self.node_features.shape[1])
+        self.featurizer_name = self.meta.get("featurizer", "unknown")
+        declared = self.meta.get("feat_dim")
+        if declared is not None and int(declared) != self.feat_dim:
+            raise ValueError(
+                f"cache is inconsistent: splits.json declares feat_dim="
+                f"{declared} but node_features.npy has {self.feat_dim} columns. "
+                "Re-run prepare.py against the featurized archive.")
 
         self._gold_edges: np.ndarray | None = None
         self._gold_edge_off: np.ndarray | None = None
@@ -95,9 +100,10 @@ class LatticeStore:
         return ids[n > 0]
 
     def features(self, node_ids):
-        f = np.asarray(self.node_features[node_ids], dtype=np.float32)
-        wl = np.asarray(self.word_len[node_ids], dtype=np.float32)
-        return np.concatenate([f, np.log1p(wl)[:, None]], axis=1)
+        # No log1p(word_length) append here any more: the featurizer already
+        # emitted that column. Appending it again would silently widen the
+        # vector past what the exported C++ weights expect.
+        return np.asarray(self.node_features[node_ids], dtype=np.float32)
 
 
 class Batch(dict):

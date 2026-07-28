@@ -7,6 +7,7 @@
 #include <cstring>
 #include <fstream>
 #include <stdexcept>
+#include <string>
 
 namespace cushr {
 
@@ -42,7 +43,14 @@ float LogLinearScorer::score(const Lattice& lat, int edge_id) const {
 // ---------------------------------------------------------------- biaffine
 
 namespace {
-constexpr int kBiaffineMagic = 0x43534232;  // 'CSB2'
+// 'CSB3'. Bumped from 'CSB2' when featurization moved into
+// cushr_train/featurizers.py. Under CSB2 this scorer appended log1p(word
+// length) itself as the final feature column; a CSB3 featurizer emits every
+// column it wants, including that one. The two conventions produce silently
+// different scores from the same weights, so the magic changes to make an
+// old/new mismatch a load-time error instead of a numerical mystery.
+constexpr int kBiaffineMagic = 0x43534233;  // 'CSB3'
+constexpr int kBiaffineMagicV2 = 0x43534232;  // 'CSB2', no longer supported
 }
 
 BiaffineScorer BiaffineScorer::load(const std::string& bin_path) {
@@ -57,7 +65,17 @@ BiaffineScorer BiaffineScorer::load(const std::string& bin_path) {
     in.read(reinterpret_cast<char*>(&feat_dim), 4);
     in.read(reinterpret_cast<char*>(&hidden), 4);
     in.read(reinterpret_cast<char*>(&bias), 4);
-    if (!in || magic != kBiaffineMagic) {
+    if (!in) {
+        throw std::runtime_error("BiaffineScorer: cannot read header of " + bin_path);
+    }
+    if (magic == kBiaffineMagicV2) {
+        throw std::runtime_error(
+            "BiaffineScorer: " + bin_path + " is a CSB2 file. Those weights "
+            "expect this scorer to append log1p(word_length) as the last "
+            "feature; featurization now lives in cushr_train/featurizers.py. "
+            "Re-export from a model retrained on a featurized archive.");
+    }
+    if (magic != kBiaffineMagic) {
         throw std::runtime_error("BiaffineScorer: bad magic in " + bin_path +
                                  " (not an export_weights.py --bin file?)");
     }
@@ -95,21 +113,24 @@ const float* BiaffineScorer::project_(const Lattice& lat, int v) const {
     float* out = proj_cache_.data() + (size_t)slot * 2 * hidden_;
     if (proj_valid_[slot]) return out;
 
-    // x(v) = [node_features (feat_dim_-1 of them), log1p(word_length)]
+    // x(v) is the featurizer's output verbatim -- nothing is appended here.
+    // Any length, position or frequency signal the model relies on is already
+    // a column, put there by cushr_train/featurizers.py.
     const float* f = lat.node_feature_ptr(v);
-    const int raw = feat_dim_ - 1;
-    if (raw != lat.feat_dim()) {
+    if (feat_dim_ != lat.feat_dim()) {
         throw std::runtime_error(
-            "BiaffineScorer: model feat_dim-1 does not match lattice feat_dim");
+            "BiaffineScorer: model feat_dim (" + std::to_string(feat_dim_) +
+            ") does not match lattice feat_dim (" +
+            std::to_string(lat.feat_dim()) + "); the model and the .npz were "
+            "built by different featurizers");
     }
-    const float wl = std::log1p((float)lat.node_word_length(v));
 
     for (int h = 0; h < hidden_; ++h) {
         const float* ws = src_proj_.data() + (size_t)h * feat_dim_;
         const float* wd = dst_proj_.data() + (size_t)h * feat_dim_;
-        float as = ws[raw] * wl;
-        float ad = wd[raw] * wl;
-        for (int i = 0; i < raw; ++i) {
+        float as = 0.0f;
+        float ad = 0.0f;
+        for (int i = 0; i < feat_dim_; ++i) {
             as += ws[i] * f[i];
             ad += wd[i] * f[i];
         }

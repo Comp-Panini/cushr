@@ -8,7 +8,8 @@ import struct
 
 import numpy as np
 
-MAGIC = 0x43534232
+# 'CSB3' -- must track export_weights.py and cushr_cpu/src/scorer.cpp.
+MAGIC = 0x43534233
 
 
 def read_bin(path):
@@ -44,7 +45,6 @@ def main():
         return
 
     nf = np.load(os.path.join(args.cache, "node_features.npy"), mmap_mode="r")
-    wl = np.load(os.path.join(args.cache, "node_word_length.npy"), mmap_mode="r")
     row_ptr = np.load(os.path.join(args.cache, "row_ptr.npy"))
     col_idx = np.load(os.path.join(args.cache, "col_idx.npy"), mmap_mode="r")
     es = np.load(args.edge_scores, mmap_mode="r")
@@ -58,9 +58,8 @@ def main():
     v = np.asarray(col_idx[eids], dtype=np.int64)
 
     def x(nodes):
-        return np.concatenate(
-            [np.asarray(nf[nodes], dtype=np.float32),
-             np.log1p(np.asarray(wl[nodes], dtype=np.float32))[:, None]], axis=1)
+        # Features verbatim -- the featurizer owns every column now.
+        return np.asarray(nf[nodes], dtype=np.float32)
 
     want = np.einsum("ij,ij->i", x(u) @ src.T, x(v) @ dst.T) + bias
     got = np.asarray(es[eids])

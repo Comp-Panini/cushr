@@ -10,7 +10,7 @@ import time
 import numpy as np
 import torch
 
-from dataset import LatticeStore, collate, FEAT_DIM
+from dataset import LatticeStore, collate
 from model import BiaffineEdgeScorer
 from viterbi import viterbi, path_score, gold_score, predicted_nodes
 
@@ -35,6 +35,15 @@ def batches(ids, size, shuffle, rng=None):
         ids = ids[rng.permutation(len(ids))]
     for i in range(0, len(ids), size):
         yield ids[i:i + size]
+
+
+def save_model(path, model, feat_dim, hidden, featurizer_name):
+    """Write the model archive. Called on every dev improvement, not just at
+    the end, so an interrupted run still leaves its best weights on disk."""
+    p = model.to_numpy()
+    np.savez(path, feat_dim=np.int32(feat_dim), hidden=np.int32(hidden),
+             src_proj=p["src_proj"], dst_proj=p["dst_proj"], bias=p["bias"],
+             featurizer_name=np.array(featurizer_name))
 
 
 def f1_counts(pred_sets, gold_sets):
@@ -100,10 +109,15 @@ def main():
     test_ids = store.trainable("test")
     if args.limit_train:
         train_ids = train_ids[:args.limit_train]
-    print(f"device={dev}  train={len(train_ids)}  dev={len(dev_ids)}  "
-          f"test={len(test_ids)}  feat_dim={FEAT_DIM}")
 
-    model = BiaffineEdgeScorer(FEAT_DIM, args.hidden).to(dev)
+    # feat_dim comes from the data, not a constant: the featurizer that built
+    # this cache decided it.
+    feat_dim = store.feat_dim
+    print(f"device={dev}  train={len(train_ids)}  dev={len(dev_ids)}  "
+          f"test={len(test_ids)}  feat_dim={feat_dim}  "
+          f"featurizer={store.featurizer_name}")
+
+    model = BiaffineEdgeScorer(feat_dim, args.hidden).to(dev)
     print(f"parameters: {model.num_params()}")
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr,
                             weight_decay=args.weight_decay)
@@ -173,7 +187,17 @@ def main():
                 best_f1 = rec["dev"]["f1"]
                 best_state = {k: v.detach().clone()
                               for k, v in model.state_dict().items()}
+                # Checkpoint on every improvement rather than only at the end.
+                # A long CPU run can be killed by an external time limit, and
+                # without this the entire run's work is lost; with it the best
+                # model so far is already on disk and usable.
+                save_model(args.out, model, feat_dim, args.hidden,
+                           store.featurizer_name)
         history.append(rec)
+        # Same reasoning for the log: keep the epoch history durable as it goes.
+        with open(args.log, "w") as f:
+            json.dump({"args": vars(args), "featurizer": store.featurizer_name,
+                       "feat_dim": int(feat_dim), "history": history}, f, indent=2)
         d = rec.get("dev")
         print(f"epoch {ep:>2}  loss {rec['train_loss']:.4f}  "
               f"active {rec['active_frac']:.3f}  {rec['sec']:.1f}s"
@@ -186,13 +210,12 @@ def main():
     print(f"\ntest: F1 {test['f1']:.4f}  P {test['precision']:.4f}  "
           f"R {test['recall']:.4f}  PM {test['perfect_match']:.4f}  n={test['n']}")
 
-    p = model.to_numpy()
-
-    np.savez(args.out, feat_dim=np.int32(FEAT_DIM), hidden=np.int32(args.hidden),
-             src_proj=p["src_proj"], dst_proj=p["dst_proj"], bias=p["bias"])
+    save_model(args.out, model, feat_dim, args.hidden, store.featurizer_name)
     print(f"wrote {args.out}")
     with open(args.log, "w") as f:
-        json.dump({"args": vars(args), "history": history, "test": test}, f, indent=2)
+        json.dump({"args": vars(args), "featurizer": store.featurizer_name,
+                   "feat_dim": int(feat_dim),
+                   "history": history, "test": test}, f, indent=2)
     print(f"wrote {args.log}")
 
 

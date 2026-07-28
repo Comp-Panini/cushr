@@ -9,7 +9,11 @@ import struct
 
 import numpy as np
 
-MAGIC = 0x43534232
+# 'CSB3'. See the matching constant in cushr_cpu/src/scorer.cpp: under the old
+# 'CSB2' contract the C++ scorer appended log1p(word_length) as a final feature
+# column itself. Featurizers now emit every column, so the file format changes
+# version to make a stale weight file fail loudly at load.
+MAGIC = 0x43534233
 
 
 def main():
@@ -27,6 +31,8 @@ def main():
     dst = np.ascontiguousarray(m["dst_proj"], dtype=np.float32)
     bias = float(np.asarray(m["bias"]).reshape(-1)[0])
     assert src.shape == (hidden, feat_dim) and dst.shape == (hidden, feat_dim)
+    if "featurizer_name" in m.files:
+        print(f"model featurizer: {m['featurizer_name']}")
 
     with open(args.bin, "wb") as f:
         f.write(struct.pack("<iiif", MAGIC, feat_dim, hidden, bias))
@@ -39,7 +45,6 @@ def main():
 
     import os
     nf = np.load(os.path.join(args.cache, "node_features.npy"), mmap_mode="r")
-    wl = np.load(os.path.join(args.cache, "node_word_length.npy"), mmap_mode="r")
     row_ptr = np.load(os.path.join(args.cache, "row_ptr.npy"))
     col_idx = np.load(os.path.join(args.cache, "col_idx.npy"), mmap_mode="r")
     sent_off = np.load(os.path.join(args.cache, "sentence_offsets.npy"))
@@ -53,10 +58,9 @@ def main():
     for s0 in range(0, n_sent, block_sent):
         s1 = min(s0 + block_sent, n_sent)
         nb0, nb1 = int(sent_off[s0]), int(sent_off[s1])
-        x = np.concatenate(
-            [np.asarray(nf[nb0:nb1], dtype=np.float32),
-             np.log1p(np.asarray(wl[nb0:nb1], dtype=np.float32))[:, None]],
-            axis=1)
+        # Features verbatim: the featurizer already emitted every column,
+        # including the length one this used to append.
+        x = np.asarray(nf[nb0:nb1], dtype=np.float32)
         S = x @ src.T
         D = x @ dst.T
         e0, e1 = int(row_ptr[nb0]), int(row_ptr[nb1])

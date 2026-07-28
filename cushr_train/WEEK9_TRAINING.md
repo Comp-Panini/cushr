@@ -6,15 +6,21 @@ A trained `BiaffineEdgeScorer` that produces edge scores.
 ## Pipeline
 
 ```
-python prepare.py --npz ../data/new_cushr_data_fixed_USE_THIS.npz
+# 1. choose a featurization (see "Featurizers" below)
+python build_features.py --featurizer scalars64 \
+    --raw ../data/new_cushr_data_full_with_gold.npz \
+    --out ../data/features_scalars64.npz
+
+# 2. split + cache
+python prepare.py --npz ../data/features_scalars64.npz
 python smoke_test.py                    # validates collate + viterbi
-python baseline.py                      
+python baseline.py
 python train.py --epochs 10 --batch 64
 python export_weights.py --bin model_biaffine.bin --edge-scores edge_score.npy
 python check_export.py
 
 # use it in the CPU decoder:
-../cushr_cpu/cushr_evaluate ../data/new_cushr_data_fixed_USE_THIS.npz \
+../cushr_cpu/cushr_evaluate ../data/features_scalars64.npz \
     --scorer biaffine --model model_biaffine.bin --K 10
 ```
 
@@ -22,19 +28,50 @@ python check_export.py
 
 ```
 score(e = (u, v)) = <W_s x(u), W_d x(v)> + b
-x(v) = [ node_features[v] (43 morph one-hots) , log1p(word_length[v]) ]
+x(v) = node_features[v]        # verbatim; the featurizer decides the columns
 ```
+
+## Featurizers
+
+Featurization is a named component (`cushr_train/featurizers.py`), not a fixed
+step. Every featurizer emits 64 columns, zero-padding if it has less to say, so
+archives and kernels see one shape. `feat_dim` and the featurizer name travel
+inside the `.npz` and the `.bin`, so training and the C++ decoder read them
+rather than agreeing on a constant.
+
+| name | what it adds |
+|---|---|
+| `morph43` | 43 morph one-hots + log1p(length). The pre-registry vector; regression baseline. |
+| `scalars64` | `morph43` + length buckets, sentence/chunk position, corpus frequency, character-class rates. |
+| `ngram_split` | Hellwig-style n-gram split probabilities. Registered but not implemented. |
+
+Corpus statistics are fitted on the **training split only** — `build_features.py`
+reproduces `prepare.py`'s md5 bucketing to determine it. Counting frequencies
+over the whole corpus leaks test information into a feature and inflates dev
+scores for free.
+
+Note that changing featurizer changes the weight file's meaning. The `.bin`
+magic is `CSB3`; older `CSB2` files (where the C++ scorer appended
+`log1p(word_length)` itself) are rejected at load rather than silently
+mis-scored.
 
 ## Results
 
 Top-1, word-level:
 
-| scorer | F1 | P | R | 
+| scorer | F1 | P | R |
 |---|---|---|---|
-| uniform | 0.4857 | 0.4217 | 0.5726 | 
-| length | 0.4848 | 0.4209 | 0.5716 | 
-| log_linear | 0.5666 | 0.5276 | 0.6118 | 
-| biaffine | 0.7904 | 0.8175 | 0.7650 | 
+| uniform | 0.4857 | 0.4217 | 0.5726 |
+| length | 0.4848 | 0.4209 | 0.5716 |
+| log_linear | 0.5666 | 0.5276 | 0.6118 |
+| biaffine | 0.7904 | 0.8175 | 0.7650 |
+| biaffine + `scalars64` | **0.8534** | 0.8580 | 0.8487 |
+
+The `biaffine` row above is the `morph43` featurization; re-run through the
+featurizer registry it reproduces at F1 0.7894. Swapping in `scalars64` at the
+same parameter count gains +6.4 F1 -- see
+[FEATURIZER_COMPARISON.md](FEATURIZER_COMPARISON.md) for the per-frequency-bucket
+breakdown and what it implies about the next featurizer.
 
 ![Segmentation accuracy by scorer](scorer_f1.png)
 
