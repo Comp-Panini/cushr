@@ -189,15 +189,28 @@ def write_report(path, results, split):
         r = results[n]
         cells = " | ".join(f"{r['bucket_recall'][b[0]]:.4f}" for b in BUCKETS)
         L.append(f"| `{n}` | {cells} |")
-    if len(names) == 2:
-        a, b = names
-        L.append(f"\nDelta (`{b}` - `{a}`):\n")
-        L.append("| bucket | " + " | ".join(x[0] for x in BUCKETS) + " |")
+    if len(names) >= 2:
+        # Deltas against the first run, which is the baseline rung of the
+        # ladder. With more than two runs the step-to-step delta is what
+        # attributes a gain to a particular block, so report both.
+        base = names[0]
+        L.append(f"\nDelta vs `{base}`:\n")
+        L.append("| featurizer | " + " | ".join(x[0] for x in BUCKETS) + " |")
         L.append("|---" * (len(BUCKETS) + 1) + "|")
-        d = " | ".join(
-            f"{results[b]['bucket_recall'][x[0]] - results[a]['bucket_recall'][x[0]]:+.4f}"
-            for x in BUCKETS)
-        L.append(f"| recall | {d} |")
+        for n in names[1:]:
+            d = " | ".join(
+                f"{results[n]['bucket_recall'][x[0]] - results[base]['bucket_recall'][x[0]]:+.4f}"
+                for x in BUCKETS)
+            L.append(f"| `{n}` | {d} |")
+        if len(names) > 2:
+            L.append("\nStep-to-step delta (each rung vs the one before):\n")
+            L.append("| step | " + " | ".join(x[0] for x in BUCKETS) + " |")
+            L.append("|---" * (len(BUCKETS) + 1) + "|")
+            for prev, n in zip(names, names[1:]):
+                d = " | ".join(
+                    f"{results[n]['bucket_recall'][x[0]] - results[prev]['bucket_recall'][x[0]]:+.4f}"
+                    for x in BUCKETS)
+                L.append(f"| `{prev}` -> `{n}` | {d} |")
 
     L.append("\n## Error counts\n")
     L.append("| featurizer | TP | FP | FN |")

@@ -96,6 +96,44 @@ def train_node_mask(raw, dev_pct, test_pct):
     return mask, n_train
 
 
+def build_id_columns(raw, train_mask, vocab_dir, min_count):
+    """Remapped [n, 3] id column (form, lemma, preverb) for the learned path.
+
+    Counts are taken over the training split only -- same rule as the frequency
+    features, and for the same reason: a threshold computed over dev/test would
+    leak which words the model is about to be evaluated on.
+    """
+    import learned_featurizers as LF
+
+    keep = train_mask & ~featurizers.boundary_mask(raw)
+    cols, sizes, kept = [], {}, {}
+    for field, vocab_file, mc in (
+            ("node_form_id", "form_vocabulary.txt", min_count),
+            ("node_lemma_id", "lemma_vocabulary.txt", min_count),
+            # The preverb inventory is tiny and closed, so thresholding it
+            # would only throw away real signal.
+            ("node_preverb_id", "preverb_vocabulary.txt", 1)):
+        ids = np.asarray(raw[field], dtype=np.int64)
+        n_vocab = len(featurizers.load_strings(os.path.join(vocab_dir, vocab_file)))
+        counts = np.bincount(ids[keep], minlength=n_vocab)
+        new, size, n_kept = LF.remap_ids(ids, counts, mc)
+        cols.append(new)
+        sizes[field] = size
+        kept[field] = n_kept
+        print(f"  {field:<18} raw {n_vocab:>7,} -> kept {n_kept:>6,} "
+              f"(+PAD/UNK = {size:,}) at min_count={mc}")
+
+    node_ids = np.stack(cols, axis=1).astype(np.int32)
+    unk_rate = float((node_ids[keep, 0] == LF.UNK_ID).mean())
+    print(f"  <UNK> rate on training form ids: {unk_rate:.3f}")
+    return {
+        "node_ids": node_ids,
+        "id_vocab_sizes": np.array(
+            [sizes["node_form_id"], sizes["node_lemma_id"],
+             sizes["node_preverb_id"]], dtype=np.int32),
+    }
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--featurizer", default="scalars64",
@@ -108,6 +146,14 @@ def main():
                          "defaults to the directory of --raw")
     ap.add_argument("--dev-pct", type=int, default=5)
     ap.add_argument("--test-pct", type=int, default=5)
+    ap.add_argument("--emit-ids", action="store_true",
+                    help="also write remapped form/lemma/preverb id columns, "
+                         "for training a learned featurizer on top of these "
+                         "scalars (see learned_featurizers.py)")
+    ap.add_argument("--min-count", type=int, default=3,
+                    help="with --emit-ids: forms/lemmas occurring fewer than "
+                         "this many times in the training split are folded "
+                         "into <UNK>")
     args = ap.parse_args()
 
     # Vocabularies are written beside their archive, so that is the right
@@ -164,6 +210,9 @@ def main():
     for key in RAW_PASSTHROUGH:
         if key in raw:
             save[key] = raw[key]
+
+    if args.emit_ids:
+        save.update(build_id_columns(raw, mask, vocab_dir, args.min_count))
 
     print(f"saving {out} ...")
     # Uncompressed: cnpy, the C++ .npz reader, cannot read compressed archives.

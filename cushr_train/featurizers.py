@@ -25,9 +25,13 @@ Two invariants every featurizer must hold:
 """
 
 import os
+import zlib
 
 import numpy as np
 
+# Default output width. Featurizers may override `out_dim`; the value travels
+# with the data (feat_dim in the .npz, and in the exported .bin header), so the
+# rest of the pipeline reads it rather than assuming a constant.
 OUT_DIM = 64
 
 FEATURIZERS = {}
@@ -76,7 +80,7 @@ class Featurizer:
         return self
 
     def transform(self, raw, out=None):
-        """Featurize into `out` ([n, OUT_DIM] float32), allocating if needed.
+        """Featurize into `out` ([n, self.out_dim] float32), allocating if needed.
 
         Subclasses write columns into the buffer rather than returning a matrix
         that then has to be padded and concatenated. At corpus scale that
@@ -88,10 +92,11 @@ class Featurizer:
         """
         n = len(raw["node_features"])
         if out is None:
-            out = np.zeros((n, OUT_DIM), dtype=np.float32)
-        if out.shape != (n, OUT_DIM):
+            out = np.zeros((n, self.out_dim), dtype=np.float32)
+        if out.shape != (n, self.out_dim):
             raise ValueError(
-                f"{self.name}: out has shape {out.shape}, expected {(n, OUT_DIM)}")
+                f"{self.name}: out has shape {out.shape}, "
+                f"expected {(n, self.out_dim)}")
         out[:] = 0.0
         self._fill(raw, out)
         # Boundary nodes must not carry signal regardless of what the subclass
@@ -377,6 +382,70 @@ def _charclass(w):
         1.0 if first in VOWELS else 0.0,
         1.0 if last in LONG_VOWELS else 0.0,
     ]
+
+
+N_NGRAM_BUCKETS = 16
+NGRAM_ORDERS = (2, 3)
+
+
+def hashed_ngrams(word, n_buckets=N_NGRAM_BUCKETS, orders=NGRAM_ORDERS):
+    """Count-normalised hash of a form's character n-grams.
+
+    A parameter-free stand-in for form identity: frequent affixes and stems land
+    in consistent buckets, so the scorer can tell some forms apart without a
+    per-form parameter, and an unseen form simply hashes wherever it hashes
+    instead of hitting an out-of-vocabulary cliff.
+
+    Deliberately uses a stable hash (not Python's randomised `hash`), because
+    the bucket assignment has to be identical between the run that trains a
+    model and any later run that featurizes data for it.
+    """
+    vec = np.zeros(n_buckets, dtype=np.float32)
+    total = 0
+    for n in orders:
+        for i in range(max(len(word) - n + 1, 0)):
+            g = word[i:i + n]
+            vec[zlib.crc32(g.encode("utf-8")) % n_buckets] += 1.0
+            total += 1
+    if total:
+        vec /= total
+    return vec
+
+
+@register("ngrams80")
+class Ngrams80(Featurizer):
+    """`scalars64` plus 16 hashed character-n-gram columns (cols 64-79).
+
+    Still zero learned parameters -- the whole vector is precomputed and stored
+    as floats. This is the rung of the ablation ladder that isolates what a
+    coarse, parameter-free identity signal buys on its own, before spending
+    millions of parameters on real embedding tables.
+    """
+
+    out_dim = 80
+
+    def __init__(self, vocab_dir="../ingest"):
+        super().__init__(vocab_dir)
+        self._scalars = Scalars64(vocab_dir)
+
+    def fit(self, raw, train_nodes):
+        self._scalars.fit(raw, train_nodes)
+        return self
+
+    def _fill(self, raw, out):
+        # Columns 0-63 are exactly scalars64, so the two are directly comparable
+        # and this stays a strict superset rather than a re-derivation.
+        self._scalars._fill(raw, out[:, :64])
+
+        forms = load_strings(self.vocab("form_vocabulary.txt"))
+        table = np.zeros((len(forms), N_NGRAM_BUCKETS), dtype=np.float32)
+        for i, w in enumerate(forms):
+            if w:
+                table[i] = hashed_ngrams(w)
+        ids = np.clip(np.asarray(raw["node_form_id"], dtype=np.int64),
+                      0, len(forms) - 1)
+        for lo, hi in node_blocks(len(ids)):
+            out[lo:hi, 64:80] = table[ids[lo:hi]]
 
 
 @register("ngram_split")

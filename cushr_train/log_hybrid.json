@@ -1,0 +1,136 @@
+{
+  "args": {
+    "cache": "C:/Users/nishk/AppData/Local/Temp/claude/C--Users-nishk-OneDrive---The-University-of-Texas-at-Austin-Sanskrit-cushr/903ceefb-2e7b-4150-9398-6ef1748aac8d/scratchpad/full/c_ngrams80",
+    "epochs": 8,
+    "batch": 64,
+    "lr": 0.001,
+    "margin": 1.0,
+    "weight_decay": 1e-05,
+    "hidden": 128,
+    "seed": 0,
+    "limit_train": 0,
+    "eval_every": 1,
+    "out": "C:/Users/nishk/AppData/Local/Temp/claude/C--Users-nishk-OneDrive---The-University-of-Texas-at-Austin-Sanskrit-cushr/903ceefb-2e7b-4150-9398-6ef1748aac8d/scratchpad/full/model_hybrid.npz",
+    "log": "C:/Users/nishk/AppData/Local/Temp/claude/C--Users-nishk-OneDrive---The-University-of-Texas-at-Austin-Sanskrit-cushr/903ceefb-2e7b-4150-9398-6ef1748aac8d/scratchpad/full/log_hybrid.json",
+    "learned": "hybrid",
+    "node_dim": 96,
+    "word_dropout": 0.1,
+    "materialize": "C:/Users/nishk/AppData/Local/Temp/claude/C--Users-nishk-OneDrive---The-University-of-Texas-at-Austin-Sanskrit-cushr/903ceefb-2e7b-4150-9398-6ef1748aac8d/scratchpad/full/f_hybrid.npz",
+    "device": "cpu"
+  },
+  "featurizer": "ngrams80",
+  "feat_dim": 80,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 3.0170728471265726,
+      "active_frac": 0.8851219512195122,
+      "sec": 48.10957670211792,
+      "dev": {
+        "precision": 0.8396408682804865,
+        "recall": 0.8270920794850266,
+        "f1": 0.8333192341313482,
+        "perfect_match": 0.4253269098417068,
+        "n": 2906
+      }
+    },
+    {
+      "epoch": 2,
+      "train_loss": 2.470082173132762,
+      "active_frac": 0.8531144465290806,
+      "sec": 40.25822162628174,
+      "dev": {
+        "precision": 0.8565825375170532,
+        "recall": 0.8434928631402183,
+        "f1": 0.8499873085709452,
+        "perfect_match": 0.4635237439779766,
+        "n": 2906
+      }
+    },
+    {
+      "epoch": 3,
+      "train_loss": 2.3179814270155514,
+      "active_frac": 0.8392120075046904,
+      "sec": 38.584503412246704,
+      "dev": {
+        "precision": 0.8641863620943119,
+        "recall": 0.8555275678701372,
+        "f1": 0.8598351663806926,
+        "perfect_match": 0.4807295251204405,
+        "n": 2906
+      }
+    },
+    {
+      "epoch": 4,
+      "train_loss": 2.2339521500943524,
+      "active_frac": 0.8319887429643528,
+      "sec": 63.12495279312134,
+      "dev": {
+        "precision": 0.868623811934087,
+        "recall": 0.8645396025748671,
+        "f1": 0.8665768950232845,
+        "perfect_match": 0.5003441156228493,
+        "n": 2906
+      }
+    },
+    {
+      "epoch": 5,
+      "train_loss": 2.166263226764958,
+      "active_frac": 0.8258724202626642,
+      "sec": 40.767452001571655,
+      "dev": {
+        "precision": 0.8680504496352016,
+        "recall": 0.8591099916036944,
+        "f1": 0.8635570809655094,
+        "perfect_match": 0.49311768754301444,
+        "n": 2906
+      }
+    },
+    {
+      "epoch": 6,
+      "train_loss": 2.1188936178858686,
+      "active_frac": 0.8208630393996248,
+      "sec": 39.419769287109375,
+      "dev": {
+        "precision": 0.8717081148141882,
+        "recall": 0.8652672823957459,
+        "f1": 0.8684757570650037,
+        "perfect_match": 0.5020646937370956,
+        "n": 2906
+      }
+    },
+    {
+      "epoch": 7,
+      "train_loss": 2.0808475929711148,
+      "active_frac": 0.8170731707317073,
+      "sec": 40.13802623748779,
+      "dev": {
+        "precision": 0.8753860841242208,
+        "recall": 0.872544080604534,
+        "f1": 0.8739627719219556,
+        "perfect_match": 0.5230557467309016,
+        "n": 2906
+      }
+    },
+    {
+      "epoch": 8,
+      "train_loss": 2.045882051755966,
+      "active_frac": 0.8141651031894934,
+      "sec": 37.182899951934814,
+      "dev": {
+        "precision": 0.8763640454494319,
+        "recall": 0.8720962776378394,
+        "f1": 0.8742249530062004,
+        "perfect_match": 0.5196145905024088,
+        "n": 2906
+      }
+    }
+  ],
+  "test": {
+    "precision": 0.8794675317411489,
+    "recall": 0.8747705146036161,
+    "f1": 0.8771127349807553,
+    "perfect_match": 0.5246015246015246,
+    "n": 2886
+  }
+}

@@ -65,13 +65,21 @@ Top-1, word-level:
 | length | 0.4848 | 0.4209 | 0.5716 |
 | log_linear | 0.5666 | 0.5276 | 0.6118 |
 | biaffine | 0.7904 | 0.8175 | 0.7650 |
-| biaffine + `scalars64` | **0.8534** | 0.8580 | 0.8487 |
+| biaffine + `scalars64` | 0.8534 | 0.8580 | 0.8487 |
+| biaffine + `ngrams80` | 0.8543 | 0.8570 | 0.8515 |
+| biaffine + `hybrid` | **0.8771** | **0.8795** | **0.8748** |
 
 The `biaffine` row above is the `morph43` featurization; re-run through the
-featurizer registry it reproduces at F1 0.7894. Swapping in `scalars64` at the
-same parameter count gains +6.4 F1 -- see
+featurizer registry it reproduces at F1 0.7894. The remaining rows are rungs of
+an ablation ladder: `scalars64` adds surface-derived scalars at the same
+parameter count (+6.4 F1), `ngrams80` adds hashed character n-grams (+0.1, a
+wash), and `hybrid` adds learned form/lemma/preverb embeddings (+2.3).
+
+`hybrid` trains 1.2M embedding parameters but **decodes with an unchanged C++
+scorer**: the tables are frozen after training and baked into a dense node
+array, so no gather path or new file format is needed. See
 [FEATURIZER_COMPARISON.md](FEATURIZER_COMPARISON.md) for the per-frequency-bucket
-breakdown and what it implies about the next featurizer.
+breakdown, the caveats, and how the materialization works.
 
 ![Segmentation accuracy by scorer](scorer_f1.png)
 

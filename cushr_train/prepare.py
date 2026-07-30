@@ -34,6 +34,10 @@ def extract_array(npz_path, z, name, out):
 
 ARRAYS = ["node_features", "node_word_length", "row_ptr", "col_idx", "topo_level", "sentence_offsets","gold_path_mask", "gold_path_nodes", "gold_path_offsets"]
 
+# Present only when build_features.py ran with --emit-ids; required by the
+# learned featurizers, ignored by the precomputed ones.
+OPTIONAL_ARRAYS = ["node_ids", "id_vocab_sizes"]
+
 
 #hashing it into 100 bins which can then be divided among dev, test, train
 def bucket(sentence_id: int) -> int:
@@ -54,7 +58,7 @@ def main():
     z = np.load(args.npz)
 
     # extract arrays from npz (zipped) to npy
-    for name in ARRAYS:
+    for name in ARRAYS + [a for a in OPTIONAL_ARRAYS if a in z.files]:
         out = os.path.join(args.cache, name + ".npy")
         if os.path.exists(out) and not args.force:
             print(f"  {name:<20} cached")

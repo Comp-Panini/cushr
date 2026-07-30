@@ -23,6 +23,15 @@ class LatticeStore:
         self.gold_nodes = np.load(os.path.join(cache, "gold_path_nodes.npy"))
         self.gold_off = np.load(os.path.join(cache, "gold_path_offsets.npy"))
 
+        # Present only when the archive was built with --emit-ids. Their
+        # presence is what tells train.py to build a learned featurizer on top
+        # of the precomputed columns rather than scoring them directly.
+        idp = os.path.join(cache, "node_ids.npy")
+        self.node_ids = m("node_ids") if os.path.exists(idp) else None
+        vp = os.path.join(cache, "id_vocab_sizes.npy")
+        self.id_vocab_sizes = (np.load(vp).tolist()
+                               if os.path.exists(vp) else None)
+
         with open(os.path.join(cache, "splits.json")) as f:
             blob = json.load(f)
         self.meta = blob["meta"]
@@ -176,6 +185,8 @@ def collate(store: LatticeStore, sent_ids):
 
     return Batch(
         feats=store.features(global_node),
+        ids=(np.asarray(store.node_ids[global_node], dtype=np.int64)
+             if store.node_ids is not None else None),
         src=src_local, dst=dst_local,
         level_ptr=level_ptr,
         source=node_off[:-1].copy(), sink=(node_off[1:] - 1).copy(),

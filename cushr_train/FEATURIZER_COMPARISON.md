@@ -1,39 +1,23 @@
-# Featurizer comparison: `morph43` vs `scalars64`
+# Featurizer comparison: `morph43` → `scalars64` → `ngrams80` → `hybrid`
 
 - Corpus: all 119,503 SIGHUM sentences (4,488,155 lattice nodes, 61,140,552 edges)
 - Sentences with a resolved gold path: 59,092 (49.4%) → train 53,300 / dev 2,906 / test 2,886
-- Both models are the same size (16,385 parameters). Only the input features differ
+- Identical training for all four: 8 epochs, batch 64, AdamW lr 1e-3, structured hinge
 
-## What the two featurizations contain
+## What each featurization contains
 
-| columns | block | `morph43` | `scalars64` |
-|---|---|---|---|
-| 0–42 | morph presence bits (43) | yes | yes |
-| 43 | `log1p(word length)` | yes | yes |
-| 44–47 | length extras: scaled length + short/medium/long buckets | zero | added |
-| 48–51 | position in sentence and chunk | zero | added |
-| 52–55 | corpus frequency of the form and lemma | zero | added |
-| 56–63 | character-class / phonotactic summary | zero | added |
-| | columns carrying signal | 43 of 64 | 63 of 64 |
-
-1. **Length extras (4).** `morph43` already has `log1p(length)`, a single
-   monotonic column. Adding a scaled copy plus three bucket indicators lets the
-   model express a *non-monotonic* length preference instead of one slope.
-2. **Position (4).** Where the candidate starts and ends within the sentence,
-   how far it sits from the end of its chunk, and which chunk it is. Encodes
-   compound-initial vs compound-final, and position-sensitive phenomena such as
-   verse-final verbs and particle placement.
-3. **Frequency (4).** How often the surface form and its lemma occur in the
-   *training split*. This is the block that does most of the work (see the
-   bucket analysis below): it is a parameter-free surrogate for word identity,
-   letting the model prefer a common analysis over a rare-but-legal one.
-4. **Character class (8).** Vowel/cluster/retroflex rates and what the form
-   begins and ends with. Sandhi is conditioned on the phonemes at a word
-   junction, so a form's final phoneme carries real information about which
-   junctions are plausible.
-
-Crucially, no learned parameters are added. All 20 columns are computed
-during ingest/featurization and stored as plain floats. 
+| columns | block | `morph43` | `scalars64` | `ngrams80` | `hybrid` |
+|---|---|---|---|---|---|
+| 0–42 | morph presence bits (43) | yes | yes | yes | yes |
+| 43 | `log1p(word length)` | yes | yes | yes | yes |
+| 44–47 | length extras | zero | added | yes | yes |
+| 48–51 | position in sentence and chunk | zero | added | yes | yes |
+| 52–55 | corpus frequency of form and lemma | zero | added | yes | yes |
+| 56–63 | character-class / phonotactic summary | zero | added | yes | yes |
+| 64–79 | hashed character n-grams (16 buckets) | — | — | added | yes |
+| — | learned form/lemma/preverb embeddings | — | — | — | added |
+| | node vector width | 64 | 64 | 80 | 96 |
+| | trainable parameters | 16,385 | 16,385 | 20,481 | 1,200,529 |
 
 ## Headline
 
@@ -41,22 +25,35 @@ during ingest/featurization and stored as plain floats.
 |---|---|---|---|---|---|
 | `morph43` | 0.7894 | 0.8176 | 0.7632 | 0.3049 | 16,385 |
 | `scalars64` | 0.8534 | 0.8580 | 0.8487 | 0.4612 | 16,385 |
+| `ngrams80` | 0.8543 | 0.8570 | 0.8515 | 0.4733 | 20,481 |
+| `hybrid` | **0.8771** | **0.8795** | **0.8748** | **0.5246** | 1,200,529 |
 
 
-## Featurizer vs Rareness of word
+## Recall by training frequency of the gold word
 
 | featurizer | unseen (n=663) | rare 1–4 (n=1,027) | mid 5–49 (n=4,122) | common 50+ (n=12,163) |
 |---|---|---|---|---|
 | `morph43` | 0.7481 | 0.8578 | 0.8214 | 0.7362 |
 | `scalars64` | 0.7903 | 0.8929 | 0.8559 | 0.8458 |
+| `ngrams80` | 0.7677 | 0.8822 | 0.8510 | 0.8537 |
+| `hybrid` | 0.7949 | 0.8861 | 0.8675 | 0.8806 |
 
 
-### Error composition
+| step | unseen | rare | mid | common |
+|---|---|---|---|---|
+| `morph43` → `scalars64` | +0.0422 | +0.0351 | +0.0344 | +0.1095 |
+| `scalars64` → `ngrams80` | −0.0226 | −0.0107 | −0.0049 | +0.0079 |
+| `ngrams80` → `hybrid` | +0.0271 | +0.0039 | +0.0165 | +0.0270 |
 
-| featurizer | True Pos | False Pos | False Neg |
+## Error counts
+
+| featurizer | TP | FP | FN |
 |---|---|---|---|
 | `morph43` | 13,718 | 3,061 | 4,257 |
 | `scalars64` | 15,256 | 2,524 | 2,719 |
+| `ngrams80` | 15,306 | 2,553 | 2,669 |
+| `hybrid` | 15,724 | 2,155 | 2,251 |
+
 
 ## Training behaviour
 
@@ -66,16 +63,15 @@ Dev F1 by epoch:
 |---|---|---|---|---|---|---|---|---|
 | `morph43` | 0.7677 | 0.7812 | 0.7711 | 0.7727 | 0.7788 | 0.7792 | 0.7726 | 0.7814 |
 | `scalars64` | 0.8299 | 0.8354 | 0.8425 | 0.8390 | 0.8413 | 0.8436 | 0.8437 | 0.8438 |
+| `ngrams80` | 0.8308 | 0.8406 | 0.8472 | 0.8434 | 0.8452 | 0.8472 | 0.8478 | 0.8451 |
+| `hybrid` | 0.8333 | 0.8500 | 0.8598 | 0.8666 | 0.8636 | 0.8685 | 0.8740 | 0.8742 |
 
 ## Feature reference: what every column is
 
-"Fires" is the fraction of the 4,249,149 non-boundary lattice nodes in the full corpus where the column is non-zero.
-
-"Mean" is its average value over those nodes.
+Fires is the fraction of the nodes where the column is non-zero. 
+Mean is its average over those nodes. 
 
 ### Columns 0–42: morphology (presence bits parsed from the SHR tag)
-
-Decompose 'one-hot' tags into their parts, so it's not one-hot and memory-heavy.
 
 | # | token | meaning | fires |
 |---|---|---|---|
@@ -123,14 +119,11 @@ Decompose 'one-hot' tags into their parts, so it's not one-hot and memory-heavy.
 | 41 | `ca` | causative (as in `ca. pp.`) | 0.0065 |
 | 42 | `UNKNOWN` | tag absent or unparsed | 0.0000 |
 
-
-### Column 43: length (in both featurizations)
+### Column 43: length (in all four featurizations)
 
 | # | feature | definition | fires | mean |
 |---|---|---|---|---|
 | 43 | `log1p(length)` | `log(1 + surface char length)` | 1.0000 | 1.7095 |
-
-This one column is the entire hand-tuned `LengthScorer` baseline.
 
 ### Columns 44–63: `scalars64` additions
 
@@ -157,6 +150,21 @@ This one column is the entire hand-tuned `LengthScorer` baseline.
 | 62 | char class | starts with vowel | initial char is a vowel | 0.3249 | 0.3249 |
 | 63 | char class | final long vowel | final char is a long vowel | 0.2940 | 0.2940 |
 
+### Columns 64–79: `ngrams80` additions
+
+| # | feature | definition |
+|---|---|---|
+| 64–79 | hashed character n-grams | count-normalised CRC32 hash of the form's character bigrams and trigrams into 16 buckets |
+
+### `hybrid`: learned embeddings
+
+| table | vocabulary | kept (min_count=3) | dim | params |
+|---|---|---|---|---|
+| surface form | 89,045 | 31,206 (+PAD/UNK) | 32 | 998,656 |
+| lemma | 24,120 | 10,078 (+PAD/UNK) | 16 | 161,280 |
+| preverb | 1,675 | 810 (+PAD/UNK, no threshold) | 4 | 3,248 |
+
+
 ## Reproducing
 
 ```bash
@@ -164,18 +172,37 @@ This one column is the entire hand-tuned `LengthScorer` baseline.
 cd ingest
 python parallel_ingest.py --out ../data/raw.npz --workers 11
 
-# 2. featurize, cache, and train, per featurizer
 cd ../cushr_train
+# 2. precomputed featurizers
 for F in morph43 scalars64; do
   python build_features.py --featurizer $F --raw ../data/raw.npz --out ../data/f_$F.npz
   python prepare.py --npz ../data/f_$F.npz --cache ./cache_$F --force
-  python train.py --cache ./cache_$F --epochs 8 --batch 64 \
-      --out model_$F.npz --log log_$F.json
+  python train.py --cache ./cache_$F --epochs 8 --out model_$F.npz --log log_$F.json
 done
 
-# 3. comparison report (this file)
+# 3. ngrams80, emitting the id columns hybrid will reuse
+python build_features.py --featurizer ngrams80 --raw ../data/raw.npz \
+    --out ../data/f_ngrams80.npz --emit-ids --min-count 3
+python prepare.py --npz ../data/f_ngrams80.npz --cache ./cache_ngrams80 --force
+python train.py --cache ./cache_ngrams80 --learned none --epochs 8 \
+    --out model_ngrams80.npz --log log_ngrams80.json
+
+# 4. hybrid: same cache, learned tables, then freeze to a dense archive
+python train.py --cache ./cache_ngrams80 --learned hybrid --node-dim 96 \
+    --word-dropout 0.1 --epochs 8 \
+    --out model_hybrid.npz --log log_hybrid.json --materialize ../data/f_hybrid.npz
+python prepare.py --npz ../data/f_hybrid.npz --cache ./cache_hybrid --force
+
+# 5. comparison report (this file)
 python compare_featurizers.py --raw ../data/raw.npz \
     --run morph43=./cache_morph43=model_morph43.npz \
     --run scalars64=./cache_scalars64=model_scalars64.npz \
+    --run ngrams80=./cache_ngrams80=model_ngrams80.npz \
+    --run hybrid=./cache_hybrid=model_hybrid.npz \
     --out FEATURIZER_COMPARISON.md
 ```
+
+All corpus statistics — frequency features and the `min_count` threshold alike —
+are fitted on the training split only. `build_features.py` reproduces
+`prepare.py`'s md5 bucketing to determine it, so no dev or test sentence
+contributes.

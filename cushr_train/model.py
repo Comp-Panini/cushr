@@ -37,7 +37,9 @@ class BiaffineEdgeScorer(nn.Module):
         s, d = self.node_proj(feats)
         return (s[src] * d[dst]).sum(-1) + self.bias
 
-    def forward(self, feats, src, dst):
+    # `ids` is accepted and ignored so that this and LearnedBiaffine share one
+    # call signature and the training/eval loops need no branch.
+    def forward(self, feats, src, dst, ids=None):
         return self.edge_scores(feats, src, dst)
 
     # export trained matrices as numpy arrays (use at the very end)
