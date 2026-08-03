@@ -47,7 +47,7 @@ VOCAB_COLUMNS = [
 
 
 def worker(job):
-    idx, files, graphml_dir, p_dir, shard_dir = job
+    idx, files, graphml_dir, p_dir, shard_dir, repair, reach = job
     out = os.path.join(shard_dir, f"shard_{idx:03d}.npz")
     index = os.path.join(shard_dir, f"shard_{idx:03d}_index.json")
     # Each shard writes its vocabularies beside itself (ingest keys them off the
@@ -55,7 +55,8 @@ def worker(job):
     sys.stdout = open(os.path.join(shard_dir, f"shard_{idx:03d}.log"), "w")
     ingest.process_corpus(graphml_dir, p_dir, output_filename=out,
                           index_filename=index, filepaths=files,
-                          progress_every=200, vocab_prefix=f"shard_{idx:03d}_")
+                          progress_every=200, vocab_prefix=f"shard_{idx:03d}_",
+                          repair_orphan_gold=repair, reach_repair=reach)
     return out
 
 
@@ -176,10 +177,37 @@ def main():
     ap.add_argument("--out", default="../data/cushr_data_full_with_gold.npz")
     ap.add_argument("--index", default="sentence_index.json")
     ap.add_argument("--shard-dir", default=None)
-    ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
+    ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1),
+                    help="processes running at once; peak RAM scales with this")
+    ap.add_argument("--shards", type=int, default=0,
+                    help="number of shards to split the corpus into (default: "
+                         "one per worker). Setting this HIGHER than --workers "
+                         "is the memory lever: a worker accumulates one shard "
+                         "in RAM and writes it out before starting the next, so "
+                         "peak RAM is workers x shard-size, not corpus-size.")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--keep-shards", action="store_true")
+    ap.add_argument("--repair-orphan-gold", action="store_true",
+                    help="see ingest.build_repair_index; gold resolution only")
+    ap.add_argument("--reach-repair", action="store_true",
+                    help="see ingest.reconstruct_gold_path(expand_surface); "
+                         "implies --repair-orphan-gold")
+    ap.add_argument("--resume", action="store_true",
+                    help="skip shards whose .npz already exists in --shard-dir. "
+                         "Shard boundaries are a pure function of the sorted "
+                         "file list and --shards, so a resumed run reproduces "
+                         "the same split -- but only if --shards matches.")
+    ap.add_argument("--merge-only", action="store_true",
+                    help="merge the shards already in --shard-dir; ingest none")
+    ap.add_argument("--max-new", type=int, default=0,
+                    help="ingest at most N shards this invocation, then stop "
+                         "without merging. Bounds wall-clock per run so a long "
+                         "job can be driven to completion by repeated "
+                         "--resume calls that each finish well inside any "
+                         "external time limit.")
     args = ap.parse_args()
+    if args.reach_repair:
+        args.repair_orphan_gold = True
 
     files = sorted(glob.glob(os.path.join(args.graphml_dir, "*.graphml")))
     if args.limit:
@@ -190,20 +218,51 @@ def main():
     shard_dir = args.shard_dir or (os.path.abspath(args.out) + ".shards")
     os.makedirs(shard_dir, exist_ok=True)
 
-    n = args.workers
+    n = args.shards or args.workers
     bounds = [round(i * len(files) / n) for i in range(n + 1)]
-    jobs = [(i, files[bounds[i]:bounds[i + 1]], args.graphml_dir, args.p_dir, shard_dir)
+    jobs = [(i, files[bounds[i]:bounds[i + 1]], args.graphml_dir, args.p_dir,
+             shard_dir, args.repair_orphan_gold, args.reach_repair)
             for i in range(n) if bounds[i + 1] > bounds[i]]
-    print(f"{len(files):,} sentences across {len(jobs)} shards "
-          f"(~{len(files)//len(jobs):,} each)")
+    n_shards = len(jobs)
+    all_shards = [os.path.join(shard_dir, f"shard_{i:03d}.npz")
+                  for i in range(n_shards)]
 
-    t0 = time.time()
-    with mp.Pool(len(jobs)) as pool:
-        shards = pool.map(worker, jobs)
-    print(f"shards done in {(time.time() - t0)/60:.1f} min; merging ...")
+    todo = jobs
+    if args.resume or args.merge_only:
+        todo = [j for j in jobs if not os.path.exists(
+            os.path.join(shard_dir, f"shard_{j[0]:03d}.npz"))]
+        print(f"{n_shards - len(todo)} / {n_shards} shards already on disk")
+    if args.max_new and len(todo) > args.max_new:
+        todo = todo[:args.max_new]
+    if args.merge_only:
+        if todo:
+            raise SystemExit(f"--merge-only but {len(todo)} shards are missing: "
+                             f"{[j[0] for j in todo]}")
+        todo = []
+
+    if todo:
+        n_proc = min(args.workers, len(todo))
+        print(f"{len(files):,} sentences across {n_shards} shards "
+              f"(~{len(files)//n_shards:,} each); ingesting {len(todo)}, "
+              f"{n_proc} at a time")
+        t0 = time.time()
+        with mp.Pool(n_proc) as pool:
+            # chunksize=1 so a worker takes one shard, frees it, then takes the
+            # next -- the default would hand each worker a contiguous block of
+            # shards up front and defeat the memory bound.
+            pool.map(worker, todo, chunksize=1)
+        print(f"shards done in {(time.time() - t0)/60:.1f} min")
+
+    missing = [s for s in all_shards if not os.path.exists(s)]
+    if missing:
+        print(f"\n{len(missing)} shard(s) still missing; re-run with --resume "
+              f"to continue, or --merge-only once complete. NOT merging.")
+        return
+    shards = all_shards
+    print("merging ...")
 
     index_paths = [os.path.join(shard_dir, f"shard_{i:03d}_index.json")
-                   for i in range(len(jobs))]
+                   for i in range(n_shards)]
     sentence_index = merge(shards, shard_dir, args.out, index_paths)
     with open(args.index, "w", encoding="utf-8") as f:
         json.dump(sentence_index, f)

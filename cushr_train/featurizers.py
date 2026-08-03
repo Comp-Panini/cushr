@@ -127,8 +127,13 @@ def boundary_mask(raw):
     return raw["node_chunk"] < 0
 
 
-def fill_morph_onehots(raw, vocab_path, out):
+def fill_morph_presence(raw, vocab_path, out):
     """Write 43 presence features per node into out[:, :43].
+
+    Multi-hot, not one-hot: a tag sets one bit per grammatical component it
+    names, so `nom. sg. m.` lights three columns and `pr. ac. sg. 3` lights
+    four. Each individual dimension (case, number, gender, ...) is exclusive
+    within itself; the 43 bits together are their conjunction.
 
     Expanded from the interned morph tag, blockwise so the gathered table never
     exists whole.
@@ -218,7 +223,7 @@ class Morph43(Featurizer):
     """
 
     def _fill(self, raw, out):
-        fill_morph_onehots(raw, self.vocab("morph_vocabulary.txt"), out)
+        fill_morph_presence(raw, self.vocab("morph_vocabulary.txt"), out)
         length = np.asarray(raw["node_word_length"], dtype=np.float32)
         out[:, MORPH_DIM] = np.log1p(length)
 
@@ -247,9 +252,9 @@ class Scalars64(Featurizer):
 
     def __init__(self, vocab_dir="../ingest"):
         super().__init__(vocab_dir)
-        self.form_counts = None
-        self.lemma_counts = None
-        self.form_rank = None
+        self.form_counts: np.ndarray | None = None
+        self.lemma_counts: np.ndarray | None = None
+        self.form_rank: np.ndarray | None = None
 
     def fit(self, raw, train_nodes):
         form_ids = np.asarray(raw["node_form_id"], dtype=np.int64)
@@ -273,11 +278,14 @@ class Scalars64(Featurizer):
         return self
 
     def _fill(self, raw, out):
-        if self.form_counts is None:
+        form_counts, lemma_counts, form_rank = (
+            self.form_counts, self.lemma_counts, self.form_rank
+        )
+        if form_counts is None or lemma_counts is None or form_rank is None:
             raise RuntimeError("scalars64.fit() must run before transform()")
 
         n = len(raw["node_features"])
-        fill_morph_onehots(raw, self.vocab("morph_vocabulary.txt"), out)
+        fill_morph_presence(raw, self.vocab("morph_vocabulary.txt"), out)
         length = np.asarray(raw["node_word_length"], dtype=np.float32)
         out[:, 43] = np.log1p(length)
 
@@ -296,12 +304,12 @@ class Scalars64(Featurizer):
         # -- frequency (52-55) -------------------------------------------------
         form_ids = np.asarray(raw["node_form_id"], dtype=np.int64)
         lemma_ids = np.asarray(raw["node_lemma_id"], dtype=np.int64)
-        fc = self.form_counts[np.clip(form_ids, 0, len(self.form_counts) - 1)]
-        lc = self.lemma_counts[np.clip(lemma_ids, 0, len(self.lemma_counts) - 1)]
+        fc = form_counts[np.clip(form_ids, 0, len(form_counts) - 1)]
+        lc = lemma_counts[np.clip(lemma_ids, 0, len(lemma_counts) - 1)]
         out[:, 52] = np.log1p(fc) / 10.0
         out[:, 53] = np.log1p(lc) / 10.0
         out[:, 54] = fc <= 1               # hapax / unseen-in-train
-        out[:, 55] = self.form_rank[np.clip(form_ids, 0, len(self.form_rank) - 1)]
+        out[:, 55] = form_rank[np.clip(form_ids, 0, len(form_rank) - 1)]
         del fc, lc, lemma_ids
 
         # -- character class (56-63) -------------------------------------------
@@ -412,17 +420,22 @@ def hashed_ngrams(word, n_buckets=N_NGRAM_BUCKETS, orders=NGRAM_ORDERS):
     return vec
 
 
-@register("ngrams80")
-class Ngrams80(Featurizer):
-    """`scalars64` plus 16 hashed character-n-gram columns (cols 64-79).
+class NgramsBase(Featurizer):
+    """`scalars64` plus `n_buckets` hashed character-n-gram columns.
 
     Still zero learned parameters -- the whole vector is precomputed and stored
     as floats. This is the rung of the ablation ladder that isolates what a
     coarse, parameter-free identity signal buys on its own, before spending
     millions of parameters on real embedding tables.
+
+    The bucket count is a class attribute rather than a constructor argument on
+    purpose: it changes the meaning of every column it controls, so it has to be
+    a property of the archive (recorded via the featurizer name and `feat_dim`)
+    rather than of the invocation that built it. Otherwise a model and its data
+    can disagree about what column 70 means with nothing to detect it.
     """
 
-    out_dim = 80
+    n_buckets = N_NGRAM_BUCKETS
 
     def __init__(self, vocab_dir="../ingest"):
         super().__init__(vocab_dir)
@@ -438,14 +451,56 @@ class Ngrams80(Featurizer):
         self._scalars._fill(raw, out[:, :64])
 
         forms = load_strings(self.vocab("form_vocabulary.txt"))
-        table = np.zeros((len(forms), N_NGRAM_BUCKETS), dtype=np.float32)
+        table = np.zeros((len(forms), self.n_buckets), dtype=np.float32)
         for i, w in enumerate(forms):
             if w:
-                table[i] = hashed_ngrams(w)
+                table[i] = hashed_ngrams(w, self.n_buckets)
         ids = np.clip(np.asarray(raw["node_form_id"], dtype=np.int64),
                       0, len(forms) - 1)
+        end = 64 + self.n_buckets
         for lo, hi in node_blocks(len(ids)):
-            out[lo:hi, 64:80] = table[ids[lo:hi]]
+            out[lo:hi, 64:end] = table[ids[lo:hi]]
+
+
+@register("ngrams80")
+class Ngrams80(NgramsBase):
+    """16 buckets (cols 64-79). The original, and the published rung.
+
+    Name and behaviour are frozen: the trained model and the `ngrams80` row of
+    FEATURIZER_COMPARISON.md refer to this exact featurization.
+    """
+
+    out_dim = 80
+    n_buckets = 16
+
+
+@register("ngrams96")
+class Ngrams96(NgramsBase):
+    """32 buckets (cols 64-95). First rung of the bucket-count sweep.
+
+    `ngrams80` bought +0.0009 F1 over `scalars64` and *lost* 0.0226 recall on
+    unseen words. Two mechanisms explain that and they disagree about this
+    experiment: if 16 buckets collide too heavily, widening recovers signal; if
+    the damage is dilution -- `hashed_ngrams` divides by the total n-gram count,
+    so a long form spreads thin -- widening makes every value smaller and helps
+    nothing. Unseen-word recall is the column that separates them.
+    """
+
+    out_dim = 96
+    n_buckets = 32
+
+
+@register("ngrams128")
+class Ngrams128(NgramsBase):
+    """64 buckets (cols 64-127). Far end of the sweep.
+
+    Four times `ngrams80`'s width, at ~862 MB more archive (each column is
+    ~18 MB at corpus scale). If the curve from 16 to 32 to 64 is flat here, the
+    bucket count is not the knob and the normalisation in `hashed_ngrams` is.
+    """
+
+    out_dim = 128
+    n_buckets = 64
 
 
 @register("ngram_split")

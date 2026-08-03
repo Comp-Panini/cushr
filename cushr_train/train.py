@@ -143,10 +143,14 @@ def main():
     # plain dense archive once training finishes.
     featurizer = None
     if store.node_ids is not None and args.learned != "none":
-        n_forms, n_lemmas, n_preverbs = store.id_vocab_sizes
+        # Caches built before the morph-tag column existed carry three sizes;
+        # n_tags=0 then, which disables any tag embedding.
+        sizes = list(store.id_vocab_sizes)
+        n_forms, n_lemmas, n_preverbs = sizes[:3]
+        n_tags = sizes[3] if len(sizes) > 3 else 0
         featurizer = LF.get(args.learned, n_scalars=feat_dim,
                             n_forms=n_forms, n_lemmas=n_lemmas,
-                            n_preverbs=n_preverbs,
+                            n_preverbs=n_preverbs, n_tags=n_tags,
                             out_dim=args.node_dim,
                             word_dropout=args.word_dropout).to(dev)
         scorer = BiaffineEdgeScorer(args.node_dim, args.hidden).to(dev)

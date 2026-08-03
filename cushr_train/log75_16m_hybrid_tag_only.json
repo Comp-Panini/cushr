@@ -1,0 +1,51 @@
+{
+  "args": {
+    "cache": "./cache75_ngrams80",
+    "epochs": 16,
+    "batch": 64,
+    "lr": 0.001,
+    "margin": 1.0,
+    "weight_decay": 1e-05,
+    "hidden": 128,
+    "seed": 0,
+    "limit_train": 0,
+    "eval_every": 1,
+    "out": "model75_16m_hybrid_tag_only.npz",
+    "log": "log75_16m_hybrid_tag_only.json",
+    "learned": "hybrid_tag_only",
+    "node_dim": 96,
+    "word_dropout": 0.1,
+    "materialize": "../data/g75_16_hybrid_tag_only.npz",
+    "device": "cpu"
+  },
+  "featurizer": "ngrams80",
+  "feat_dim": 80,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 3.402788857015337,
+      "active_frac": 0.9223578291352895,
+      "sec": 77.26710891723633,
+      "dev": {
+        "precision": 0.8263152177848583,
+        "recall": 0.8045831129913626,
+        "f1": 0.815304372677908,
+        "perfect_match": 0.3406013311911866,
+        "n": 4357
+      }
+    },
+    {
+      "epoch": 2,
+      "train_loss": 2.7633726164429397,
+      "active_frac": 0.8954013181486565,
+      "sec": 52.551390171051025,
+      "dev": {
+        "precision": 0.8420056426556194,
+        "recall": 0.8312004230565838,
+        "f1": 0.8365681439165454,
+        "perfect_match": 0.3800780353454212,
+        "n": 4357
+      }
+    }
+  ]
+}

@@ -1,23 +1,25 @@
-# Featurizer comparison: `morph43` → `scalars64` → `ngrams80` → `hybrid`
+# Featurizer comparison: `morph43` → `scalars64` → `ngrams80` → `hybrid` → `hybrid_tag`
 
 - Corpus: all 119,503 SIGHUM sentences (4,488,155 lattice nodes, 61,140,552 edges)
 - Sentences with a resolved gold path: 59,092 (49.4%) → train 53,300 / dev 2,906 / test 2,886
-- Identical training for all four: 8 epochs, batch 64, AdamW lr 1e-3, structured hinge
+- Identical training for all six: 8 epochs, batch 64, AdamW lr 1e-3, structured hinge
 
 ## What each featurization contains
 
-| columns | block | `morph43` | `scalars64` | `ngrams80` | `hybrid` |
-|---|---|---|---|---|---|
-| 0–42 | morph presence bits (43) | yes | yes | yes | yes |
-| 43 | `log1p(word length)` | yes | yes | yes | yes |
-| 44–47 | length extras | zero | added | yes | yes |
-| 48–51 | position in sentence and chunk | zero | added | yes | yes |
-| 52–55 | corpus frequency of form and lemma | zero | added | yes | yes |
-| 56–63 | character-class / phonotactic summary | zero | added | yes | yes |
-| 64–79 | hashed character n-grams (16 buckets) | — | — | added | yes |
-| — | learned form/lemma/preverb embeddings | — | — | — | added |
-| | node vector width | 64 | 64 | 80 | 96 |
-| | trainable parameters | 16,385 | 16,385 | 20,481 | 1,200,529 |
+| columns | block | `morph43` | `scalars64` | `ngrams80` | `hybrid` | `hybrid_tag_only` | `hybrid_tag` |
+|---|---|---|---|---|---|---|---|
+| 0–42 | morph presence bits (43) | yes | yes | yes | yes | **zeroed** | yes |
+| 43 | `log1p(word length)` | yes | yes | yes | yes | yes | yes |
+| 44–47 | length extras | zero | added | yes | yes | yes | yes |
+| 48–51 | position in sentence and chunk | zero | added | yes | yes | yes | yes |
+| 52–55 | corpus frequency of form and lemma | zero | added | yes | yes | yes | yes |
+| 56–63 | character-class / phonotactic summary | zero | added | yes | yes | yes | yes |
+| 64–79 | hashed character n-grams (16 buckets) | — | — | added | yes | yes | yes |
+| — | learned form/lemma/preverb embeddings | — | — | — | added | yes | yes |
+| — | learned morph-tag embedding (24d) | — | — | — | — | added | added |
+| | node vector width | 64 | 64 | 80 | 96 | 96 | 96 |
+| | trainable parameters | 16,385 | 16,385 | 20,481 | 1,200,529 | 1,223,185 | 1,223,185 |
+
 
 ## Headline
 
@@ -26,7 +28,9 @@
 | `morph43` | 0.7894 | 0.8176 | 0.7632 | 0.3049 | 16,385 |
 | `scalars64` | 0.8534 | 0.8580 | 0.8487 | 0.4612 | 16,385 |
 | `ngrams80` | 0.8543 | 0.8570 | 0.8515 | 0.4733 | 20,481 |
-| `hybrid` | **0.8771** | **0.8795** | **0.8748** | **0.5246** | 1,200,529 |
+| `hybrid` | 0.8771 | 0.8795 | 0.8748 | 0.5246 | 1,200,529 |
+| `hybrid_tag_only` | 0.8806 | 0.8838 | 0.8774 | 0.5333 | 1,223,185 |
+| `hybrid_tag` | 0.8831 | 0.8863 | 0.8800 | 0.5450 | 1,223,185 |
 
 
 ## Recall by training frequency of the gold word
@@ -37,6 +41,8 @@
 | `scalars64` | 0.7903 | 0.8929 | 0.8559 | 0.8458 |
 | `ngrams80` | 0.7677 | 0.8822 | 0.8510 | 0.8537 |
 | `hybrid` | 0.7949 | 0.8861 | 0.8675 | 0.8806 |
+| `hybrid_tag_only` | 0.7873 | 0.8948 | 0.8724 | 0.8826 |
+| `hybrid_tag` | **0.7979** | 0.8919 | **0.8775** | **0.8843** |
 
 
 | step | unseen | rare | mid | common |
@@ -44,6 +50,9 @@
 | `morph43` → `scalars64` | +0.0422 | +0.0351 | +0.0344 | +0.1095 |
 | `scalars64` → `ngrams80` | −0.0226 | −0.0107 | −0.0049 | +0.0079 |
 | `ngrams80` → `hybrid` | +0.0271 | +0.0039 | +0.0165 | +0.0270 |
+| `hybrid` → `hybrid_tag_only` | **−0.0075** | +0.0088 | +0.0049 | +0.0020 |
+| `hybrid_tag_only` → `hybrid_tag` | **+0.0106** | −0.0029 | +0.0051 | +0.0017 |
+
 
 ## Error counts
 
@@ -53,6 +62,8 @@
 | `scalars64` | 15,256 | 2,524 | 2,719 |
 | `ngrams80` | 15,306 | 2,553 | 2,669 |
 | `hybrid` | 15,724 | 2,155 | 2,251 |
+| `hybrid_tag_only` | 15,772 | 2,073 | 2,203 |
+| `hybrid_tag` | **15,818** | **2,029** | **2,157** |
 
 
 ## Training behaviour
@@ -65,6 +76,13 @@ Dev F1 by epoch:
 | `scalars64` | 0.8299 | 0.8354 | 0.8425 | 0.8390 | 0.8413 | 0.8436 | 0.8437 | 0.8438 |
 | `ngrams80` | 0.8308 | 0.8406 | 0.8472 | 0.8434 | 0.8452 | 0.8472 | 0.8478 | 0.8451 |
 | `hybrid` | 0.8333 | 0.8500 | 0.8598 | 0.8666 | 0.8636 | 0.8685 | 0.8740 | 0.8742 |
+| `hybrid_tag_only` | 0.8264 | 0.8430 | 0.8595 | 0.8615 | 0.8722 | 0.8712 | 0.8748 | 0.8816 |
+| `hybrid_tag` | 0.8419 | 0.8527 | 0.8681 | 0.8685 | 0.8753 | 0.8766 | 0.8826 | 0.8857 |
+
+The three learned rungs are still climbing at epoch 8; `HYBRID_LONGER_TRAINING.md`
+reruns them at 16 epochs (+0.007 to +0.008 F1, ranking unchanged). Those numbers
+are not interchangeable with the tables here, which share an 8-epoch budget.
+
 
 ## Feature reference: what every column is
 
@@ -164,6 +182,12 @@ Mean is its average over those nodes.
 | lemma | 24,120 | 10,078 (+PAD/UNK) | 16 | 161,280 |
 | preverb | 1,675 | 810 (+PAD/UNK, no threshold) | 4 | 3,248 |
 
+### `hybrid_tag` / `hybrid_tag_only`: additional morph-tag table
+
+| table | vocabulary | kept | dim | params |
+|---|---|---|---|---|
+| morph tag | 848 | 848 (no threshold) | 24 | 20,352 |
+
 
 ## Reproducing
 
@@ -193,12 +217,22 @@ python train.py --cache ./cache_ngrams80 --learned hybrid --node-dim 96 \
     --out model_hybrid.npz --log log_hybrid.json --materialize ../data/f_hybrid.npz
 python prepare.py --npz ../data/f_hybrid.npz --cache ./cache_hybrid --force
 
+# 4b. morph-tag embedding variants: same cache again, one flag apart
+for V in hybrid_tag hybrid_tag_only; do
+  python train.py --cache ./cache_ngrams80 --learned $V --node-dim 96 \
+      --word-dropout 0.1 --epochs 8 \
+      --out model_$V.npz --log log_$V.json --materialize ../data/f_$V.npz
+  python prepare.py --npz ../data/f_$V.npz --cache ./cache_$V --force
+done
+
 # 5. comparison report (this file)
 python compare_featurizers.py --raw ../data/raw.npz \
     --run morph43=./cache_morph43=model_morph43.npz \
     --run scalars64=./cache_scalars64=model_scalars64.npz \
     --run ngrams80=./cache_ngrams80=model_ngrams80.npz \
     --run hybrid=./cache_hybrid=model_hybrid.npz \
+    --run hybrid_tag_only=./cache_hybrid_tag_only=model_hybrid_tag_only.npz \
+    --run hybrid_tag=./cache_hybrid_tag=model_hybrid_tag.npz \
     --out FEATURIZER_COMPARISON.md
 ```
 

@@ -123,6 +123,16 @@ def build_id_columns(raw, train_mask, vocab_dir, min_count):
         print(f"  {field:<18} raw {n_vocab:>7,} -> kept {n_kept:>6,} "
               f"(+PAD/UNK = {size:,}) at min_count={mc}")
 
+    # Fourth column: the morph tag id, passed through unremapped. The tagset is
+    # small (848) and closed, and every node already carries a valid tag, so
+    # there is nothing to threshold -- only boundary nodes need forcing to PAD.
+    tag_ids = np.asarray(raw["node_features"], dtype=np.int64).ravel().copy()
+    tag_ids[featurizers.boundary_mask(raw)] = LF.PAD_ID
+    n_tags = int(tag_ids.max()) + 1
+    cols.append(tag_ids)
+    print(f"  {'node_tag_id':<18} raw {n_tags:>7,} -> kept {n_tags:>6,} "
+          f"(no threshold: small closed tagset)")
+
     node_ids = np.stack(cols, axis=1).astype(np.int32)
     unk_rate = float((node_ids[keep, 0] == LF.UNK_ID).mean())
     print(f"  <UNK> rate on training form ids: {unk_rate:.3f}")
@@ -130,7 +140,7 @@ def build_id_columns(raw, train_mask, vocab_dir, min_count):
         "node_ids": node_ids,
         "id_vocab_sizes": np.array(
             [sizes["node_form_id"], sizes["node_lemma_id"],
-             sizes["node_preverb_id"]], dtype=np.int32),
+             sizes["node_preverb_id"], n_tags], dtype=np.int32),
     }
 
 

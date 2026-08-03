@@ -45,6 +45,11 @@ import torch.nn as nn
 PAD_ID = 0      # boundary nodes; embedding row is fixed at zero
 UNK_ID = 1      # below-threshold or unseen at featurization time
 
+# Number of leading scalar columns holding the hand-parsed morph presence bits
+# (featurizers.MORPH_DIM). Mirrored here so `drop_morph_bits` knows what to
+# zero without importing the precomputed-featurizer module.
+MORPH_BITS = 43
+
 LEARNED = {}
 
 
@@ -100,13 +105,24 @@ class HybridFeaturizer(nn.Module):
     exists precisely to stop the model from ignoring them.
     """
 
-    def __init__(self, n_scalars, n_forms, n_lemmas, n_preverbs,
+    # Width of the learned morph-tag embedding. 0 disables it, which is the
+    # `hybrid` case: morphology is already present as the 43 hand-parsed
+    # presence bits inside the scalar block. Subclasses turn it on.
+    tag_dim = 0
+    # Zeroes the 43 morph presence bits, so a tag embedding *replaces*
+    # hand-parsed morphology instead of supplementing it. Subclasses set this;
+    # the constructor argument can still override it explicitly.
+    drop_morph_bits = False
+
+    def __init__(self, n_scalars, n_forms, n_lemmas, n_preverbs, n_tags=0,
                  form_dim=32, lemma_dim=16, preverb_dim=4, out_dim=96,
-                 word_dropout=0.0, sparse=True):
+                 word_dropout=0.0, sparse=True, drop_morph_bits=None):
         super().__init__()
         self.n_scalars = n_scalars
         self.out_dim = out_dim
         self.word_dropout = word_dropout
+        if drop_morph_bits is not None:
+            self.drop_morph_bits = drop_morph_bits
         # padding_idx pins the boundary row at zero and keeps it there: no
         # gradient flows to it, so super-source/sink stay featureless exactly as
         # they are in the precomputed featurizers.
@@ -116,29 +132,57 @@ class HybridFeaturizer(nn.Module):
                                       sparse=sparse)
         self.preverb_emb = nn.Embedding(n_preverbs, preverb_dim,
                                         padding_idx=PAD_ID, sparse=sparse)
-        self.proj = nn.Linear(n_scalars + form_dim + lemma_dim + preverb_dim,
-                              out_dim)
+        # The morph tag vocabulary is small (848) and closed, so unlike surface
+        # forms it is NOT frequency-thresholded: folding the 518 tags that occur
+        # under 100 times into <UNK> would discard exactly the distinctions this
+        # table exists to test. Their rows are simply noisily estimated.
+        self.tag_emb = (nn.Embedding(n_tags, self.tag_dim, padding_idx=PAD_ID,
+                                     sparse=sparse)
+                        if self.tag_dim else None)
+        self.proj = nn.Linear(
+            n_scalars + form_dim + lemma_dim + preverb_dim + self.tag_dim,
+            out_dim)
 
     def embedding_parameters(self):
         """Table parameters -- these need a sparse-aware optimizer."""
-        return list(self.form_emb.parameters()) + \
+        p = list(self.form_emb.parameters()) + \
             list(self.lemma_emb.parameters()) + \
             list(self.preverb_emb.parameters())
+        if self.tag_emb is not None:
+            p += list(self.tag_emb.parameters())
+        return p
 
     def dense_parameters(self):
         return list(self.proj.parameters())
 
     def forward(self, scalars, ids):
-        """scalars: [n, n_scalars] float32; ids: [n, 3] int64 (form, lemma, preverb)."""
+        """scalars: [n, n_scalars] float32.
+
+        ids: [n, 3] int64 (form, lemma, preverb), or [n, 4] with the morph tag
+        id appended when a tag embedding is in use.
+        """
         form, lemma, preverb = ids[:, 0], ids[:, 1], ids[:, 2]
         if self.training and self.word_dropout > 0:
             form = self._drop(form)
             lemma = self._drop(lemma)
-        x = torch.cat([scalars,
-                       self.form_emb(form),
-                       self.lemma_emb(lemma),
-                       self.preverb_emb(preverb)], dim=-1)
-        out = self.proj(x)
+        if self.drop_morph_bits:
+            # Zero the 43 morph presence bits so the tag embedding replaces
+            # them. Build a masked copy rather than writing into `scalars`,
+            # which is a view onto the shared batch tensor.
+            mask = torch.ones(scalars.shape[-1], dtype=scalars.dtype,
+                              device=scalars.device)
+            mask[:MORPH_BITS] = 0.0
+            scalars = scalars * mask
+        parts = [scalars, self.form_emb(form), self.lemma_emb(lemma),
+                 self.preverb_emb(preverb)]
+        if self.tag_emb is not None:
+            if ids.shape[1] < 4:
+                raise ValueError(
+                    "this featurizer needs a morph tag id column; the cache was "
+                    "built by an older build_features.py (node_ids has "
+                    f"{ids.shape[1]} columns, need 4)")
+            parts.append(self.tag_emb(ids[:, 3]))
+        out = self.proj(torch.cat(parts, dim=-1))
         # Boundary nodes carry no signal, matching the precomputed featurizers.
         # Their scalar row is already all-zero, so detect them by that.
         pad = (form == PAD_ID)
@@ -149,6 +193,37 @@ class HybridFeaturizer(nn.Module):
         m = (torch.rand_like(ids, dtype=torch.float) < self.word_dropout) & \
             (ids != PAD_ID)
         return torch.where(m, torch.full_like(ids, UNK_ID), ids)
+
+
+@register("hybrid_tag")
+class HybridTagFeaturizer(HybridFeaturizer):
+    """`hybrid` plus a learned morph-tag embedding, keeping the presence bits.
+
+    The 43 presence bits are *additive* over a tag's components, so the biaffine
+    can already learn morphology-to-morphology compatibility -- what it cannot
+    do is give a specific full tag (`nom. sg. m.`) idiosyncratic behaviour that
+    does not follow from `nom` + `sg` + `m` separately. This table supplies
+    exactly that, so the comparison against `hybrid` isolates non-additive tag
+    identity rather than "morphology" in general.
+
+    A strict superset of `hybrid`, which keeps the ablation ladder additive.
+    """
+
+    tag_dim = 24
+
+
+@register("hybrid_tag_only")
+class HybridTagOnlyFeaturizer(HybridFeaturizer):
+    """Tag embedding *replacing* the presence bits -- the original design sketch.
+
+    Answers the complementary question: are the hand-parsed bits redundant once
+    a tag embedding exists? A loss here relative to `hybrid_tag` would say the
+    factored bits generalise to rare tags in a way a table with 518 thinly
+    -attested rows cannot.
+    """
+
+    tag_dim = 24
+    drop_morph_bits = True
 
 
 class LearnedBiaffine(nn.Module):

@@ -2,6 +2,17 @@
 data/*.npz
 data/*.npz.bak
 
+# Per-shard ingest output from parallel_ingest.py --keep-shards. `data/*.npz`
+# above does not cover these: they live one level down, in a directory named
+# after the merged archive (data/<name>.npz.shards/shard_000.npz).
+data/*.shards/
+
+# Vocabularies and the sentence index are written beside whichever archive
+# produced them (ingest keys the path off --out), so a run targeting data/
+# drops generated copies there. The canonical, tracked copies live in ingest/.
+data/*_vocabulary.txt
+data/sentence_index*.json
+
 # Visualizer database (exceeds GitHub's 100 MB file limit)
 viz/cushr_viz.db
 
@@ -10,10 +21,17 @@ viz/cushr_viz.db
 *.o
 cushr_cpu/cushr_tests
 
-# Week-9 training cache (extracted .npy mirrors of the npz, ~1 GB) and the
-# precomputed per-edge score table (~244 MB)
+# Training caches: extracted .npy mirrors of the featurized npz, ~1.4 GB EACH.
+# The trailing glob matters -- the per-featurizer caches are cache75_morph43/,
+# cache75_ngrams80/, ... and a bare `cache/` rule misses every one of them.
 cushr_train/cache/
+cushr_train/cache*/
 cushr_train/edge_score*.npy
+
+# Learned featurizer weights materialised beside a dense archive in data/.
+# (The cushr_train/model_*.featurizer.pt siblings ARE tracked -- they are part
+# of the committed model set -- so this is scoped to data/ only.)
+data/*.featurizer.pt
 
 # Python bytecode
 __pycache__/

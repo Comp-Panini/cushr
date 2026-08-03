@@ -275,7 +275,34 @@ def load_gold_entries(p_filepath):
     return entries
 
 
-def reconstruct_gold_path(gold_entries, triple_idx, succ, sources, sinks):
+def build_repair_index(node_attrs, succ, has_in):
+    """Index for redirecting gold words off unwired (orphan) nodes.
+
+    A node is *wired* if it has at least one surviving forward edge in either
+    direction. Nodes with none can never lie on a source-to-sink path, so a
+    gold word that matches only those is unresolvable no matter what the DP
+    does.
+
+    Returns {"wired", "surface", "by_surface"}, where `by_surface` maps
+    (chunk_str, word_str) to the wired nodes carrying that exact surface form.
+    Only wired nodes are indexed, so a redirect can never land on another
+    orphan.
+
+    Note this is empty for a sentence whose lattice has no edges at all -- a
+    genuine one-word sentence, where the lone node is both source and sink and
+    already resolves. `wired` being empty makes every redirect a no-op there,
+    which is the intended behaviour rather than a special case.
+    """
+    wired = {i for i in succ if succ[i] or i in has_in}
+    surface = [str(a.get('word', '')) for a in node_attrs]
+    by_surface = defaultdict(list)
+    for i in sorted(wired):
+        by_surface[(str(node_attrs[i].get('chunk_no', '')), surface[i])].append(i)
+    return {"wired": wired, "surface": surface, "by_surface": by_surface}
+
+
+def reconstruct_gold_path(gold_entries, triple_idx, succ, sources, sinks,
+                          repair=None, stats=None, expand_surface=False):
     """Resolve the ordered gold-word sequence to a single connected path.
 
     The gold annotation is a *path*: source-word, ..., sink-word, with each
@@ -295,6 +322,14 @@ def reconstruct_gold_path(gold_entries, triple_idx, succ, sources, sinks):
         succ         : {local_word_id: set(local_word_id successors)}
         sources      : set of local_word_ids with in-degree 0
         sinks        : set of local_word_ids with out-degree 0
+        repair       : optional orphan-redirect index; see `build_repair_index`.
+                       None reproduces the pre-repair behaviour exactly.
+        stats        : optional Counter, incremented with redirect tallies.
+        expand_surface : widen EVERY gold word to all wired nodes sharing its
+                       chunk and surface form, not just words whose candidates
+                       are all unwired. Intended as a fallback pass after the
+                       strict attempt fails -- see `process_corpus`. Requires
+                       `repair`.
 
     Returns the ordered list of local word ids, or [] if unresolvable.
     """
@@ -307,6 +342,40 @@ def reconstruct_gold_path(gold_entries, triple_idx, succ, sources, sinks):
         nodes = set()
         for (lem, cng) in pairs:
             nodes.update(triple_idx.get((chunk_str, lem, cng), ()))
+        if repair is not None and nodes and nodes.isdisjoint(repair["wired"]):
+            # Every node this gold word matched is edge-less, so no path can
+            # ever run through it. That is not a disagreement about the word:
+            # SHR attaches auxiliary analyses (the verbal root of a participle,
+            # position -1, negative cng) as unwired nodes, and DCS names
+            # exactly those. Redirect to the wired node covering the same
+            # surface span -- same chunk, byte-identical `word` -- which is the
+            # same analysis under SHR's lemma convention.
+            twins = set()
+            for n in nodes:
+                twins.update(repair["by_surface"].get(
+                    (chunk_str, repair["surface"][n]), ()))
+            if twins:
+                # Only ever narrow to real, wired nodes; if there is no twin the
+                # candidates are left untouched and this fails as it did before.
+                nodes = twins
+                if stats is not None:
+                    stats["gold_words_redirected"] += 1
+        if expand_surface and repair is not None and nodes:
+            # The orphan rule above only fires when EVERY candidate is unwired.
+            # It therefore misses the commonest residual failure: a node that
+            # has in-edges (so counts as wired) but no out-edges, i.e. a dead
+            # end reached mid-sentence. Widening to every wired node with the
+            # same chunk and surface form puts the traversable analysis of the
+            # same span back in play. This only ever ADDS candidates, so it can
+            # turn a failure into a success but never the reverse.
+            widened = set(nodes)
+            for n in tuple(nodes):
+                widened.update(repair["by_surface"].get(
+                    (chunk_str, repair["surface"][n]), ()))
+            if widened != nodes:
+                nodes = widened
+                if stats is not None:
+                    stats["gold_words_widened"] += 1
         if not nodes:
             return []  # this gold word matched nothing -> path is broken
         cand.append(sorted(nodes))
@@ -353,13 +422,19 @@ def reconstruct_gold_path(gold_entries, triple_idx, succ, sources, sinks):
 # ---------------------------------------------------------------------------
 def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gold.npz",
                    index_filename="sentence_index.json", limit=0, filepaths=None,
-                   progress_every=1000, vocab_prefix=""):
+                   progress_every=1000, vocab_prefix="",
+                   repair_orphan_gold=False, reach_repair=False):
     """Ingest a corpus into one .npz archive.
 
     `filepaths` overrides the directory scan with an explicit, already-ordered
     file list. parallel_ingest.py uses it to hand each worker one shard of the
     corpus; everything else about the per-sentence logic is unchanged, so a
     sharded run and a single sequential run do the same work.
+
+    `repair_orphan_gold` opts into the orphan redirect described in
+    `build_repair_index`. It changes gold resolution only -- the node set, the
+    edges, and every other emitted array are bit-identical either way -- so the
+    two settings can be diffed directly.
     """
     print(f"scanning graphml directory: {graphml_dir}")
     print(f"scanning gold-path directory: {p_dir}")
@@ -432,6 +507,9 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
     n_with_pfile = 0
     n_without_pfile = 0
     resolved_sentences = 0
+    # Stays all-zero unless repair_orphan_gold is on, which is how a run
+    # advertises whether the redirect actually fired.
+    repair_stats = defaultdict(int)
 
     for idx, filepath in enumerate(filepaths):
         if progress_every and idx % progress_every == 0 and idx > 0:
@@ -514,8 +592,28 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
                        str(attrs.get('lemma', '')),
                        str(attrs.get('cng', '')))
                 triple_idx[key].append(i)
+            repair = (build_repair_index(node_attrs, succ, has_in)
+                      if repair_orphan_gold else None)
+            before = repair_stats["gold_words_redirected"]
             gold_local = reconstruct_gold_path(
-                gold_entries, triple_idx, succ, sources, sinks)
+                gold_entries, triple_idx, succ, sources, sinks,
+                repair=repair, stats=repair_stats)
+            if repair_stats["gold_words_redirected"] > before:
+                repair_stats["sentences_touched"] += 1
+                if gold_local:
+                    repair_stats["sentences_recovered"] += 1
+            if not gold_local and reach_repair and repair is not None:
+                # Fallback only. The strict pass above is authoritative, so a
+                # sentence that already resolves is never re-derived and its
+                # label cannot change -- the widened pass runs exclusively on
+                # sentences that produced no path at all.
+                widened = reconstruct_gold_path(
+                    gold_entries, triple_idx, succ, sources, sinks,
+                    repair=repair, stats=repair_stats, expand_surface=True)
+                repair_stats["widened_attempts"] += 1
+                if widened:
+                    repair_stats["widened_recovered"] += 1
+                    gold_local = widened
             if gold_local:
                 resolved_sentences += 1
 
@@ -716,15 +814,52 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
     print(f"sentences with a fully resolved gold path: "
           f"{resolved_sentences:,} / {n_sent:,}  ({rate:.2f}%)")
     print(f"total gold nodes flagged: {int(gold_mask_np.sum()):,}")
+    if repair_orphan_gold:
+        print()
+        print("--- orphan-gold repair ---")
+        print(f"gold words redirected:  {repair_stats['gold_words_redirected']:,}")
+        print(f"sentences touched:      {repair_stats['sentences_touched']:,}")
+        print(f"sentences recovered:    {repair_stats['sentences_recovered']:,}")
+    if reach_repair:
+        print()
+        print("--- reachability (surface-widened) fallback ---")
+        print(f"gold words widened:     {repair_stats['gold_words_widened']:,}")
+        print(f"fallback attempts:      {repair_stats['widened_attempts']:,}")
+        print(f"fallback recovered:     {repair_stats['widened_recovered']:,}")
     print(f"wrote sentence index map: {index_filename}")
 
 
 if __name__ == "__main__":
+    import argparse
+
     GRAPHML_DIR = "../../SIGHUM_database/After_graphml"
     P_DIR = "../../SIGHUM_database_gold_path/DCS_pick"
 
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--graphml-dir", default=GRAPHML_DIR)
+    ap.add_argument("--p-dir", default=P_DIR)
+    ap.add_argument("--out", default="cushr_data_full_with_gold.npz",
+                    help="output .npz; vocabularies are written beside it")
+    ap.add_argument("--index", default="sentence_index.json")
+    ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--repair-orphan-gold", action="store_true",
+                    help="redirect gold words that match only edge-less nodes "
+                         "onto the wired node covering the same surface span "
+                         "(see build_repair_index)")
+    ap.add_argument("--reach-repair", action="store_true",
+                    help="on sentences the strict pass cannot resolve, retry "
+                         "with every gold word widened to same-surface wired "
+                         "nodes. Implies --repair-orphan-gold.")
+    args = ap.parse_args()
+    if args.reach_repair:
+        args.repair_orphan_gold = True
+
     process_corpus(
-        GRAPHML_DIR,
-        P_DIR,
-        output_filename="cushr_data_full_with_gold.npz",
+        args.graphml_dir,
+        args.p_dir,
+        output_filename=args.out,
+        index_filename=args.index,
+        limit=args.limit,
+        repair_orphan_gold=args.repair_orphan_gold,
+        reach_repair=args.reach_repair,
     )
