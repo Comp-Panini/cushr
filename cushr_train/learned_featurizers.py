@@ -113,6 +113,11 @@ class HybridFeaturizer(nn.Module):
     # hand-parsed morphology instead of supplementing it. Subclasses set this;
     # the constructor argument can still override it explicitly.
     drop_morph_bits = False
+    # When False the concatenated vector goes to the scorer untouched and
+    # `out_dim` is ignored -- out_dim becomes the concat width. Otherwise the
+    # projection is a rank bottleneck: 156 -> 96 for hybrid_tag, so the biaffine
+    # never sees more than a 96-dimensional view of what the tables computed.
+    project = True
 
     def __init__(self, n_scalars, n_forms, n_lemmas, n_preverbs, n_tags=0,
                  form_dim=32, lemma_dim=16, preverb_dim=4, out_dim=96,
@@ -139,9 +144,17 @@ class HybridFeaturizer(nn.Module):
         self.tag_emb = (nn.Embedding(n_tags, self.tag_dim, padding_idx=PAD_ID,
                                      sparse=sparse)
                         if self.tag_dim else None)
-        self.proj = nn.Linear(
-            n_scalars + form_dim + lemma_dim + preverb_dim + self.tag_dim,
-            out_dim)
+        concat_dim = (n_scalars + form_dim + lemma_dim + preverb_dim
+                      + self.tag_dim)
+        if self.project:
+            self.proj = nn.Linear(concat_dim, out_dim)
+            self.out_dim = out_dim
+        else:
+            # nn.Identity has no parameters, so dense_parameters() returns []
+            # here. That is fine: train.py pairs it with the scorer's
+            # parameters, so AdamW is never handed an empty list.
+            self.proj = nn.Identity()
+            self.out_dim = concat_dim
 
     def embedding_parameters(self):
         """Table parameters -- these need a sparse-aware optimizer."""
@@ -224,6 +237,29 @@ class HybridTagOnlyFeaturizer(HybridFeaturizer):
 
     tag_dim = 24
     drop_morph_bits = True
+
+
+@register("hybrid_tag_full")
+class HybridTagFullFeaturizer(HybridTagFeaturizer):
+    """`hybrid_tag` with the projection removed: the scorer sees all 156 columns.
+
+    Every other hybrid rung ends in `Linear(concat -> 96)`, so the composition
+    with the scorer's own `Linear(96 -> hidden)` has rank at most 96 -- the
+    biaffine cannot see more than a 96-dimensional view of the 156 columns the
+    featurizer actually computed. This variant hands the concatenation over
+    untouched, isolating whether that bottleneck was discarding usable signal.
+
+    Strictly more expressive than `hybrid_tag` rather than merely wider:
+    `Linear(156->96)` then `Linear(96->h)` is a special case of `Linear(156->h)`.
+
+    `out_dim` and `--node-dim` are ignored here; the width is dictated by the
+    blocks being concatenated (80 scalars + 32 form + 16 lemma + 4 preverb +
+    24 tag). Note the removed projection was also the only bias term in the
+    feature path -- the scorer's `src_proj`/`dst_proj` are `bias=False` -- so
+    the unprojected scalars reach the scorer at their natural scales.
+    """
+
+    project = False
 
 
 class LearnedBiaffine(nn.Module):

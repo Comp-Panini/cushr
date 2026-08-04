@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import glob
 import os
 
+import ingest
+
 def reconstruct_from_csr(data, sentence_idx):
     """Rebuilds a single sentence graph strictly from the flat CSR arrays."""
     rowptr = data['rowptr']
@@ -37,22 +39,15 @@ def reconstruct_from_csr(data, sentence_idx):
             
     return G_recon
 
-def load_and_filter_original(filepath):
-    """Loads the original XML and applies the exact same filters as ingest.py"""
-    G_orig = nx.read_graphml(filepath)
-    
-    edges_to_remove = []
-    for u, v, data in G_orig.edges(data=True):
-        u_id = int(u[1:]) if str(u).startswith('n') else int(u)
-        v_id = int(v[1:]) if str(v).startswith('n') else int(v)
-        
-        if str(data.get('key', '0')) != '1' or u_id >= v_id:  
-            edges_to_remove.append((u, v))
-            
-    G_orig.remove_edges_from(edges_to_remove)
-    return G_orig
+def load_and_filter_original(filepath, edge_order="id"):
+    """Loads the original XML and applies the exact same filter as ingest.py.
 
-def verify_all_sentences(npz_path, graphml_dir, display_time=3.0):
+    `edge_order` must match the setting the archive under test was built with,
+    or every sentence will report a spurious edge mismatch.
+    """
+    return ingest.forward_edge_filter(nx.read_graphml(filepath), edge_order)
+
+def verify_all_sentences(npz_path, graphml_dir, display_time=3.0, edge_order="id"):
     # Load the GPU Arrays once
     data = np.load(npz_path)
     
@@ -69,7 +64,7 @@ def verify_all_sentences(npz_path, graphml_dir, display_time=3.0):
         
         # 1. Reconstruct and Filter
         G_recon = reconstruct_from_csr(data, sentence_idx)
-        G_orig = load_and_filter_original(original_filepath)
+        G_orig = load_and_filter_original(original_filepath, edge_order)
         
         # 2. Mathematical Isomorphism Check
         is_match = nx.is_isomorphic(G_recon, G_orig)

@@ -31,7 +31,7 @@ P_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'SIGHUM_database_gol
 INDEX_JSON = os.path.join(os.path.dirname(__file__), '..', 'ingest', 'sentence_index.json')
 
 
-def build_sentence(stem):
+def build_sentence(stem, edge_order="id"):
     """Return a compact dict {nodes, edges, gold_path} for one sentence, or None."""
     fp = os.path.join(GRAPHML_DIR, f'{stem}.graphml')
     if not os.path.exists(fp):
@@ -41,14 +41,9 @@ def build_sentence(stem):
     except Exception:
         return None
 
-    # Same DAG filtering as ingest: keep only forward (key==1) edges u<v.
-    rm = []
-    for u, v, d in G.edges(data=True):
-        ui = int(u[1:]) if str(u).startswith('n') else int(u)
-        vi = int(v[1:]) if str(v).startswith('n') else int(v)
-        if str(d.get('key', '0')) != '1' or ui >= vi:
-            rm.append((u, v))
-    G.remove_edges_from(rm)
+    # Same DAG filtering as ingest. Must match the --edge-order the npz this db
+    # accompanies was built with, or node numbering and edges disagree with it.
+    ig.forward_edge_filter(G, edge_order)
 
     try:
         node_list = sorted(G.nodes(), key=lambda x: int(x[1:]) if x.startswith('n') else int(x))
@@ -118,6 +113,9 @@ def main():
     ap.add_argument('--n', type=int, default=0,
                     help='number of sentences (npz indices 0..n-1); 0 = all')
     ap.add_argument('--out', default=os.path.join(os.path.dirname(__file__), 'cushr_viz.db'))
+    ap.add_argument('--edge-order', choices=('id', 'position'), default='id',
+                    help='must match the --edge-order the companion npz was '
+                         'ingested with; see ingest.forward_edge_filter')
     args = ap.parse_args()
 
     if not os.path.exists(INDEX_JSON):
@@ -140,7 +138,7 @@ def main():
     for idx in range(n):
         if idx % 2000 == 0 and idx:
             print(f'  {idx}/{n}  ({n_gold} with gold)')
-        s = build_sentence(sentence_index[idx])
+        s = build_sentence(sentence_index[idx], args.edge_order)
         if s is None:
             continue
         has_gold = 1 if s['gold_path'] else 0

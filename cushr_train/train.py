@@ -97,6 +97,10 @@ def main():
     ap.add_argument("--limit-train", type=int, default=0,
                     help="cap training sentences (smoke runs)")
     ap.add_argument("--eval-every", type=int, default=1)
+    ap.add_argument("--train-subset", default="",
+                    help="npz whose gold_path_offsets restrict which TRAINING "
+                         "sentences are supervised. Dev/test are untouched, so "
+                         "runs with and without it stay directly comparable.")
     ap.add_argument("--out", default="model_biaffine.npz")
     ap.add_argument("--log", default="train_log.json")
     # --- learned featurizer options (used only if the cache carries node_ids)
@@ -126,6 +130,18 @@ def main():
     train_ids = store.trainable("train")
     dev_ids = store.trainable("dev")
     test_ids = store.trainable("test")
+    if args.train_subset:
+        # Keep only training sentences that also carry a gold path in the given
+        # archive. This holds the FEATURES fixed (they come from --cache) while
+        # varying which sentences are supervised, so a model trained on an older,
+        # smaller gold set can be compared against one trained on a larger set
+        # without the two also disagreeing about their input vectors.
+        other = np.load(args.train_subset)
+        has = np.diff(np.asarray(other["gold_path_offsets"], dtype=np.int64)) > 0
+        keep = np.array([s < len(has) and bool(has[s]) for s in train_ids])
+        print(f"--train-subset {args.train_subset}: "
+              f"{len(train_ids):,} -> {int(keep.sum()):,} training sentences")
+        train_ids = train_ids[keep]
     if args.limit_train:
         train_ids = train_ids[:args.limit_train]
 
@@ -153,11 +169,19 @@ def main():
                             n_preverbs=n_preverbs, n_tags=n_tags,
                             out_dim=args.node_dim,
                             word_dropout=args.word_dropout).to(dev)
-        scorer = BiaffineEdgeScorer(args.node_dim, args.hidden).to(dev)
+        # The featurizer is authoritative about its own width: a variant with no
+        # projection (LF.HybridFeaturizer.project = False) ignores out_dim and
+        # emits the raw concatenation instead, so building the scorer from
+        # args.node_dim would size it wrong and fail on the first batch.
+        scorer = BiaffineEdgeScorer(featurizer.out_dim, args.hidden).to(dev)
         model = LF.LearnedBiaffine(featurizer, scorer).to(dev)
         print(f"learned featurizer {args.learned!r}: "
               f"forms={n_forms:,} lemmas={n_lemmas:,} preverbs={n_preverbs:,} "
-              f"node_dim={args.node_dim} word_dropout={args.word_dropout}")
+              f"node_dim={featurizer.out_dim} word_dropout={args.word_dropout}")
+        if featurizer.out_dim != args.node_dim:
+            print(f"  note: {args.learned} sets its own width; "
+                  f"--node-dim {args.node_dim} ignored, "
+                  f"using {featurizer.out_dim}")
         print(f"  embedding params: "
               f"{sum(p.numel() for p in featurizer.embedding_parameters()):,}")
         # Embedding gradients are sparse -- a batch touches only the rows it
@@ -178,9 +202,10 @@ def main():
 
     # What gets exported as the .bin is always the biaffine scorer, operating on
     # whatever width the node vector ends up being: feat_dim for a precomputed
-    # featurizer, node_dim once a learned one has been materialised.
+    # featurizer, the learned featurizer's own out_dim once it has been
+    # materialised (which is not necessarily args.node_dim -- see above).
     scorer_module = model.scorer if featurizer is not None else model
-    export_dim = args.node_dim if featurizer is not None else feat_dim
+    export_dim = featurizer.out_dim if featurizer is not None else feat_dim
     # Record the composed name, so a model file says which learned featurizer
     # produced the vectors it expects rather than only naming the scalar block.
     export_name = (f"{store.featurizer_name}+{args.learned}"

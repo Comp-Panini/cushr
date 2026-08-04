@@ -275,6 +275,80 @@ def load_gold_entries(p_filepath):
     return entries
 
 
+def _node_id(n):
+    """Numeric id from a graphml node name, which is either 'n42' or '42'."""
+    return int(n[1:]) if str(n).startswith('n') else int(n)
+
+
+def _orientation_keys(G, edge_order):
+    """{node -> key} giving each node's place in the order edges run along.
+
+    Built once per graph rather than per edge endpoint: the corpus has ~61M
+    edges against ~4.2M nodes, so keying by edge would repeat this work
+    roughly thirty times over.
+
+    'id' is the original behaviour: node id alone.
+
+    'position' orders by where the node actually sits in the sentence, with
+    (end offset, node id) appended. Since node ids are unique the whole key is
+    injective, so this is a *strict total order* and two distinct nodes can
+    never tie. That matters: a tie would compare equal in both directions and
+    drop both, silently losing an edge. As it is, exactly one direction of
+    every symmetric pair survives, and the surviving word-to-word edge count is
+    identical under either ordering -- verified at 1,418,774 over 3,000
+    sentences.
+
+    (The end-offset component is therefore redundant for correctness. It is
+    kept because it makes the order meaningful rather than arbitrary when two
+    nodes share a start offset: shorter span first.)
+
+    Nodes with position -1 -- the unwired auxiliary analyses, see
+    build_repair_index -- sort first within their chunk. They carry no key=1
+    edges at all (measured: 0 across 717 such nodes), so this is inert.
+    """
+    if edge_order == "id":
+        return {n: (_node_id(n),) for n in G.nodes()}
+    keys = {}
+    for n, a in G.nodes(data=True):
+        pos = int(a.get('position', -1))
+        keys[n] = (int(a.get('chunk_no', 0)), pos,
+                   pos + int(a.get('length_word', 0)), _node_id(n))
+    return keys
+
+
+def forward_edge_filter(G, edge_order="id"):
+    """Orient SHR's key=1 relation into a DAG, in place. Returns G.
+
+    SHR uses key values of -1, 2 and 3 to attach auxiliary and alternative
+    analyses; only key == 1 is the "can co-occur" relation, and those edges are
+    **symmetric** -- measured over 3,000 graphml files, all 2,837,548 of them
+    have a reciprocal partner, with zero self-loops. So this function does not
+    remove spurious edges, it *chooses a direction* for an undirected relation.
+
+    Which direction matters. `edge_order='id'` uses node id, but SHR node ids
+    are not sentence order: the merged unsplit analysis of a chunk is often
+    numbered after the nodes of later chunks (sentence 100104 numbers chunk-1
+    'aBiGAtam' as n38, after chunk-2/3/4's n23-n37). Orienting by id then
+    reverses genuine edges and strands those nodes with out-degree 0 --
+    a dead end mid-sentence, which is the commonest gold-path failure.
+    `edge_order='position'` orients by (chunk_no, position) instead, the same
+    ordering surface reconstruction and char_start already use.
+
+    Kept as one function because verify.py and viz/build_db.py have to apply
+    exactly this filter; three hand-copied versions is how they drift apart.
+    """
+    if edge_order not in ("id", "position"):
+        raise ValueError(f"edge_order must be 'id' or 'position', got {edge_order!r}")
+    key = _orientation_keys(G, edge_order)
+    # Both keys are injective, so `>=` only ever fires on the strictly backward
+    # direction (or a self-loop, of which there are none). The result is a DAG
+    # by construction: edges only ever run up a strict total order.
+    drop = [(u, v) for u, v, data in G.edges(data=True)
+            if str(data.get('key', '0')) != '1' or key[u] >= key[v]]
+    G.remove_edges_from(drop)
+    return G
+
+
 def build_repair_index(node_attrs, succ, has_in):
     """Index for redirecting gold words off unwired (orphan) nodes.
 
@@ -423,7 +497,7 @@ def reconstruct_gold_path(gold_entries, triple_idx, succ, sources, sinks,
 def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gold.npz",
                    index_filename="sentence_index.json", limit=0, filepaths=None,
                    progress_every=1000, vocab_prefix="",
-                   repair_orphan_gold=False, reach_repair=False):
+                   repair_orphan_gold=False, reach_repair=False, edge_order="id"):
     """Ingest a corpus into one .npz archive.
 
     `filepaths` overrides the directory scan with an explicit, already-ordered
@@ -435,6 +509,11 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
     `build_repair_index`. It changes gold resolution only -- the node set, the
     edges, and every other emitted array are bit-identical either way -- so the
     two settings can be diffed directly.
+
+    `edge_order` selects how the symmetric key=1 relation is oriented; see
+    `forward_edge_filter`. Unlike `repair_orphan_gold` this one does change the
+    emitted edges (rowptr/colidx), though not the node set or any node field.
+    Default 'id' reproduces existing archives byte for byte.
     """
     print(f"scanning graphml directory: {graphml_dir}")
     print(f"scanning gold-path directory: {p_dir}")
@@ -507,6 +586,7 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
     n_with_pfile = 0
     n_without_pfile = 0
     resolved_sentences = 0
+    n_cyclic = 0
     # Stays all-zero unless repair_orphan_gold is on, which is how a run
     # advertises whether the redirect actually fired.
     repair_stats = defaultdict(int)
@@ -535,16 +615,13 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
             sentence_index.pop()
             continue
 
-        # ----- force DAG: drop conflict edges and any non-forward edges -----
-        edges_to_remove = []
-        for u, v, data in G.edges(data=True):
-            u_id = int(u[1:]) if str(u).startswith('n') else int(u)
-            v_id = int(v[1:]) if str(v).startswith('n') else int(v)
-            if str(data.get('key', '0')) != '1' or u_id >= v_id:
-                edges_to_remove.append((u, v))
-        G.remove_edges_from(edges_to_remove)
+        # ----- force DAG: keep key=1 edges, oriented by `edge_order` -----
+        forward_edge_filter(G, edge_order)
 
         # ----- consistent node ordering -----
+        # Node id, independent of `edge_order`: this is only a stable labelling
+        # for the emitted arrays. Traversal order downstream comes from
+        # topolevel, which is recomputed from the surviving edges below.
         try:
             node_list = sorted(
                 G.nodes(),
@@ -568,7 +645,11 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
                 for child in G.successors(n):
                     word_topo[child] = max(word_topo[child], word_topo[n] + 1)
         except nx.NetworkXUnfeasible:
+            # Should be unreachable: both orientations are strict total orders,
+            # so the surviving edge set is a DAG by construction. Counted rather
+            # than only printed so a regression cannot hide in the log.
             print(f"warning: cycle detected in {filepath} after edge filter, skipping.")
+            n_cyclic += 1
             sentence_index.pop()
             continue
 
@@ -806,6 +887,8 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
     print(f"total edges:            {len(global_colidx):,}")
     print(f"total sentences:        {n_sent:,}")
     print(f"unique morph tags:      {len(morph_vocab):,}")
+    print(f"edge orientation:       {edge_order}")
+    print(f"sentences dropped as cyclic: {n_cyclic:,}")
     print()
     print("--- gold-path coverage ---")
     print(f"sentences with .p file:    {n_with_pfile:,}")
@@ -846,6 +929,12 @@ if __name__ == "__main__":
                     help="redirect gold words that match only edge-less nodes "
                          "onto the wired node covering the same surface span "
                          "(see build_repair_index)")
+    ap.add_argument("--edge-order", choices=("id", "position"), default="id",
+                    help="how to orient SHR's symmetric key=1 edges. 'id' "
+                         "(default) reproduces existing archives; 'position' "
+                         "orients by (chunk_no, position), which stops genuine "
+                         "edges being reversed into dead ends (see "
+                         "forward_edge_filter)")
     ap.add_argument("--reach-repair", action="store_true",
                     help="on sentences the strict pass cannot resolve, retry "
                          "with every gold word widened to same-surface wired "
@@ -862,4 +951,5 @@ if __name__ == "__main__":
         limit=args.limit,
         repair_orphan_gold=args.repair_orphan_gold,
         reach_repair=args.reach_repair,
+        edge_order=args.edge_order,
     )

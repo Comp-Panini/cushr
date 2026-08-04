@@ -1,8 +1,13 @@
 # Gold-path ingestion: methodology, coverage, and residual failures
 
 How the SIGHUM corpus becomes trainable data, why only half of it originally
-carried a usable label, what was changed to raise that to three quarters, and
-what is actually wrong with the quarter that still fails.
+carried a usable label, the two changes that raised that to **93.9%**, and what is
+actually wrong with the 6% that still fails.
+
+Two conclusions in earlier versions of this document were wrong and are retracted
+in place rather than deleted — §4d's "no realization in the lattice" and §4b's
+reading of the `no_source_start` group. The retractions are kept visible because
+in both cases the error was the same one, and it is instructive.
 
 Every number here is either **measured** over the full 119,503-sentence corpus
 or **sampled** with the sample size stated. Where a figure is an estimate, it
@@ -16,7 +21,8 @@ says so.
 
 **The lattice** comes from a Sanskrit Heritage Reader (SHR) `.graphml` file. Nodes
 are candidate word analyses — a surface form with a lemma, a morphological tag
-(`cng`), a chunk index, and a position. Edges mean *can directly follow*.
+(`cng`), a chunk index, and a position. Edges mean *can be adjacent* — they are
+undirected in the source file, and ingest orients them (see §1's filter).
 Segmenting a sentence is choosing a source-to-sink path.
 
 **The label** comes from a Digital Corpus of Sanskrit (DCS) `.p` pickle: the
@@ -34,35 +40,63 @@ DCS names words; SHR names nodes. They are joined on the triple
 (chunk_no, lemma, cng)
 ```
 
-`reconstruct_gold_path` (`ingest.py:302`) collects candidate nodes per gold word,
+`reconstruct_gold_path` (`ingest.py:366`) collects candidate nodes per gold word,
 then runs a forward DP with backpointers. It returns `[]` — failure — at four
 points:
 
 | exit | meaning |
 |---|---|
-| `ingest.py:358` | a gold word matched no node at all |
-| `ingest.py:369` | no candidate for gold word 0 is a source |
-| `ingest.py:379` | no forward edge from position *i−1* to any candidate at *i* |
-| `ingest.py:384` | chain complete but the last word is not a sink |
+| `ingest.py:442` | a gold word matched no node at all |
+| `ingest.py:452` | no candidate for gold word 0 is a source |
+| `ingest.py:462` | no forward edge from position *i−1* to any candidate at *i* |
+| `ingest.py:467` | chain complete but the last word is not a sink |
 
 All four collapse to the same output: an empty path. `goldpathmask`
-(`ingest.py:541`) is derived *from* the resolved path, so it is all-zero on
+(`ingest.py:707`) is derived *from* the resolved path, so it is all-zero on
 failure and **cannot distinguish these cases**. That is why diagnosing this
 required re-running the resolution logic offline rather than reading the archive.
 
 ### The forced-DAG edge filter
 
-Before anything else, `ingest.py:517-524` drops every edge that is not
-`key == '1'` or not forward in node-id order. SHR uses `key` values of `-1`, `2`,
-and `3` to attach auxiliary and alternative analyses; only `key == '1'` is the
-traversable "can follow" relation. Keeping the others would make the graph
-cyclic and the DP meaningless.
+Before anything else, the filter (`forward_edge_filter`) drops every edge that is
+not `key == '1'` or not forward in the chosen node order. SHR uses `key` values of
+`-1`, `2`, and `3` to attach auxiliary and alternative analyses; only `key == '1'`
+relates two candidate words that can co-occur. Keeping the others would make the
+graph cyclic and the DP meaningless.
+
+**`key == '1'` is symmetric, and that changes what this filter is.** Measured over
+3,000 graphml files: all **2,837,548** `key=1` edges have a reciprocal partner —
+100%, with zero self-loops. Both `1 → 38` and `38 → 1` are present. So it is not a
+directed *can follow* relation, as this document previously claimed; it is an
+undirected compatibility relation, and the second half of the filter does not
+remove spurious edges — it **chooses an orientation**.
+
+Which order it orients along is therefore a real modelling decision, not a
+formality. Ingest offers two, via `--edge-order`:
+
+| | orientation key | notes |
+|---|---|---|
+| `id` *(default)* | node id | original behaviour; reproduces every archive below |
+| `position` | `(chunk_no, position, position+length_word, node_id)` | sentence order, the same key `surface.py` and `char_start` already use |
+
+Node id is **not** sentence order — see §4b, which is where the consequences land.
+
+Both keys are **injective** (node id is unique, and it is the last component of
+the `position` key), so each is a strict total order and two nodes can never tie.
+That is what makes the result a DAG by construction, and it means **exactly one
+direction of every symmetric pair survives under either ordering** — no edge is
+ever lost to the choice. Confirmed on the §4e A/B: word-to-word edge count is
+identical at **1,418,774** either way. Only the super-source/sink wiring differs,
+since which nodes are sources and sinks does change.
 
 > **Methodological note.** An early version of this diagnosis omitted that filter
 > and reported `n_sources: 0` for every sentence — impossible, since a finite DAG
 > always has a source. That impossibility is what exposed the bug. Every
-> diagnostic below replicates `ingest.py:517-524` exactly. Any analysis of this
-> lattice that does not apply the filter is measuring a different graph.
+> diagnostic below replicates the filter exactly, which is now enforced by
+> construction: `verify.py` and `viz/build_db.py` call the same
+> `forward_edge_filter` rather than each keeping a hand-copied version. Any
+> analysis of this lattice that does not apply the filter is measuring a
+> different graph.
 
 ---
 
@@ -97,7 +131,7 @@ is a *superset*: 322,232 pickles have no corresponding graphml, so the corpus is
 limited by how many sentences were run through SHR, not by annotation.
 
 *(Caveat, stated because it is an inherited assumption rather than a proven one:
-the graphml↔pickle join is by filename stem, which is what `ingest.py:502`
+the graphml↔pickle join is by filename stem, which is what `ingest.py:591`
 assumes. That DCS sentence *N* and SHR sentence *N* are the same text was not
 independently verified. The circumstantial evidence is strong — 59,092 sentences
 resolve to fully connected paths with chunks and lemmas agreeing — but it is not
@@ -138,7 +172,7 @@ Measured over the corpus:
 | nodes whose only wiring is `SRC → n → SINK` | 11.3% |
 | sentences containing at least one such node | 77.7% |
 
-The second row is a side effect worth naming: `ingest.py:624-630` wires
+The second row is a side effect worth naming: `ingest.py:690-699` wires
 super-source → every source and every sink → super-sink. An edge-less node is in
 *both* sets, so it becomes a legal one-word "segmentation" of the entire
 sentence. These degenerate paths are spurious labels.
@@ -151,7 +185,7 @@ sentence. These degenerate paths are spurious labels.
 
 If a gold word's candidates are **all** edge-less, redirect it to nodes with the
 **same `chunk_no` and byte-identical surface `word`** that do have edges
-(`build_repair_index`, `ingest.py:278`; applied at `ingest.py:340`).
+(`build_repair_index`, `ingest.py:340`; applied at `ingest.py:422`).
 
 The rationale is that the orphan and its wired twin describe the same span of
 text; SHR simply files the root analysis separately from the inflected one. The
@@ -254,7 +288,11 @@ Repeat until it merges. ~7 min per 5 shards, ~35 min total.
 
 ---
 
-## 4. Why the remaining 25% still fails
+## 4. Why the remaining 25% still fails *(superseded by §4e)*
+
+This section diagnoses the residual left by §3's orphan repair. Two of its
+conclusions turned out to be wrong; §4e replaces them and cuts the residual from
+25% to 6%. It is kept in full because the reasoning that misled it is the point.
 
 29,892 sentences remain unresolved. Sample of 50, same offline replication of the
 resolution logic:
@@ -290,10 +328,40 @@ This is the orphan problem one level subtler. `build_repair_index` defines
 *wired* as having **any** edge, in or out. A node with in-edges but no out-edges
 passes that test, so the repair never fires — yet it is a dead end mid-sentence.
 
-The `no_source_start` group is the mirror image: in **all 12**, the first gold
-word's candidates have in-edges, so none can start a path. The traces show the
-underlying disagreement plainly — DCS annotates a whole chunk as one word, SHR
-wires only the sandhi split:
+#### Worked example: 100104, and why the dead ends exist
+
+Four chunks: `pramattezu aBiGAtam / hi / kuryAt SAlvaH / naraDipaH`. All 7 gold
+words match a node. The DP still dies:
+
+```
+i=0  'pramad/-190' -> n3,7,9 all orphans -> REDIRECTED to n1,2,4,5,6,8   ok
+i=1  'aBiGAta/69'  -> n38, reached via 1->38                             ok
+i=2  'hi/2'        -> n23, reachable from {38}: []                       FAIL
+```
+
+n38 is `aBiGAtam`, chunk 1, position 10 — mid-sentence — with **in-degree 30,
+out-degree 0**. But the edge the DP wanted exists in the raw graphml:
+
+```
+38 -> 23  {'key': 1}      # aBiGAtam (ch1) -> hi (ch2)
+```
+
+It is deleted because `38 >= 23`. **Every** `key=1` out-edge of n38 goes to a
+lower id, so the node loses all of them.
+
+The cause is that node ids are not sentence order. SHR numbers the sandhi-split
+alternatives first (n19 `aBi`, n21/22 `GAtam`, both chunk 1) and the merged
+unsplit analysis last (n38/39 `aBiGAtam`) — *after* the chunk-2/3/4 nodes n23–n37.
+Orienting by id then reverses genuine edges, and does so preferentially on
+exactly the merged-form nodes DCS likes to annotate. Under `--edge-order position`
+the sentence resolves: `1 → 38 → 23 → 24 → 25 → 26 → 27`.
+
+This is measured in §4e, and it is why the conclusions in §4d needed revising.
+
+The `no_source_start` group is the mirror image — more literally than was
+realised when this was written; see §4e, which shows it is the *same* bug and
+retracts the reading below. In **all 12**, the first gold word's candidates have
+in-edges, so none can start a path:
 
 ```
 [307806] gold word 0: 'aDArmikAH'   sources: 'a'    + 'DArmikAH'
@@ -302,7 +370,9 @@ wires only the sandhi split:
 [4568]   gold word 0: 'viqaNgA'     sources: 'viw'  ...
 ```
 
-The unsplit form exists as a node but sits off the traversable path.
+The unsplit form exists as a node but sits off the traversable path. *(The
+inference drawn here — that this is a DCS/SHR segmentation disagreement — was
+wrong. It sits off the path because its edges were oriented backwards. §4e.)*
 
 ### 4c. `word_unmatched` (12%)
 
@@ -356,23 +426,163 @@ the chain hold.
 > entire effect. **Predict path-level outcomes by running the path algorithm, not
 > by counting local properties of nodes on it.**
 
-#### What the null result establishes
+#### What the null result establishes — and what it does not
 
-The residual failures are not "the right node was passed over." For these
-sentences the gold path DCS describes has **no realization in SHR's lattice at
-all**. The `no_source_start` evidence (0 of 12 twins) already pointed this way;
-the null result generalises it to the broken-chain group.
+The null result is sound but was over-read. What it establishes is narrow: **no
+redirection among the nodes present can fix these sentences.** The conclusion
+drawn from it — that the gold path "has no realization in SHR's lattice at all,"
+and hence that ~75% is a ceiling — was wrong for the `broken_chain` **and**
+`no_source_start` groups, which together were 88% of the residual. §4e measures by
+how much.
 
-This is consistent with the concrete traces in §4b: DCS annotates a whole chunk as
-one word (`anaBimatam`), SHR only ever wires the sandhi split (`an` + `aBimatam`).
-No redirection among existing nodes can produce a node that was never built.
+The error was scope. `--reach-repair` widens *candidate node sets*. If the failure
+is a **deleted edge**, no choice of nodes can help, so the fallback was structurally
+incapable of detecting the actual cause and its silence carried no information
+about it. For 100104 the gold path is fully realizable in `key=1` edges — ingest
+oriented two of them backwards.
 
-Closing the gap therefore requires changing the lattice or the annotation, not the
-resolution logic — adding DCS's segmentation as new nodes, or re-running SHR with
-different sandhi settings. Neither is a change to `ingest.py`.
+What survives unchanged is only the narrow claim: no redirection produces a node
+that was never built. The `no_source_start` reading in §4b — that DCS annotates
+`anaBimatam` where SHR wires only `an` + `aBimatam` — does **not** survive. Those
+nodes exist and are reachable; §4e shows that group all but disappears under a
+corrected edge orientation.
 
 The `--reach-repair` code is retained despite recovering nothing: it is a cheap,
-runnable refutation of the most obvious next idea.
+runnable refutation of the most obvious next idea, and a standing reminder that a
+null result bounds only the mechanism actually tested.
+
+### 4e. Edge orientation: `--edge-order position`
+
+Per §1, `key=1` is symmetric and the filter chooses a direction. Orienting by
+`(chunk_no, position)` instead of node id stops genuine edges being reversed.
+
+Controlled A/B, 3,000 sentences, `--repair-orphan-gold` on in both, nothing else
+changed:
+
+| | `id` | `position` |
+|---|---:|---:|
+| resolved | 2,140 (71.33%) | **2,779 (92.63%)** |
+| newly resolved | — | **+639** |
+| paths **lost** | — | **0** |
+| paths **altered** | — | **3** |
+| sentences dropped as cyclic | 0 | **0** |
+| gold nodes flagged | 14,575 | 18,538 |
+
+Edge counts, to make precise what "reorientation" costs: **word-to-word edges are
+identical at 1,418,774** under both orderings, as §1 argues they must be. The
+totals differ (1,465,888 vs 1,467,704) only in boundary wiring — `SRC→x` goes
+22,454 → 23,354 and `x→SINK` 24,660 → 25,576, because the source and sink sets
+change. Nothing is discarded; edges are pointed the other way.
+
+Array-level diff of the two archives: all 11 node/surface arrays
+(`node_features`, `node_position`, `node_chunk`, `node_form_id`, `node_lemma_id`,
+`node_preverb_id`, `node_length`, `node_char_start`, `sentenceoffsets`,
+`surface_text`, `surface_text_offsets`) **bit-identical**. `rowptr`/`colidx` differ
+by construction — that is the change — as does `topolevel`, which is recomputed by
+longest path from the surviving edges. The invariant the C++ loader asserts
+(`lattice.cpp:216`, `topo_level[u] < topo_level[v]` on every edge) holds in both,
+with 0 violations across 1.47M edges.
+
+**The 3 altered paths.** All three differ only in the final node, and in every case
+the two nodes are the same word: `samAhitaH`, same chunk, same position, same
+`cng=29`, lemma spelled `samAhita` vs `samaahita` — one transliteration
+convention against another, which `lemma_cng_candidates` already treats as
+equivalent. SHR emits both as parallel nodes; `reconstruct_gold_path` breaks the
+tie with `min(ends)`, and a changed sink set moves it to the lower-id twin. These
+are duplicate-node tie-breaks, not relabellings.
+
+Reproduce the A/B with:
+
+```bash
+python ingest.py --limit 3000 --repair-orphan-gold --edge-order id       --out /tmp/id.npz  --index /tmp/id_index.json
+python ingest.py --limit 3000 --repair-orphan-gold --edge-order position --out /tmp/pos.npz --index /tmp/pos_index.json
+```
+
+and the full corpus with `parallel_ingest.py --edge-order position` (same shape as
+the §3 command). **Shards from different `--edge-order` settings must not share a
+`--shard-dir`** — unlike the repair flags, this one changes the emitted edges, and
+`--resume` matches on filename only.
+
+#### Full corpus
+
+All 119,503 sentences, `--shards 24 --workers 4`, 22 minutes:
+
+| | `id` (§3) | `position` |
+|---|---:|---:|
+| **gold path resolved** | 89,611 (74.99%) | **112,200 (93.89%)** |
+| newly resolved | — | **+22,616** |
+| lost | — | **27** |
+| altered | — | **20** |
+| gold nodes flagged | 584,604 | 732,669 |
+| dropped as cyclic | 0 | **0** |
+
+All 11 node/surface arrays are bit-identical to `cushr_data_repaired.npz`. Over
+61,189,928 edges: **0** violations of `topo_level[u] < topo_level[v]`, and every
+edge stays inside its sentence block. 1,293,970 edges now point backwards in node-id
+space — expected, and consumed by nothing (every decoder sweeps by topo level).
+
+**The 27 lost are spurious labels, as in §3.** In all 27, the DCS gold does not
+cover the whole sentence: 18 stop before the last chunk, and the other 9 stop
+partway through the final chunk, leaving text like `EH`, `na`, `SOdreRa`
+unannotated. They resolved under id-order only because the last gold node's real
+successors were all lower-id and got deleted, making it a **spurious sink** — the
+same failure mode as §3's degenerate `SRC → node → SINK`, one level up. Under
+`position` the node keeps its successors, is correctly not a sink, and the
+incomplete annotation is correctly rejected.
+
+```
+[93167]  gold = 2 words, both chunk 1; sentence has chunks 1-2
+         last gold node n31 'avyayIBAvam' (ch1 pos 9)
+         id-order successors: none  -> "sink", path accepted
+         position successors:  n9 'na'(ch2), n10 'api'(ch2), ... -> not a sink
+```
+
+**The 20 altered are not relabellings.** Every one covers an *identical*
+`(chunk, position, surface)` sequence at every step — same segmentation, a
+different duplicate node for it. These are SHR emitting the same analysis twice
+under two transliteration spellings (`samAhita` / `samaahita`), which
+`lemma_cng_candidates` already treats as equivalent; `min(ends)` breaks the tie
+differently once the sink set changes. **0 of 112,200 resolved paths describe a
+different segmentation.**
+
+#### What is left, and a second correction to §4b
+
+Residual failures after reorientation, 300-sentence sample of the 7,303 still
+unresolved, classified the same way as §2:
+
+| stage | before (of 29,892) | after (of 7,303) | absolute |
+|---|---:|---:|---|
+| `word_unmatched` | 12% | **64.3%** | ~3,600 → ~4,700 |
+| `broken_chain` | 64% | 27.7% | ~19,100 → ~2,000 |
+| `no_sink_end` | ~0% | 7.7% | — → ~560 |
+| `no_source_start` | 24% | **0.3%** | ~7,200 → **~22** |
+
+**The `no_source_start` group was also an orientation artifact.** §4b explained it
+as DCS annotating a whole chunk (`anaBimatam`) where SHR only wires the sandhi
+split (`an` + `aBimatam`) — a genuine annotation disagreement. That reading was
+wrong, and reorientation eliminates the group almost entirely: ~7,200 sentences
+down to roughly 22.
+
+The mechanism is the exact mirror of the dead end, which §4b half-saw when it
+called this group "the mirror image". The merged unsplit node is numbered high, so
+under id-order every one of its `key=1` edges to lower-numbered nodes was kept as
+an *in*-edge — giving it in-degree > 0 and disqualifying it as a source. Under
+position order those same edges point outward from it, it correctly has in-degree
+0, and it starts the path. The unsplit form was never "off the traversable path";
+ingest had pointed its edges the wrong way.
+
+What remains is dominated by `word_unmatched` — §4c's finding, that the chunk and
+`cng` match but the lemma does not. That is a real DCS/SHR lemmatization
+disagreement and no edge orientation can touch it.
+
+> **Methodological note, again.** A 1,500-sentence pilot of this change measured
+> **0 lost and 0 altered**. The full corpus gives 27 and 20. The pilot was not
+> wrong, it was small — and both quantities are rare events, precisely what a
+> pilot under-observes. The §4d note says to predict path-level outcomes by
+> running the path algorithm; the corollary is to run it at full scale before
+> quoting a zero. Note also that the pilot's zeros were *optimistic in appearance
+> only*: inspecting the 27 showed them to be spurious labels being removed, which
+> is a better outcome than the zero suggested.
 
 ---
 
@@ -391,8 +601,31 @@ to pick spans — but it has **not been validated against downstream accuracy**.
 against the **original 59,092-sentence subset**. If F1 there drops relative to a
 model trained only on those 59,092, the added labels are noise and the repair is
 hurting. If it holds or improves, the extra 30,523 sentences are real signal.
-Until that is run, treat 75% coverage as *more data of slightly different
+Until that is run, treat the added coverage as *more data of slightly different
 provenance*, not simply *more of the same data*.
+
+This caveat applies with **less** force to §4e's increment than to §3's. The
+orphan redirect substitutes SHR's positioned analysis for the DCS one, genuinely
+redefining the label. Reorientation does not: it changes which edges exist, and
+all 20 paths it altered describe an identical `(chunk, position, surface)`
+sequence. Its 22,616 new labels are ordinary gold paths that were unreachable, not
+relabelled ones.
+
+**This has now been run** — `cushr_train/GOLD94_EDGE_ORDER.md`. `hybrid_tag`,
+8 epochs, evaluated on the constant gold49 subset (2,885 sentences):
+
+| model | F1 | PM |
+|---|---:|---:|
+| gold49-trained | 0.8831 | 0.5450 |
+| gold75-trained | 0.8827 | 0.5324 |
+| **gold94-trained** | **0.8865** | **0.5529** |
+
+93.9% coverage costs nothing on the original distribution and is slightly ahead
+of both predecessors. The two increments also behave differently on their own
+recovered sentences: the orphan-repair set scores 0.0642 F1 below its baseline,
+the reorientation set only 0.0056 below — consistent with the argument above that
+one redefines labels and the other merely makes existing ones reachable. Single
+seed, single featurizer; see that file's caveats.
 
 ---
 
@@ -403,23 +636,43 @@ provenance*, not simply *more of the same data*.
 | baseline | 49.45% | gold words match orphan nodes left edge-less by the forced-DAG filter |
 | orphan redirect | **74.99%** | redirect to a same-surface wired twin (+30,523, −4) |
 | reachability repair *(built, measured)* | **74.99%** | widen candidates to same-surface wired nodes — **+0**, see §4d |
-| ceiling for resolution-side fixes | **~75%** | remainder has no realization in the lattice at all |
+| `--edge-order position` | **93.89%** | orient the symmetric `key=1` relation by sentence order instead of node id (+22,616, −27 spurious) — §4e |
 
-**75% is the ceiling for anything done inside `ingest.py`.** The two candidate
-repairs are now separated by evidence rather than plausibility: the orphan
-redirect gained 25.5 points, and the reachability repair — equally plausible
-beforehand — gained nothing. What is left is not a resolution bug but a
-disagreement between DCS's segmentation and the lattice SHR built.
+**The earlier claim that 75% is a ceiling was wrong; the figure is 93.89%.** Three
+candidate repairs are now separated by evidence rather than plausibility: the
+orphan redirect gained 25.5 points, the reachability repair — equally plausible
+beforehand — gained nothing, and the edge reorientation gained a further 18.9.
+
+The pattern across all three is worth stating, because it cost two wrong
+conclusions. Both errors came from reasoning about **nodes** when the object that
+determines a path is the **edge set**: §4d predicted recovery by counting node
+properties, and then read a node-level null result as a statement about the
+lattice as a whole. The failure was an edge the filter deleted, and neither
+analysis was looking at edges.
+
+What remains unresolved (7,303 sentences, 6.11%) is the group §4b and §4c
+describe: genuine node-level disagreement between DCS's segmentation and SHR's,
+plus lemmatization mismatches. For that group the original conclusion still holds
+— it needs a different lattice, not different resolution logic. Whether *that* is
+now the real ceiling is not established; the honest statement is that it is the
+ceiling for every mechanism tested so far, which is exactly what was said, wrongly,
+about 75%.
 
 Two routes past it, both outside this module:
 
-1. **Change the lattice.** Re-run SHR with different sandhi settings, or inject
-   DCS's unsplit word forms as nodes. Addresses the 24% `no_source_start` group
-   directly.
+1. **Change the lattice or reconcile lemmas.** The residual is now 64%
+   `word_unmatched` — chunk and `cng` agree, the lemma does not. A normalization
+   table over DCS↔SHR lemma conventions is the cheap first probe; §4c's sample
+   suggests it is a spelling/convention gap rather than a genuine analysis
+   disagreement, but that has not been measured at scale. *(The
+   `no_source_start` group this bullet used to target no longer exists — §4e.)*
 2. **Change the corpus.** The corpus is not annotation-limited — every sentence
    has gold, and **322,232 pickles have no lattice at all**. Generating graphml
    for those would expand the corpus **3.7×**, against the ~25% still unresolved
    here. This is by far the larger prize, and it needs SHR runs, not ingest work.
 
-Before either, the cheaper question is whether the 30,523 recovered sentences
-actually help: run the §5 validation first.
+The §5 validation has been run for the reorientation increment
+(`cushr_train/GOLD94_EDGE_ORDER.md`): on the held-constant gold49 subset the
+gold94 model scores 0.8865 F1 against gold49's 0.8831 and gold75's 0.8827, so the
+added coverage costs nothing. That result also covers the orphan increment
+transitively, since gold94 contains it.

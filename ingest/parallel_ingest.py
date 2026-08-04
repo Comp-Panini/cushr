@@ -47,7 +47,7 @@ VOCAB_COLUMNS = [
 
 
 def worker(job):
-    idx, files, graphml_dir, p_dir, shard_dir, repair, reach = job
+    idx, files, graphml_dir, p_dir, shard_dir, repair, reach, edge_order = job
     out = os.path.join(shard_dir, f"shard_{idx:03d}.npz")
     index = os.path.join(shard_dir, f"shard_{idx:03d}_index.json")
     # Each shard writes its vocabularies beside itself (ingest keys them off the
@@ -56,7 +56,8 @@ def worker(job):
     ingest.process_corpus(graphml_dir, p_dir, output_filename=out,
                           index_filename=index, filepaths=files,
                           progress_every=200, vocab_prefix=f"shard_{idx:03d}_",
-                          repair_orphan_gold=repair, reach_repair=reach)
+                          repair_orphan_gold=repair, reach_repair=reach,
+                          edge_order=edge_order)
     return out
 
 
@@ -192,6 +193,11 @@ def main():
     ap.add_argument("--reach-repair", action="store_true",
                     help="see ingest.reconstruct_gold_path(expand_surface); "
                          "implies --repair-orphan-gold")
+    ap.add_argument("--edge-order", choices=("id", "position"), default="id",
+                    help="see ingest.forward_edge_filter. Unlike the repair "
+                         "flags this changes the emitted edges, so shards from "
+                         "different settings must not be mixed in one "
+                         "--shard-dir")
     ap.add_argument("--resume", action="store_true",
                     help="skip shards whose .npz already exists in --shard-dir. "
                          "Shard boundaries are a pure function of the sorted "
@@ -221,7 +227,8 @@ def main():
     n = args.shards or args.workers
     bounds = [round(i * len(files) / n) for i in range(n + 1)]
     jobs = [(i, files[bounds[i]:bounds[i + 1]], args.graphml_dir, args.p_dir,
-             shard_dir, args.repair_orphan_gold, args.reach_repair)
+             shard_dir, args.repair_orphan_gold, args.reach_repair,
+             args.edge_order)
             for i in range(n) if bounds[i + 1] > bounds[i]]
     n_shards = len(jobs)
     all_shards = [os.path.join(shard_dir, f"shard_{i:03d}.npz")
@@ -240,12 +247,15 @@ def main():
                              f"{[j[0] for j in todo]}")
         todo = []
 
+    # Set before the `if todo` branch: on a --merge-only or fully-resumed run
+    # nothing is ingested, and the TOTAL_MIN line below still has to have a
+    # start time to subtract.
+    t0 = time.time()
     if todo:
         n_proc = min(args.workers, len(todo))
         print(f"{len(files):,} sentences across {n_shards} shards "
               f"(~{len(files)//n_shards:,} each); ingesting {len(todo)}, "
               f"{n_proc} at a time")
-        t0 = time.time()
         with mp.Pool(n_proc) as pool:
             # chunksize=1 so a worker takes one shard, frees it, then takes the
             # next -- the default would hand each worker a contiguous block of
