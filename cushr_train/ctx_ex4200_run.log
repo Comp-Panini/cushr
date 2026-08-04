@@ -1,0 +1,20 @@
+splits override splits_ex4200.json: train=80,871  dev=924  test=4,383
+device=cpu  train=80871  dev=924  test=4383  feat_dim=80  featurizer=ngrams80
+contextual encoder 'char_bilstm': hidden=128 layers=2 out_dim=96  params=618,624
+learned featurizer 'hybrid_tag': forms=44,178 lemmas=12,515 preverbs=1,147 node_dim=96 word_dropout=0.1
+  embedding params: 1,638,876
+parameters: 2321725
+epoch  1  loss 2.6417  active 0.876  395.3s  dev_F1 0.8679  dev_PM 0.4870
+epoch  2  loss 1.9530  active 0.816  777.6s  dev_F1 0.8985  dev_PM 0.5758
+epoch  3  loss 1.6704  active 0.774  572.4s  dev_F1 0.9043  dev_PM 0.5790
+epoch  4  loss 1.4948  active 0.742  305.2s  dev_F1 0.9149  dev_PM 0.6212
+epoch  5  loss 1.3668  active 0.716  341.8s  dev_F1 0.9175  dev_PM 0.6374
+epoch  6  loss 1.2628  active 0.694  334.0s  dev_F1 0.9201  dev_PM 0.6374
+epoch  7  loss 1.1790  active 0.675  317.5s  dev_F1 0.9221  dev_PM 0.6494
+epoch  8  loss 1.1005  active 0.654  308.8s  dev_F1 0.9251  dev_PM 0.6667
+
+test: F1 0.9297  P 0.9309  R 0.9285  PM 0.6735  n=4383
+wrote model75_ctx_ex4200.npz
+wrote log75_ctx_ex4200.json
+materialising 4,488,155 node vectors -> (4,488,155, 192) ...
+wrote ../data/g75_ctx_ex4200.npz  (3753 MB)

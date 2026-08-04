@@ -32,6 +32,22 @@ class LatticeStore:
         self.id_vocab_sizes = (np.load(vp).tolist()
                                if os.path.exists(vp) else None)
 
+        # Raw sentence characters and each node's span within them. Present
+        # only if prepare.py found them in the archive; `has_chars` is what
+        # tells collate() whether it can emit the tensors a contextual encoder
+        # needs. char_start is already sentence-relative and is -1 on boundary
+        # nodes; word_len is the surface length, 0 on boundary nodes.
+        tp = os.path.join(cache, "surface_text.npy")
+        if os.path.exists(tp):
+            self.surface_text = m("surface_text")
+            self.text_off = np.load(os.path.join(cache,
+                                                 "surface_text_offsets.npy"))
+            self.char_start = m("node_char_start")
+            self.has_chars = True
+        else:
+            self.surface_text = self.text_off = self.char_start = None
+            self.has_chars = False
+
         with open(os.path.join(cache, "splits.json")) as f:
             blob = json.load(f)
         self.meta = blob["meta"]
@@ -183,7 +199,38 @@ def collate(store: LatticeStore, sent_ids):
     gold_node[node_off[:-1]] = True     
     gold_node[node_off[1:] - 1] = True   
 
+    # ---- character context (only if the cache carries it) -------------------
+    # A node's vector may depend on the sentence it sits in, but never on the
+    # path chosen through it, so this stays a per-node function and the
+    # materialise-then-decode contract is preserved.
+    chars = char_len = span_start = span_end = char_ok = None
+    if store.has_chars:
+        t_lo = store.text_off[sent_ids].astype(np.int64)
+        t_hi = store.text_off[sent_ids + 1].astype(np.int64)
+        clens = t_hi - t_lo
+        lmax = int(clens.max()) if len(clens) else 0
+        # Store byte+1 so that 0 unambiguously means padding: the encoder's
+        # embedding uses padding_idx=0, and a real byte must never map onto it.
+        chars = np.zeros((len(sent_ids), lmax), dtype=np.int64)
+        for i, (lo, hi) in enumerate(zip(t_lo, t_hi)):
+            chars[i, :hi - lo] = np.asarray(store.surface_text[lo:hi],
+                                            dtype=np.int64) + 1
+        char_len = clens
+
+        cs = np.asarray(store.char_start[global_node], dtype=np.int64)
+        wl = np.asarray(store.word_len[global_node], dtype=np.int64)
+        char_ok = (cs >= 0) & (wl > 0)
+        span_start = np.where(char_ok, cs, 0)
+        # Clamp to the sentence: a malformed span must not read another
+        # sentence's row or run past the padded end.
+        sent_len = clens[node_sent]
+        span_start = np.minimum(span_start, np.maximum(sent_len - 1, 0))
+        span_end = np.minimum(span_start + np.where(char_ok, wl, 1), sent_len)
+        span_end = np.maximum(span_end, span_start + 1)
+
     return Batch(
+        chars=chars, char_len=char_len, span_start=span_start,
+        span_end=span_end, char_ok=char_ok,
         feats=store.features(global_node),
         ids=(np.asarray(store.node_ids[global_node], dtype=np.int64)
              if store.node_ids is not None else None),

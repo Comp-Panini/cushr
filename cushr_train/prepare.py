@@ -36,7 +36,14 @@ ARRAYS = ["node_features", "node_word_length", "row_ptr", "col_idx", "topo_level
 
 # Present only when build_features.py ran with --emit-ids; required by the
 # learned featurizers, ignored by the precomputed ones.
-OPTIONAL_ARRAYS = ["node_ids", "id_vocab_sizes"]
+#
+# The surface_text / node_char_start trio comes through build_features.py's
+# RAW_PASSTHROUGH and is what a contextual encoder reads: the raw sentence
+# characters plus each node's span within them. Optional for the same reason as
+# node_ids -- a cache built without them still loads, the encoder just cannot
+# be used against it.
+OPTIONAL_ARRAYS = ["node_ids", "id_vocab_sizes",
+                   "surface_text", "surface_text_offsets", "node_char_start"]
 
 
 #hashing it into 100 bins which can then be divided among dev, test, train

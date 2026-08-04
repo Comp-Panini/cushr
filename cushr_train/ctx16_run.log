@@ -1,0 +1,27 @@
+device=cpu  train=80871  dev=4357  test=4383  feat_dim=80  featurizer=ngrams80
+contextual encoder 'char_bilstm': hidden=128 layers=2 out_dim=96  params=618,624
+learned featurizer 'hybrid_tag': forms=44,178 lemmas=12,515 preverbs=1,147 node_dim=96 word_dropout=0.1
+  embedding params: 1,638,876
+parameters: 2321725
+epoch  1  loss 2.6479  active 0.878  389.7s  dev_F1 0.8755  dev_PM 0.4919
+epoch  2  loss 1.9435  active 0.815  355.1s  dev_F1 0.9015  dev_PM 0.5731
+epoch  3  loss 1.6589  active 0.772  378.8s  dev_F1 0.9133  dev_PM 0.6123
+epoch  4  loss 1.4778  active 0.739  351.7s  dev_F1 0.9225  dev_PM 0.6431
+epoch  5  loss 1.3568  active 0.715  368.6s  dev_F1 0.9257  dev_PM 0.6564
+epoch  6  loss 1.2557  active 0.692  362.1s  dev_F1 0.9277  dev_PM 0.6610
+epoch  7  loss 1.1764  active 0.675  356.8s  dev_F1 0.9298  dev_PM 0.6711
+epoch  8  loss 1.0986  active 0.656  355.1s  dev_F1 0.9302  dev_PM 0.6725
+epoch  9  loss 1.0276  active 0.633  382.1s  dev_F1 0.9311  dev_PM 0.6787
+epoch 10  loss 0.9646  active 0.618  362.2s  dev_F1 0.9312  dev_PM 0.6801
+epoch 11  loss 0.9052  active 0.599  369.7s  dev_F1 0.9286  dev_PM 0.6693
+epoch 12  loss 0.8562  active 0.583  381.4s  dev_F1 0.9283  dev_PM 0.6661
+epoch 13  loss 0.8099  active 0.565  364.2s  dev_F1 0.9297  dev_PM 0.6791
+epoch 14  loss 0.7683  active 0.550  369.8s  dev_F1 0.9295  dev_PM 0.6725
+epoch 15  loss 0.7326  active 0.534  339.2s  dev_F1 0.9282  dev_PM 0.6651
+epoch 16  loss 0.7027  active 0.527  305.2s  dev_F1 0.9284  dev_PM 0.6677
+
+test: F1 0.9287  P 0.9296  R 0.9278  PM 0.6724  n=4383
+wrote model75_16_ctx.npz
+wrote log75_16_ctx.json
+materialising 4,488,155 node vectors -> (4,488,155, 192) ...
+wrote ../data/g75_16_ctx.npz  (3753 MB)

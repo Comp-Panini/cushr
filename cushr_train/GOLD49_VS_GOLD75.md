@@ -116,6 +116,29 @@ before being dismissed.
 
 ---
 
+## 3a. Postscript: the recovered sentences were context-starved, not bad
+
+Everything above measures models with a **first-order** scorer — an edge score
+sees only its two endpoint nodes. Under that architecture the recovered
+sentences looked like a permanent drag: 0.8185 F1 / 0.2530 PM against 0.8827 /
+0.5324 on the pre-repair ones.
+
+Adding a character-level contextual encoder (`CONTEXTUAL_ENCODER.md`) changes
+that reading. Same corpus, same split, same seed:
+
+| test subset | first-order F1 / PM | contextual F1 / PM | ΔPM |
+|---|---|---|---:|
+| pre-repair (2,885) | 0.8827 / 0.5324 | 0.9365 / 0.7300 | +0.1976 |
+| **recovered (1,498)** | 0.8185 / 0.2530 | 0.9144 / 0.5634 | **+0.3104** |
+| all (4,383) | 0.8587 / 0.4369 | 0.9282 / 0.6731 | +0.2362 |
+
+The recovered sentences gain **the most** — they are the sandhi-heavy cases whose
+gold paths run through analyses SHR files as auxiliary, and they were the ones
+most starved of the orthographic context the encoder supplies. The two changes
+compound: the repair supplied the labels, the encoder supplied the information
+needed to use them. The §3 conclusion that the extra data "neither helped nor
+hurt" was true of the model that existed at the time, not of the data.
+
 ## 4. Bottom line
 
 | question | answer |

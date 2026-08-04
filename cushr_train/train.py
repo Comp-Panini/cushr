@@ -5,11 +5,13 @@
 
 import argparse
 import json
+import os
 import time
 
 import numpy as np
 import torch
 
+import context as CTX
 import learned_featurizers as LF
 from dataset import LatticeStore, collate
 from model import BiaffineEdgeScorer
@@ -26,6 +28,13 @@ def to_torch(batch, dev):
         t["ids"] = torch.as_tensor(batch["ids"], dtype=torch.int64, device=dev)
     t["gold_node"] = torch.as_tensor(np.asarray(batch["gold_node"]),
                                      dtype=torch.bool, device=dev)
+    # Character context, present only when the cache carries surface_text.
+    if batch.get("chars") is not None:
+        for k in ("chars", "char_len", "span_start", "span_end"):
+            t[k] = torch.as_tensor(np.asarray(batch[k]), dtype=torch.int64,
+                                   device=dev)
+        t["char_ok"] = torch.as_tensor(np.asarray(batch["char_ok"]),
+                                       dtype=torch.bool, device=dev)
     t["num_nodes"] = batch["num_nodes"]
     t["num_edges"] = batch["num_edges"]
     return t
@@ -67,7 +76,7 @@ def evaluate(model, store, ids, dev, batch_size=128):
     for chunk in batches(ids, batch_size, shuffle=False):
         b = collate(store, chunk)
         t = to_torch(b, dev)
-        w = model(t["feats"], t["src"], t["dst"], t.get("ids"))
+        w = model(t["feats"], t["src"], t["dst"], t.get("ids"), t)
         pe, pmask, _ = viterbi(t, w)
         pred_local = predicted_nodes(t, pe, pmask)
         gn = np.asarray(b["global_node"])
@@ -97,6 +106,11 @@ def main():
     ap.add_argument("--limit-train", type=int, default=0,
                     help="cap training sentences (smoke runs)")
     ap.add_argument("--eval-every", type=int, default=1)
+    ap.add_argument("--splits-override", default="",
+                    help="JSON {train,dev,test: [sentence ids]} replacing the "
+                         "cache's splits.json. Used to hold an external "
+                         "benchmark out of training (see make_clean_split.py) "
+                         "without rebuilding the cache.")
     ap.add_argument("--train-subset", default="",
                     help="npz whose gold_path_offsets restrict which TRAINING "
                          "sentences are supervised. Dev/test are untouched, so "
@@ -115,6 +129,21 @@ def main():
                          "during training; keeps the non-identity pathway "
                          "predictive so out-of-vocabulary input degrades "
                          "gracefully")
+    # --- contextual encoder (needs surface_text/node_char_start in the cache)
+    ap.add_argument("--encoder", default="none",
+                    help="contextual encoder name (context.py) or 'none'. "
+                         "Its output is concatenated onto the node vector, so "
+                         "the scorer sees featurizer_dim + ctx_dim columns.")
+    ap.add_argument("--ctx-dim", type=int, default=96,
+                    help="width of the context vector appended per node")
+    ap.add_argument("--ctx-hidden", type=int, default=128,
+                    help="per-direction LSTM hidden size")
+    ap.add_argument("--ctx-layers", type=int, default=2)
+    ap.add_argument("--ctx-char-dim", type=int, default=32)
+    ap.add_argument("--resume", action="store_true",
+                    help="restart from <--out>.ckpt if it exists. Written after "
+                         "every epoch, so a killed run resumes rather than "
+                         "restarting.")
     ap.add_argument("--materialize", default="",
                     help="after training, write the frozen node vectors here "
                          "as a dense featurized .npz that the ordinary "
@@ -127,6 +156,15 @@ def main():
     dev = torch.device(args.device)
 
     store = LatticeStore(args.cache)
+    if args.splits_override:
+        # Replace the cache's splits before `trainable` filters them, so the
+        # override still drops sentences with no gold edges exactly as the
+        # normal path does.
+        ov = json.load(open(args.splits_override))
+        for k in ("train", "dev", "test"):
+            store.splits[k] = np.asarray(ov[k], dtype=np.int64)
+        print(f"splits override {args.splits_override}: "
+              + "  ".join(f"{k}={len(ov[k]):,}" for k in ("train", "dev", "test")))
     train_ids = store.trainable("train")
     dev_ids = store.trainable("dev")
     test_ids = store.trainable("test")
@@ -157,6 +195,24 @@ def main():
     # from the archive. Everything downstream of scoring is identical either
     # way; see learned_featurizers.materialize for how this collapses back to a
     # plain dense archive once training finishes.
+    # A contextual encoder widens the node vector by its own out_dim. It is
+    # built first because the scorer has to be sized for the concatenation.
+    encoder = None
+    if args.encoder != "none":
+        if not store.has_chars:
+            raise SystemExit(
+                f"--encoder {args.encoder} needs surface_text / "
+                "node_char_start in the cache. Re-run prepare.py against an "
+                "archive built by a build_features.py that passes them "
+                "through (RAW_PASSTHROUGH).")
+        encoder = CTX.get(args.encoder, char_dim=args.ctx_char_dim,
+                          hidden=args.ctx_hidden, layers=args.ctx_layers,
+                          out_dim=args.ctx_dim).to(dev)
+        print(f"contextual encoder {args.encoder!r}: "
+              f"hidden={args.ctx_hidden} layers={args.ctx_layers} "
+              f"out_dim={encoder.out_dim}  "
+              f"params={sum(p.numel() for p in encoder.parameters()):,}")
+
     featurizer = None
     if store.node_ids is not None and args.learned != "none":
         # Caches built before the morph-tag column existed carry three sizes;
@@ -173,8 +229,11 @@ def main():
         # projection (LF.HybridFeaturizer.project = False) ignores out_dim and
         # emits the raw concatenation instead, so building the scorer from
         # args.node_dim would size it wrong and fail on the first batch.
-        scorer = BiaffineEdgeScorer(featurizer.out_dim, args.hidden).to(dev)
-        model = LF.LearnedBiaffine(featurizer, scorer).to(dev)
+        node_dim = featurizer.out_dim + (encoder.out_dim if encoder else 0)
+        scorer = BiaffineEdgeScorer(node_dim, args.hidden).to(dev)
+        model = (CTX.ContextualBiaffine(featurizer, encoder, scorer).to(dev)
+                 if encoder is not None
+                 else LF.LearnedBiaffine(featurizer, scorer).to(dev))
         print(f"learned featurizer {args.learned!r}: "
               f"forms={n_forms:,} lemmas={n_lemmas:,} preverbs={n_preverbs:,} "
               f"node_dim={featurizer.out_dim} word_dropout={args.word_dropout}")
@@ -189,12 +248,18 @@ def main():
         # every step would dominate the step time. SparseAdam handles the
         # tables; AdamW handles everything else.
         opt = torch.optim.AdamW(
-            list(featurizer.dense_parameters()) + list(scorer.parameters()),
+            list(featurizer.dense_parameters()) + list(scorer.parameters())
+            # The encoder's tables and LSTM are all dense; only the featurizer's
+            # embedding tables want SparseAdam.
+            + (list(encoder.parameters()) if encoder is not None else []),
             lr=args.lr, weight_decay=args.weight_decay)
         emb_opt = torch.optim.SparseAdam(featurizer.embedding_parameters(),
                                          lr=args.lr)
     else:
-        model = BiaffineEdgeScorer(feat_dim, args.hidden).to(dev)
+        node_dim = feat_dim + (encoder.out_dim if encoder else 0)
+        scorer = BiaffineEdgeScorer(node_dim, args.hidden).to(dev)
+        model = (CTX.ContextualBiaffine(None, encoder, scorer).to(dev)
+                 if encoder is not None else scorer)
         opt = torch.optim.AdamW(model.parameters(), lr=args.lr,
                                 weight_decay=args.weight_decay)
         emb_opt = None
@@ -204,16 +269,38 @@ def main():
     # whatever width the node vector ends up being: feat_dim for a precomputed
     # featurizer, the learned featurizer's own out_dim once it has been
     # materialised (which is not necessarily args.node_dim -- see above).
-    scorer_module = model.scorer if featurizer is not None else model
-    export_dim = featurizer.out_dim if featurizer is not None else feat_dim
+    has_ctx = encoder is not None
+    scorer_module = (model.scorer if (featurizer is not None or has_ctx)
+                     else model)
+    export_dim = (featurizer.out_dim if featurizer is not None else feat_dim) \
+        + (encoder.out_dim if has_ctx else 0)
     # Record the composed name, so a model file says which learned featurizer
     # produced the vectors it expects rather than only naming the scalar block.
     export_name = (f"{store.featurizer_name}+{args.learned}"
                    if featurizer is not None else store.featurizer_name)
+    if has_ctx:
+        export_name += f"+{args.encoder}"
 
     history = []
     best_f1, best_state = -1.0, None
-    for ep in range(1, args.epochs + 1):
+    start_ep = 1
+    ckpt_path = args.out + ".ckpt"
+    if args.resume and os.path.exists(ckpt_path):
+        ck = torch.load(ckpt_path, map_location=dev, weights_only=False)
+        model.load_state_dict(ck["model"])
+        opt.load_state_dict(ck["opt"])
+        if emb_opt is not None and ck.get("emb_opt") is not None:
+            emb_opt.load_state_dict(ck["emb_opt"])
+        rng = np.random.default_rng()
+        rng.bit_generator.state = ck["rng"]
+        history = ck["history"]
+        best_f1 = ck["best_f1"]
+        best_state = ck.get("best_state")
+        start_ep = ck["epoch"] + 1
+        print(f"resumed from {ckpt_path}: continuing at epoch {start_ep} "
+              f"(best dev F1 so far {best_f1:.4f})")
+
+    for ep in range(start_ep, args.epochs + 1):
         t0 = time.time()
         tot_loss, tot_active, nb, nsent = 0.0, 0, 0, 0
         for chunk in batches(train_ids, args.batch, True, rng):
@@ -222,7 +309,7 @@ def main():
 
             #step 2: one score per edge
             t = to_torch(b, dev)
-            w = model(t["feats"], t["src"], t["dst"], t.get("ids"))
+            w = model(t["feats"], t["src"], t["dst"], t.get("ids"), t)
 
             # step 3: cost augmentation, reward landing on a non gold node
             # we want model to be confident that gol = best
@@ -291,10 +378,20 @@ def main():
                 save_model(args.out, scorer_module, export_dim, args.hidden,
                            export_name)
         history.append(rec)
+        # Full training state, so --resume continues rather than restarting.
+        # save_model above only persists the scorer's exported weights; this
+        # keeps the optimizer moments, the shuffle stream and the learned
+        # tables as well, which is what makes a resumed run equivalent.
+        torch.save({"epoch": ep, "model": model.state_dict(),
+                    "opt": opt.state_dict(),
+                    "emb_opt": emb_opt.state_dict() if emb_opt else None,
+                    "rng": rng.bit_generator.state, "history": history,
+                    "best_f1": best_f1, "best_state": best_state},
+                   args.out + ".ckpt")
         # Same reasoning for the log: keep the epoch history durable as it goes.
         with open(args.log, "w") as f:
             json.dump({"args": vars(args), "featurizer": store.featurizer_name,
-                       "feat_dim": int(feat_dim), "history": history}, f, indent=2)
+                       "feat_dim": int(export_dim), "scalar_dim": int(feat_dim), "history": history}, f, indent=2)
         d = rec.get("dev")
         print(f"epoch {ep:>2}  loss {rec['train_loss']:.4f}  "
               f"active {rec['active_frac']:.3f}  {rec['sec']:.1f}s"
@@ -311,15 +408,16 @@ def main():
     print(f"wrote {args.out}")
     with open(args.log, "w") as f:
         json.dump({"args": vars(args), "featurizer": store.featurizer_name,
-                   "feat_dim": int(feat_dim),
+                   "feat_dim": int(export_dim), "scalar_dim": int(feat_dim),
                    "history": history, "test": test}, f, indent=2)
     print(f"wrote {args.log}")
 
-    if featurizer is not None and args.materialize:
-        write_materialized(args, store, featurizer, dev, export_dim)
+    if (featurizer is not None or has_ctx) and args.materialize:
+        write_materialized(args, store, featurizer, dev, export_dim,
+                           model if has_ctx else None)
 
 
-def write_materialized(args, store, featurizer, dev, export_dim):
+def write_materialized(args, store, featurizer, dev, export_dim, ctx_model=None):
     """Freeze a learned featurizer into an ordinary dense featurized .npz.
 
     This is what keeps embedding tables out of the C++ and CUDA paths. The
@@ -335,8 +433,15 @@ def write_materialized(args, store, featurizer, dev, export_dim):
     print(f"materialising {n:,} node vectors -> ({n:,}, {export_dim}) ...")
     feats = np.lib.format.open_memmap(scratch, mode="w+", dtype=np.float32,
                                       shape=(n, export_dim))
-    LF.materialize(featurizer, store.node_features, store.node_ids, dev,
-                   out=feats)
+    if ctx_model is not None:
+        # A contextual vector depends on the node's sentence, so nodes cannot be
+        # walked in flat blocks -- they have to be processed whole sentences at
+        # a time. Context never depends on the path chosen, so this is still a
+        # fixed per-node vector and the decoder contract is unchanged.
+        CTX.materialize_contextual(ctx_model, store, dev, feats)
+    else:
+        LF.materialize(featurizer, store.node_features, store.node_ids, dev,
+                       out=feats)
     feats.flush()
 
     cache = args.cache

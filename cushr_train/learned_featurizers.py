@@ -274,7 +274,9 @@ class LearnedBiaffine(nn.Module):
         self.featurizer = featurizer
         self.scorer = scorer
 
-    def forward(self, feats, src, dst, ids=None):
+    def forward(self, feats, src, dst, ids=None, batch=None):
+        # `batch` is accepted and ignored so this shares one call signature with
+        # BiaffineEdgeScorer and context.ContextualBiaffine.
         return self.scorer.edge_scores(self.featurizer(feats, ids), src, dst)
 
     def num_params(self):

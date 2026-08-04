@@ -16,6 +16,14 @@
 
 Word-level top-1 accuracy on the **test** split, decoded with Viterbi over the learned biaffine edge scores.
 
+> **Every rung below is superseded by `CONTEXTUAL_ENCODER.md`.** Adding a
+> character-level BiLSTM between the featurizer and the scorer reaches
+> **F1 0.9282 / PM 0.6731** on this same split and seed — +0.0695 F1 and
+> +0.2362 perfect match over the best featurizer here. The ladder below varies
+> *what each node knows about itself*; that change varies *what it knows about
+> its sentence*, and the second axis is worth far more. Keep these rows as the
+> per-node ablation they are, not as the best available model.
+
 
 ## Headline
 

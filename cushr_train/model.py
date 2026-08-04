@@ -39,7 +39,7 @@ class BiaffineEdgeScorer(nn.Module):
 
     # `ids` is accepted and ignored so that this and LearnedBiaffine share one
     # call signature and the training/eval loops need no branch.
-    def forward(self, feats, src, dst, ids=None):
+    def forward(self, feats, src, dst, ids=None, batch=None):
         return self.edge_scores(feats, src, dst)
 
     # export trained matrices as numpy arrays (use at the very end)
