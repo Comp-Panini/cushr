@@ -88,79 +88,7 @@ PRCP module rectifies predictions that fall outside the candidate space, and
 TransLIST_ngrams operates with no candidate space at all. ByT5-Sanskrit is
 lexicon-free and so has no such ceiling by construction.
 
----
 
-## 3. The full-analysis ladder — comparable to ByT5's Table 7 *in kind only*
-
-`eval_slm.py` scores at the levels ByT5-Sanskrit uses. Our lattice nodes carry
-form, lemma and `cng`, so selecting a path commits to all three at once and the
-ladder falls out of how much of the node has to match.
-
-| level | cuSHR (SIGHUM 4,200 subset) | ByT5-Sanskrit (DCS 2024, sentence) | ByT5 (DCS 2024, paragraph) |
-|---|---:|---:|---:|
-| S | **92.98** | 84.61 | 88.21 |
-| S+L | **89.54** | – | – |
-| S+M | **67.41** | 63.86 | 74.38 |
-| S+L+M | **66.89** | 61.27 | 74.31 |
-| L (alone) | – | 79.88 | 83.96 |
-| L+M | – | 62.00 | 72.33 |
-
-> **Do not read the columns against each other as a result.** ByT5's ladder is
-> measured on *their own* DCS April-2024 split (601,403 sentences, 8,398 test),
-> **not on SIGHUM**. The only ByT5 number on SIGHUM is the segmentation PM of
-> 93.83 in §1. Different corpus, different split, different annotation
-> vintage — this table shows that the *same shape* of degradation appears in both
-> systems, nothing more.
-
-Ours is measured on the 3,633 SIGHUM sentences with a resolved gold path
-(reference is our reconstructed gold, since the TSV carries only segmentation),
-so it is also a biased-easy subset — note S here is 92.98 against 82.60 in §1 for
-exactly that reason.
-
-**The shape that does transfer**: adding morphology costs far more than adding
-lemma. For us S→S+L loses 3.4 points but S→S+M loses 25.6; for ByT5 S→S+M loses
-20.8. Both systems agree that morphosyntactic tags are where joint accuracy
-collapses, which matches ByT5's own error analysis (most disagreements are
-lexical and morphological, not boundary placement) and the ambiguity of Sanskrit
-nominal endings.
-
----
-
-## 4. What our internal reports measure
-
-Our headline PM elsewhere in this repo (e.g. `CONTEXTUAL_ENCODER.md`, 0.6731) is
-**node-identity** perfect match — form *and* lemma *and* tag, i.e. the S+L+M
-level. It is not comparable to a segmentation number and reads ~26 points lower
-for that reason alone. On our own test split (4,383) this model scores F1 0.9297
-/ PM 0.6735, consistent with the 66.89 S+L+M above.
-
-Reference sanity check: our reconstructed gold path agrees with DCS's published
-segmentation on **97.7%** of the 3,633 scorable sentences. The 2.3% that differ
-are the orphan-repair redirect choosing an adjacent analysis (`iva`/`eva`,
-`saH`/`sa`), so our internal gold is a faithful stand-in with a small known
-drift.
-
----
-
-## 5. Caveats that keep this from being a clean head-to-head
-
-1. **Different training data.** SIGHUM's official split is 97,000 train / 3,000
-   dev / 4,200 test. Ours is 80,871 train drawn from a 119,503-sentence ingest of
-   the same corpus, with the 4,200 excluded. Our models see ~17% less data, and
-   not the same data.
-2. **Different candidate space in practice.** We ingest SHR graphml with a
-   forced-DAG edge filter (`INGEST_METHODOLOGY.md` §1) and lose analyses SHR
-   attaches through non-`key=1` edges. TransLIST consumes SHR's candidate space
-   through its own pipeline.
-3. **567 sentences unrepresentable.** See §2. Included in §1 (honest) but they
-   depress PM by ~9 points.
-4. **Single seed, no significance testing.** TransLIST reports p<0.05 t-tests
-   against baselines; we have one run.
-5. **Trained on CPU at 2.32M parameters** against TransLIST's 50-epoch GPU
-   training and ByT5-Sanskrit's 582M-parameter pretrained byte-level LM. The
-   comparison is informative about the approach, not a controlled experiment.
-
----
 
 ## Reproducing
 
