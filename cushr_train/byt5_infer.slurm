@@ -75,8 +75,34 @@ VENV="${SCRATCH:-$PWD}/byt5_venv"
 # That happens when the interpreter is old enough that no modern torch wheel
 # matches. Load TACC's python3 module first so the venv starts from a recent
 # interpreter, and fail loudly rather than silently running on a stale stack.
-module load python3 2>/dev/null || echo "note: no python3 module; using default"
+# Job 3346304: `module load python3` did not exist, so this fell back to
+# /usr/bin/python3 = Python 3.6.8, for which the newest torch wheel is
+# 1.10.2+cu102. Try several names; PYMOD can override from the command line:
+#     sbatch --export=ALL,PYMOD=python3/3.9.7 byt5_infer.slurm
+for m in ${PYMOD:-} python3 python/3.9 python3/3.9 python3/3.10 python3/3.11 \
+         intel-python3 conda miniconda3; do
+    [ -z "$m" ] && continue
+    if module load "$m" 2>/dev/null; then
+        echo "loaded module: $m"
+        break
+    fi
+done
 echo "python3: $(python3 --version 2>&1)  ($(command -v python3))"
+
+# Check the INTERPRETER before building anything. The venv takes ~4 minutes and
+# on Python 3.6 it can only ever produce torch 1.10, so discovering that after
+# the build wastes the whole job (which is what 3346304 did).
+python3 - <<'EOF'
+import sys
+if sys.version_info < (3, 9):
+    raise SystemExit(
+        f"python {sys.version.split()[0]} is too old -- torch >=2 needs 3.9+.\n"
+        "  On a login node, find a usable module with:\n"
+        "      module avail python 2>&1 | head -40\n"
+        "      module spider python3\n"
+        "  then re-submit with:  sbatch --export=ALL,PYMOD=<name> byt5_infer.slurm\n"
+        "  Also: rm -rf $SCRATCH/byt5_venv, or the stale env is reused.")
+EOF
 
 if [ ! -d "$VENV" ]; then
     echo "==== creating venv ===="
