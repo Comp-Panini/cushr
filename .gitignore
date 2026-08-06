@@ -36,3 +36,10 @@ data/*.featurizer.pt
 # Python bytecode
 __pycache__/
 *.pyc
+# ByT5 comparison scratch — cloned/generated on the cluster, never committed
+cushr_train/byt5-sanskrit-analyzers/
+cushr_train/byt5_in/
+cushr_train/byt5_out/
+cushr_train/byt5_preds_*.jsonl
+cushr_train/byt5_infer.o*
+cushr_train/byt5_infer.e*
