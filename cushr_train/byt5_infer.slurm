@@ -70,22 +70,56 @@ echo
 export HF_HOME="${SCRATCH:-$PWD}/hf_cache"
 VENV="${SCRATCH:-$PWD}/byt5_venv"
 
+# Job 3343791 built a venv from the default python3 and pip resolved
+# torch 1.10.2+cu102 -- a 2022 build against CUDA 10.2 on a CUDA 12.8 node.
+# That happens when the interpreter is old enough that no modern torch wheel
+# matches. Load TACC's python3 module first so the venv starts from a recent
+# interpreter, and fail loudly rather than silently running on a stale stack.
+module load python3 2>/dev/null || echo "note: no python3 module; using default"
+echo "python3: $(python3 --version 2>&1)  ($(command -v python3))"
+
 if [ ! -d "$VENV" ]; then
     echo "==== creating venv ===="
     python3 -m venv "$VENV"
     "$VENV/bin/pip" install --quiet --upgrade pip
-    "$VENV/bin/pip" install --quiet torch transformers sentencepiece accelerate
+    # pandas is imported by their run_inf_batch.py and was the actual crash in
+    # job 3343791; the rest are transformers' runtime deps.
+    "$VENV/bin/pip" install --quiet \
+        torch transformers sentencepiece accelerate pandas protobuf
 fi
 PY="$VENV/bin/python"
-$PY -c "import torch;print('torch',torch.__version__,'cuda',torch.cuda.is_available())"
+
+echo "==== environment ===="
+$PY - <<'EOF'
+import sys
+print("python      ", sys.version.split()[0])
+import torch, transformers, pandas
+print("torch       ", torch.__version__, "cuda:", torch.cuda.is_available())
+print("transformers", transformers.__version__)
+print("pandas      ", pandas.__version__)
+major = int(torch.__version__.split('.')[0])
+if major < 2:
+    raise SystemExit(
+        f"torch {torch.__version__} is too old to load this checkpoint "
+        "reliably. Delete $SCRATCH/byt5_venv and re-run after loading a "
+        "newer python3 module.")
+if not torch.cuda.is_available():
+    raise SystemExit("no CUDA visible -- this would fall back to CPU and "
+                     "take hours instead of minutes.")
+EOF
 echo
 
 # ---- their inference code -------------------------------------------
-if [ ! -d byt5-sanskrit-analyzers ]; then
-    echo "==== cloning byt5-sanskrit-analyzers ===="
-    git clone --depth 1 https://github.com/sebastian-nehrdich/byt5-sanskrit-analyzers.git
+# Cloned into $SCRATCH, NOT the submit dir. A git clone inside the repo makes
+# `git add .` try to stage an embedded repository, which git refuses to handle
+# sanely and which is a nuisance to unpick afterwards.
+CLONE="${SCRATCH:-$PWD}/byt5-sanskrit-analyzers"
+if [ ! -d "$CLONE" ]; then
+    echo "==== cloning byt5-sanskrit-analyzers -> $CLONE ===="
+    git clone --depth 1 \
+        https://github.com/sebastian-nehrdich/byt5-sanskrit-analyzers.git "$CLONE"
 fi
-APP="byt5-sanskrit-analyzers/applications/segmentation-lemma-tagging"
+APP="$CLONE/applications/segmentation-lemma-tagging"
 
 # ---- prepare input (SLP1 -> IAST, order pinned by a manifest) --------
 echo "==== preparing input ===="

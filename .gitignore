@@ -33,6 +33,21 @@ cushr_train/edge_score*.npy
 # of the committed model set -- so this is scoped to data/ only.)
 data/*.featurizer.pt
 
+# ByT5 comparison scratch: their inference repo is cloned on the cluster and
+# the inputs/outputs are regenerated per run. The clone especially must stay
+# out -- an embedded git repository makes `git add .` stage a gitlink instead
+# of the files, and unpicking that afterwards is a nuisance.
+cushr_train/byt5-sanskrit-analyzers/
+cushr_train/byt5_in/
+cushr_train/byt5_out/
+cushr_train/byt5_preds_*.jsonl
+
+# Slurm job logs (job id in the name, so they accumulate one pair per run)
+cushr_train/*.o[0-9]*
+cushr_train/*.e[0-9]*
+cushr_gpu/*.o[0-9]*
+cushr_gpu/*.e[0-9]*
+
 # Python bytecode
 __pycache__/
 *.pyc
