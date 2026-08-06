@@ -1,13 +1,15 @@
 # Gold-path ingestion: methodology, coverage, and residual failures
 
 How the SIGHUM corpus becomes trainable data, why only half of it originally
-carried a usable label, the two changes that raised that to **93.9%**, and what is
-actually wrong with the 6% that still fails.
+carried a usable label, the changes that raised that to **93.9%** and then
+**94.5%**, and what is actually wrong with the remainder.
 
-Two conclusions in earlier versions of this document were wrong and are retracted
-in place rather than deleted — §4d's "no realization in the lattice" and §4b's
-reading of the `no_source_start` group. The retractions are kept visible because
-in both cases the error was the same one, and it is instructive.
+Several conclusions in earlier versions of this document were wrong and are
+retracted in place rather than deleted — §4d's "no realization in the lattice",
+§4b's reading of the `no_source_start` group, and §4c's reading of
+`word_unmatched`. The retractions are kept visible because every one of them was
+the same error: attributing to the corpus something the code was discarding.
+See §6.
 
 Every number here is either **measured** over the full 119,503-sentence corpus
 or **sampled** with the sample size stated. Where a figure is an estimate, it
@@ -59,17 +61,34 @@ required re-running the resolution logic offline rather than reading the archive
 ### The forced-DAG edge filter
 
 Before anything else, the filter (`forward_edge_filter`) drops every edge that is
-not `key == '1'` or not forward in the chosen node order. SHR uses `key` values of
-`-1`, `2`, and `3` to attach auxiliary and alternative analyses; only `key == '1'`
-relates two candidate words that can co-occur. Keeping the others would make the
-graph cyclic and the DP meaningless.
+not in the selected `key` set or not forward in the chosen node order. Measured
+over 300 graphml files:
 
-**`key == '1'` is symmetric, and that changes what this filter is.** Measured over
+| `key` | count | symmetric | what it is |
+|---|---:|---:|---|
+| `1` | 295,764 | **100%** | words that can be adjacent, spans not touching |
+| `2` | 92,108 | **100%** | adjacent **through a sandhi merge**, spans overlap by one char |
+| `-1` | 1,339 | 0% | `position = -1` participle-root orphans |
+| `3` | 648 | 0% | (tiny) |
+
+**`key=1` and `key=2` are both genuine adjacency**, and both are symmetric.
+Earlier versions of this document said only `key=1` was traversable and the rest
+were "auxiliary and alternative analyses". That was wrong for `key=2`: it is the
+sandhi junction, where the final glyph of one word and the initial of the next
+fuse into a single character (`tejaH` + `niDim` → `tejoniDim`), so the two spans
+overlap by exactly that character. Dropping it deletes every transition across a
+sandhi merge. See §4f.
+
+`key=-1` and `key=3` are directed, tiny, and attach the auxiliary analyses
+§3's repair exists to redirect away from; they stay excluded.
+
+**The relation is symmetric, and that changes what this filter is.** Measured over
 3,000 graphml files: all **2,837,548** `key=1` edges have a reciprocal partner —
-100%, with zero self-loops. Both `1 → 38` and `38 → 1` are present. So it is not a
-directed *can follow* relation, as this document previously claimed; it is an
-undirected compatibility relation, and the second half of the filter does not
-remove spurious edges — it **chooses an orientation**.
+100%, with zero self-loops; `key=2` is likewise 100% symmetric. Both `1 → 38` and
+`38 → 1` are present. So it is not a directed *can follow* relation, as this
+document previously claimed; it is an undirected compatibility relation, and the
+second half of the filter does not remove spurious edges — it **chooses an
+orientation**.
 
 Which order it orients along is therefore a real modelling decision, not a
 formality. Ingest offers two, via `--edge-order`:
@@ -379,6 +398,12 @@ wrong. It sits off the path because its edges were oriented backwards. §4e.)*
 In **5 of 6**, the chunk exists and the `cng` matches but **the lemma does not**.
 DCS and SHR disagree on lemmatization for that word. Not a wiring problem.
 
+*(Retracted in part. The observation is right; "DCS and SHR disagree" was the
+wrong inference. For a large share of these the two agree perfectly and
+`lemma_candidates` just never generated the spelling — the anusvara and `f`-grade
+families of §4f. What remains genuinely unmatched is the compound/suppletion
+tail in §4g.)*
+
 ### 4d. The reachability repair: built, measured, recovers nothing
 
 The natural extension is to stop treating *has any edge* as sufficient and
@@ -584,6 +609,141 @@ disagreement and no edge orientation can touch it.
 > only*: inspecting the 27 showed them to be spurious labels being removed, which
 > is a better outcome than the zero suggested.
 
+### 4f. Two more things ingest was cutting
+
+§4e left 7,303 unresolved, attributed largely to `word_unmatched` — "a real
+DCS/SHR lemmatization disagreement that no edge orientation can touch." Wrong
+again, in both halves. There were two further cuts.
+
+**Cut 1: the lemma normalizer was missing two productive alternations.**
+
+| gold (DCS) | lattice (SHR) | alternation |
+|---|---|---|
+| `saMjaya` | `saYjaya` | anusvara → homorganic nasal (palatal) |
+| `puMgava` | `puNgava` | anusvara → homorganic nasal (velar) |
+| `vAr` | `vf` | vrddhi `Ar ↔ f` |
+| `mard` | `mfd` | guna `ar ↔ f` |
+
+`_retroflex_variants` covered only `M→m`, `Md→nd`, `Mb→mb`; `_guna_variants`
+covered `i/u → e/o` but **not `f`**, one of the commonest root vowels in the
+language. The lemmas never disagreed — `lemma_candidates` simply never generated
+the spelling the lattice uses. Added as `_anusvara_variants` and
+`_r_grade_variants` under `--lemma-variants extended`.
+
+**Cut 2: `key=2` edges were being deleted** (see §1). Every one of 92 sampled
+`broken_chain` failures where all lemmas matched was a gold pair overlapping by
+one character, with a `key=2` edge sitting in the raw file:
+
+```
+[413987] tejaH (ch4 p0+5) -> niDim (ch4 p4)    28->32 {'key': 2}   deleted
+[135163] udyamaH (ch3 p0+7) -> arTa (ch3 p6)   20->21 {'key': 2}   deleted
+```
+
+#### The non-obvious part: where sources and sinks come from
+
+Traversing `key=2` naively makes things **worse** — on a 400/400 sample,
+resolution collapses from 400 to 98. Extra edges cannot break a path that already
+existed; they break the *endpoint conditions*. A `key=2` edge is sandhi-internal,
+so it gives interior nodes both in- and out-edges, and the first gold word stops
+being a source while the last stops being a sink.
+
+The fix is to keep the two graphs separate:
+
+- **traversable** = `key ∈ {1,2}` — `succ`, `build_repair_index`, the gold DP,
+  `topolevel`, and the **emitted** `rowptr`/`colidx`;
+- **structural** = `key = 1` only — used for *nothing* but `sources`/`sinks`.
+
+Sentence boundaries are a `key=1` property; sandhi joins are not.
+
+| configuration | unresolved recovered | resolved kept |
+|---|---:|---:|
+| §4e baseline | 0 / 400 | 400 / 400 |
+| + lemma families | 91 (22.8%) | 400 / 400 |
+| + `key=2` naively | 49 (12.2%) | **98 / 400** |
+| **+ `key=2`, endpoints from `key=1`** | **182 (45.5%)** | **400 / 400** |
+
+The emitted lattice **must** carry the `key=2` edges: `cushr_train/dataset.py`
+looks each consecutive gold pair up in the CSR and drops the sentence when the
+edge is missing, so resolving gold over unemitted edges would recover nothing
+downstream. Edge count grows ~29% (1.47M → 1.89M on 3,000 sentences).
+
+#### Measured, 3,000-sentence A/B
+
+| | §4e | + both fixes |
+|---|---:|---:|
+| resolved | 2,779 (92.63%) | **2,836 (94.53%)** |
+| paths lost | — | **0** |
+| paths altered | — | 9 |
+| cyclic | 0 | **0** |
+| node/surface arrays | — | **bit-identical** |
+| topo invariant | 0 violations | **0 violations** |
+| gold paths traversable in emitted CSR | 2,779 / 2,779 | **2,836 / 2,836** |
+
+All 9 altered paths keep an **unchanged lemma sequence**; what moves is the span
+boundary (`prayata` → `prayatam`), which is exactly the ambiguity `key=2` exists
+to represent, plus the orphan redirect landing differently now that more nodes
+count as wired.
+
+#### Full corpus
+
+119,503 sentences, ~25 min, 78,847,461 edges (+28.9%):
+
+| | §4e | + both fixes |
+|---|---:|---:|
+| **gold path resolved** | 112,200 (93.89%) | **115,447 (96.61%)** |
+| newly resolved | — | **+3,247** |
+| lost | — | **0** |
+| altered | — | 373 (0.33%) |
+| cyclic | 0 | **0** |
+
+All 11 node/surface arrays bit-identical; 0 topo violations over 78.8M edges;
+every gold path traversable in the emitted CSR (115,447 / 115,447).
+
+**The 373 altered paths, audited.** 87.9% keep the lemma sequence, but only 30%
+keep the surface sequence — `key=2` genuinely re-cuts spans at sandhi junctions.
+Scoring each altered path's token-level agreement with DCS's own `(lemma, cng)`:
+**337 unchanged, 31 worse, 5 better**. So a net 26 sentences (0.02% of resolved)
+agree slightly less with DCS than before, against +3,247 recovered. Stated
+because it is a real cost, not because it changes the verdict.
+
+> **Two bogus equivalences caught by the altered-path check, not by the coverage
+> number.** Both raised coverage by *nothing* and silently mislabelled:
+> composing `_r_grade_variants` with itself derives `arTa → fTa → ArTa`,
+> asserting `ar ≡ Ar`, and it relabelled 19 gold paths from `arTaH` to `ArTaH`.
+> Including samprasarana (`ra ↔ f`) equated `astra` "weapon" with `astf`
+> "thrower". Fixes: apply the new families once, never to their own output, and
+> keep guna/vrddhi only. **A widening that recovers nothing can still do damage,
+> so "paths altered" has to be inspected even when coverage is flat.**
+
+### 4g. What is left, and why 100% is not reachable
+
+Attribution of 400 still-unresolved sentences after §4f:
+
+| | share | fixable? |
+|---|---:|---|
+| lemma not found (compound / suppletion) | 39.8% | open-ended — `lokapAla` vs `lokapAlatva`, `dfS` vs suppletive `paS` |
+| **gold does not cover its own sentence** | **7.2%** | **never** |
+| `cng` placeholder `= 1` | 5.2% | deferred |
+| lemma OK, `cng` mismatch | 1.5% | deferred |
+
+The 7.2% is DCS annotating only part of the sentence: its own `sentence` field
+holds more tokens than its `lemmas` list. Sentence `1001` is
+`Cade hrasvas tElapuzpas tulyas tu rasavIryataH` — six chunks — and DCS annotates
+five, leaving `rasavIryataH` unanalysed. No resolution logic can invent it. Those
+sentences are correctly rejected, exactly like the 27 §4e drops.
+
+Corpus-wide that hard floor is ~0.2–0.5%, so **~99.5% is the ceiling, not 100%.**
+
+Measured after the full-corpus §4f run: **4,056 sentences (3.39%) remain
+unresolved.** On the SIGHUM 4,200 benchmark the residue is **4 sentences
+(0.10%)** — see `cushr_train/PAPER_COMPARISON.md` §2, where this stopped being
+the binding constraint on the headline metric.
+
+The two `cng` items are deferred on purpose: both require dropping part of the
+match key, which is the first change in this line of work that could match the
+*wrong* node, and §4f shows what that costs. They need their own paths-altered
+measurement first.
+
 ---
 
 ## 5. Caveat on what the recovered labels mean
@@ -596,6 +756,16 @@ three.
 
 It is defensible — the two nodes describe the same span, and a segmenter's job is
 to pick spans — but it has **not been validated against downstream accuracy**.
+
+> **It has now been measured, and it does cost something — just not on
+> segmentation.** `cushr_train/PAPER_COMPARISON.md` §3 scores our gold path
+> against DCS's published annotation. Segmentation agreement is 98.00%, but
+> **lemma agreement is only 70.07% and lemma+tag 68.18%**, precisely because the
+> redirect substitutes SHR's analysis for DCS's on participles (`kf` → `kfta`).
+> So the label redefinition is invisible to a segmentation metric and caps any
+> lemma or morphology metric at ~70. If cuSHR is ever evaluated on
+> lemmatisation or tagging as a task, this repair — not the model — is the first
+> thing to revisit.
 
 **The test that settles it:** evaluate a model trained on the repaired corpus
 against the **original 59,092-sentence subset**. If F1 there drops relative to a
@@ -636,12 +806,24 @@ seed, single featurizer; see that file's caveats.
 | baseline | 49.45% | gold words match orphan nodes left edge-less by the forced-DAG filter |
 | orphan redirect | **74.99%** | redirect to a same-surface wired twin (+30,523, −4) |
 | reachability repair *(built, measured)* | **74.99%** | widen candidates to same-surface wired nodes — **+0**, see §4d |
-| `--edge-order position` | **93.89%** | orient the symmetric `key=1` relation by sentence order instead of node id (+22,616, −27 spurious) — §4e |
+| `--edge-order position` | **93.89%** | orient the symmetric relation by sentence order instead of node id (+22,616, −27 spurious) — §4e |
+| `--edge-keys 12 --lemma-variants extended` | **96.61%** | traverse `key=2` sandhi edges with endpoints still from `key=1`, and add the anusvara / `f`-grade lemma families (+3,247, −0) — §4f |
 
-**The earlier claim that 75% is a ceiling was wrong; the figure is 93.89%.** Three
-candidate repairs are now separated by evidence rather than plausibility: the
+**The 75% ceiling claim was wrong, and so was the reasoning that replaced it.**
+Four candidate repairs are now separated by evidence rather than plausibility: the
 orphan redirect gained 25.5 points, the reachability repair — equally plausible
-beforehand — gained nothing, and the edge reorientation gained a further 18.9.
+beforehand — gained nothing, the edge reorientation gained a further 18.9, and
+§4f's two cuts gained 2.7 more. Coverage went 49.45% → **96.61%** without a
+single change to the corpus.
+
+The recurring error is worth naming once, because it has now happened three
+times. Each residual was explained as **a property of the data** — "the gold path
+has no realization in the lattice", "DCS annotates the whole chunk where SHR
+wires the split", "DCS and SHR disagree on lemmatization". Each time it was
+**something ingest was discarding**: an edge oriented backwards, an edge class
+dropped wholesale, a spelling the normalizer never generated. The data was
+mostly fine. Before attributing a residual to the corpus, check what the code
+threw away.
 
 The pattern across all three is worth stating, because it cost two wrong
 conclusions. Both errors came from reasoning about **nodes** when the object that
@@ -650,13 +832,11 @@ properties, and then read a node-level null result as a statement about the
 lattice as a whole. The failure was an edge the filter deleted, and neither
 analysis was looking at edges.
 
-What remains unresolved (7,303 sentences, 6.11%) is the group §4b and §4c
-describe: genuine node-level disagreement between DCS's segmentation and SHR's,
-plus lemmatization mismatches. For that group the original conclusion still holds
-— it needs a different lattice, not different resolution logic. Whether *that* is
-now the real ceiling is not established; the honest statement is that it is the
-ceiling for every mechanism tested so far, which is exactly what was said, wrongly,
-about 75%.
+What remained after §4e (7,303 sentences, 6.11%) was described here as genuine
+DCS/SHR disagreement needing a different lattice. §4f cut it further still, and
+§4g gives the current breakdown. The residue that is now genuinely unfixable is
+small and specific: DCS annotations that do not cover their own sentence, ~0.2–0.5%
+of the corpus. **~99.5% is the ceiling; 100% is not reachable.**
 
 Two routes past it, both outside this module:
 

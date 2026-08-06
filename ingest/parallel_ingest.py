@@ -47,7 +47,8 @@ VOCAB_COLUMNS = [
 
 
 def worker(job):
-    idx, files, graphml_dir, p_dir, shard_dir, repair, reach, edge_order = job
+    (idx, files, graphml_dir, p_dir, shard_dir, repair, reach, edge_order,
+     edge_keys, lemma_variants) = job
     out = os.path.join(shard_dir, f"shard_{idx:03d}.npz")
     index = os.path.join(shard_dir, f"shard_{idx:03d}_index.json")
     # Each shard writes its vocabularies beside itself (ingest keys them off the
@@ -57,7 +58,8 @@ def worker(job):
                           index_filename=index, filepaths=files,
                           progress_every=200, vocab_prefix=f"shard_{idx:03d}_",
                           repair_orphan_gold=repair, reach_repair=reach,
-                          edge_order=edge_order)
+                          edge_order=edge_order, edge_keys=edge_keys,
+                          lemma_variants=lemma_variants)
     return out
 
 
@@ -198,6 +200,12 @@ def main():
                          "flags this changes the emitted edges, so shards from "
                          "different settings must not be mixed in one "
                          "--shard-dir")
+    ap.add_argument("--edge-keys", choices=("1", "12"), default="1",
+                    help="see ingest.forward_edge_filter. Also changes the "
+                         "emitted edges -- same --shard-dir caveat as "
+                         "--edge-order")
+    ap.add_argument("--lemma-variants", choices=("base", "extended"), default="base",
+                    help="see ingest.lemma_candidates; gold resolution only")
     ap.add_argument("--resume", action="store_true",
                     help="skip shards whose .npz already exists in --shard-dir. "
                          "Shard boundaries are a pure function of the sorted "
@@ -228,7 +236,7 @@ def main():
     bounds = [round(i * len(files) / n) for i in range(n + 1)]
     jobs = [(i, files[bounds[i]:bounds[i + 1]], args.graphml_dir, args.p_dir,
              shard_dir, args.repair_orphan_gold, args.reach_repair,
-             args.edge_order)
+             args.edge_order, args.edge_keys, args.lemma_variants)
             for i in range(n) if bounds[i + 1] > bounds[i]]
     n_shards = len(jobs)
     all_shards = [os.path.join(shard_dir, f"shard_{i:03d}.npz")

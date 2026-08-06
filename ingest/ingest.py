@@ -172,6 +172,49 @@ def _vowel_variants(s):
     return out
 
 
+def _anusvara_variants(s):
+    """Anusvara written as the homorganic nasal: saMjaya -> saYjaya.
+
+    DCS writes the anusvara `M`; SHR writes the nasal it actually assimilates to
+    -- `Y` before palatals (saM+jaya -> saYjaya), `N` before velars (puM+gava ->
+    puNgava), `R` before retroflexes, `n` before dentals, `m` before labials.
+
+    All five are generated unconditionally rather than conditioning on the next
+    consonant. That is cheaper, and it is safe: a spurious variant can only fail
+    to match, never match the wrong node, because the (chunk, lemma, cng) triple
+    still has to land on a node that exists.
+    """
+    out = {s}
+    if 'M' in s:
+        for nasal in 'NYRnm':
+            out.add(s.replace('M', nasal))
+    return out
+
+
+def _r_grade_variants(s):
+    """The f / ar / Ar ladder: mfd~mard, vf~vAr.
+
+    Sanskrit grades the vowel `f` (ṛ) to `ar` (guna) and `Ar` (vrddhi), and
+    `_guna_variants` covers the same alternation for i/u but not for f -- which
+    is one of the commonest root vowels in the language. DCS tends to cite the
+    graded form (`mard`, `vAr`) where SHR cites the root (`mfd`, `vf`), so both
+    directions are needed.
+
+    Deliberately NOT included: `ra`/`rA` <-> `f` (samprasarana). It is a real
+    alternation, but as a blind string rewrite it is far too eager -- it equates
+    `astra` (weapon) with `astf` (thrower) and mislabelled a gold path that way.
+    It also recovered nothing measurable. Guna and vrddhi only.
+    """
+    out = {s}
+    for a, b in (('f', 'ar'), ('f', 'Ar'), ('F', 'Ar')):
+        if a in s:
+            out.add(s.replace(a, b))
+    for a, b in (('ar', 'f'), ('Ar', 'f')):
+        if a in s:
+            out.add(s.replace(a, b))
+    return out
+
+
 def _guna_variants(s):
     """Sanskrit vowel-grade alternation between zero-grade and guna."""
     out = {s}
@@ -200,23 +243,45 @@ def _suffix_variants(s):
     return out
 
 
-def lemma_candidates(raw):
-    """Return the set of plausible graphml-side lemma forms for one gold lemma."""
+def lemma_candidates(raw, lemma_variants="base"):
+    """Return the set of plausible graphml-side lemma forms for one gold lemma.
+
+    `lemma_variants='extended'` additionally generates the anusvara and f-grade
+    families (see `_anusvara_variants` / `_r_grade_variants`). Those two
+    alternations account for a large share of the gold words that previously
+    matched no node at all -- the lemmas were never in disagreement, this
+    function simply never produced the spelling the lattice uses.
+    """
     base = normalize_lemma(raw)
+    gens = [_retroflex_variants, _vowel_variants, _suffix_variants, _guna_variants]
+
     cands = {base}
-    cands |= _retroflex_variants(base)
-    cands |= _vowel_variants(base)
-    cands |= _suffix_variants(base)
-    cands |= _guna_variants(base)
+    for g in gens:
+        cands |= g(base)
 
     # one round of cross-application (small set, cheap)
     expanded = set()
     for c in list(cands):
-        expanded |= _retroflex_variants(c)
-        expanded |= _vowel_variants(c)
-        expanded |= _suffix_variants(c)
-        expanded |= _guna_variants(c)
+        for g in gens:
+            expanded |= g(c)
     cands |= expanded
+
+    if lemma_variants == "extended":
+        # Applied ONCE to the forms above, and deliberately never fed back into
+        # themselves. `_r_grade_variants` composed with itself would derive
+        # arTa -> fTa -> ArTa, asserting ar == Ar; artha and ārtha are different
+        # words, and that round trip really did mislabel 19 of 2,779 gold paths
+        # -- picking `ArTaH` where the gold word is `arTaH`. A single
+        # application still reaches every form this is meant to reach, because
+        # the DCS/SHR divergence is one alternation deep, not two.
+        extra = set()
+        for c in cands:
+            extra |= _anusvara_variants(c)
+            extra |= _r_grade_variants(c)
+        # suffix stripping over the new forms is safe: it only shortens.
+        for c in list(extra):
+            extra |= _suffix_variants(c)
+        cands |= extra
 
     # lemma-only aliases — applied last so they pick up suffix-stripped forms
     for c in list(cands):
@@ -226,9 +291,9 @@ def lemma_candidates(raw):
     return cands
 
 
-def lemma_cng_candidates(raw_lemma, cng_str):
+def lemma_cng_candidates(raw_lemma, cng_str, lemma_variants="base"):
     """Return set of (graphml_lemma, graphml_cng) pairs for this gold entry."""
-    pairs = {(l, cng_str) for l in lemma_candidates(raw_lemma)}
+    pairs = {(l, cng_str) for l in lemma_candidates(raw_lemma, lemma_variants)}
     base = normalize_lemma(raw_lemma)
     for alt_lemma, alt_cng in LEMMA_CNG_ALIASES.get((base, cng_str), ()):
         pairs.add((alt_lemma, alt_cng))
@@ -238,7 +303,7 @@ def lemma_cng_candidates(raw_lemma, cng_str):
 # ---------------------------------------------------------------------------
 # Gold-path loading
 # ---------------------------------------------------------------------------
-def load_gold_entries(p_filepath):
+def load_gold_entries(p_filepath, lemma_variants="base"):
     """Load a DCS .p file and return the ordered list of gold words.
 
     Each gold word is a tuple (chunk_str, candidate_pairs) where
@@ -270,7 +335,13 @@ def load_gold_entries(p_filepath):
         for lem, cng in zip(lem_list, cng_list):
             entries.append((
                 str(chunk_idx),
-                frozenset(lemma_cng_candidates(lem, str(cng))),
+                frozenset(lemma_cng_candidates(lem, str(cng), lemma_variants)),
+                # DCS's OWN analysis, kept separately because the frozenset
+                # above mixes it in with generated spelling variants and loses
+                # which one was actually annotated. `reconstruct_gold_path`
+                # uses it to prefer a node that matches DCS exactly over one
+                # that only matches through a variant -- see `exact_only`.
+                (normalize_lemma(lem), str(cng)),
             ))
     return entries
 
@@ -316,14 +387,34 @@ def _orientation_keys(G, edge_order):
     return keys
 
 
-def forward_edge_filter(G, edge_order="id"):
-    """Orient SHR's key=1 relation into a DAG, in place. Returns G.
+EDGE_KEY_SETS = {
+    "1": frozenset({"1"}),
+    "12": frozenset({"1", "2"}),
+}
 
-    SHR uses key values of -1, 2 and 3 to attach auxiliary and alternative
-    analyses; only key == 1 is the "can co-occur" relation, and those edges are
-    **symmetric** -- measured over 3,000 graphml files, all 2,837,548 of them
-    have a reciprocal partner, with zero self-loops. So this function does not
-    remove spurious edges, it *chooses a direction* for an undirected relation.
+
+def forward_edge_filter(G, edge_order="id", edge_keys="1"):
+    """Orient SHR's adjacency relation into a DAG, in place. Returns G.
+
+    SHR uses four `key` values, and they are not all the same kind of thing.
+    Measured over 300 graphml files:
+
+        key= 1   295,764   100% symmetric   words that can be adjacent
+        key= 2    92,108   100% symmetric   adjacent THROUGH a sandhi merge
+        key=-1     1,339     0% symmetric   position=-1 participle-root orphans
+        key= 3       648     0% symmetric   (tiny)
+
+    `key=1` and `key=2` are both **symmetric**, so for both this function does
+    not remove spurious edges -- it *chooses a direction* for an undirected
+    relation. They differ in geometry: `key=1` joins spans that do not touch,
+    while `key=2` joins spans that **overlap by one character**, which is the
+    sandhi junction where the last glyph of one word and the first of the next
+    fuse into a single character (`tejaH` + `niDim` -> `tejoniDim`). Both are
+    genuine "can follow" relations; dropping `key=2` deletes every transition
+    across a sandhi merge.
+
+    `key=-1` and `key=3` are directed, tiny, and attach the auxiliary analyses
+    `build_repair_index` exists to redirect away from. They stay excluded.
 
     Which direction matters. `edge_order='id'` uses node id, but SHR node ids
     are not sentence order: the merged unsplit analysis of a chunk is often
@@ -339,14 +430,77 @@ def forward_edge_filter(G, edge_order="id"):
     """
     if edge_order not in ("id", "position"):
         raise ValueError(f"edge_order must be 'id' or 'position', got {edge_order!r}")
+    if edge_keys not in EDGE_KEY_SETS:
+        raise ValueError(f"edge_keys must be one of {sorted(EDGE_KEY_SETS)}, "
+                         f"got {edge_keys!r}")
+    keep = EDGE_KEY_SETS[edge_keys]
     key = _orientation_keys(G, edge_order)
-    # Both keys are injective, so `>=` only ever fires on the strictly backward
-    # direction (or a self-loop, of which there are none). The result is a DAG
-    # by construction: edges only ever run up a strict total order.
+    # Both orientation keys are injective, so `>=` only ever fires on the
+    # strictly backward direction (or a self-loop, of which there are none).
+    # The result is a DAG by construction regardless of which `key` values are
+    # kept: every surviving edge runs up a strict total order.
     drop = [(u, v) for u, v, data in G.edges(data=True)
-            if str(data.get('key', '0')) != '1' or key[u] >= key[v]]
+            if str(data.get('key', '0')) not in keep or key[u] >= key[v]]
     G.remove_edges_from(drop)
     return G
+
+
+def orphan_host_map(G):
+    """{host_node -> [orphan_nodes]} from the `key=-1` relation, pre-filter.
+
+    A `key=-1` edge does NOT mean "can follow". Inspecting where they go:
+
+        node 3   jIvatsu / jIv  / -10  / pos=-1
+          key=-1 -> node 1   jIvatsu / jIvat / 181 / pos=0
+          key=-1 -> node 2   jIvatsu / jIvat / 179 / pos=0
+
+    it points from a root-analysis node to its own positioned siblings carrying
+    the *identical surface form*. It means "is an alternative analysis of".
+
+    Dropping the edge is therefore correct; dropping it and leaving the node is
+    what strands it. These orphans end up with in-degree and out-degree 0, and
+    DCS's annotation frequently names exactly them -- so the gold path can never
+    reach the analysis DCS asked for. Measured over 300 test sentences, a node
+    matching DCS's (surface, lemma, cng) exists for 100% of gold words, but a
+    connected path through them exists for only 70% at the L level.
+
+    Must be called BEFORE `forward_edge_filter`, which removes these edges.
+    """
+    hosts = defaultdict(list)
+    for u, v, data in G.edges(data=True):
+        if str(data.get('key', '0')) == '-1':
+            hosts[v].append(u)
+    return hosts
+
+
+def inherit_orphan_edges(succ, orphans_of):
+    """Let each `key=-1` orphan stand in for its host wherever the host appears.
+
+    `orphans_of` maps a host's local id to the local ids of orphans that are
+    alternative analyses of it. For every surviving edge a -> b, the orphans of
+    `a` gain b's incoming side and the orphans of `b` gain a's outgoing side, so
+    an orphan becomes a *selectable alternative at the host's position*.
+
+    No edge is added between an orphan and its own host: they analyse the same
+    span, so a path through both would emit the word twice. That is what the
+    `x != y` guard enforces -- an edge h -> h expands to o -> o and is dropped.
+
+    Acyclicity is preserved. An orphan behaves exactly like its host, and the
+    host graph is a DAG under a strict total order, so every added edge still
+    runs up that order; `process_corpus` topologically sorts afterwards and
+    counts any failure rather than trusting this argument.
+    """
+    if not orphans_of:
+        return succ
+    for a, outs in list(succ.items()):
+        a_side = [a] + orphans_of.get(a, [])
+        for b in list(outs):
+            b_side = [b] + orphans_of.get(b, [])
+            for x in a_side:
+                for y in b_side:
+                    if x != y:
+                        succ[x].add(y)
+    return succ
 
 
 def build_repair_index(node_attrs, succ, has_in):
@@ -376,7 +530,8 @@ def build_repair_index(node_attrs, succ, has_in):
 
 
 def reconstruct_gold_path(gold_entries, triple_idx, succ, sources, sinks,
-                          repair=None, stats=None, expand_surface=False):
+                          repair=None, stats=None, expand_surface=False,
+                          exact_only=False):
     """Resolve the ordered gold-word sequence to a single connected path.
 
     The gold annotation is a *path*: source-word, ..., sink-word, with each
@@ -412,10 +567,22 @@ def reconstruct_gold_path(gold_entries, triple_idx, succ, sources, sinks,
 
     # Candidate node list per gold position (deduped, sorted for determinism).
     cand = []
-    for chunk_str, pairs in gold_entries:
-        nodes = set()
-        for (lem, cng) in pairs:
-            nodes.update(triple_idx.get((chunk_str, lem, cng), ()))
+    for entry in gold_entries:
+        # Entries are (chunk, variant_pairs) or (chunk, variant_pairs, canonical
+        # DCS pair). Unpacked tolerantly so older 2-tuple callers still work.
+        chunk_str, pairs = entry[0], entry[1]
+        canon = entry[2] if len(entry) > 2 else None
+        if exact_only:
+            # Strict pass: only nodes carrying DCS's own (lemma, cng). Used as a
+            # first attempt so that where such a path exists it wins over one
+            # reached through a generated spelling variant or a repair redirect.
+            if canon is None:
+                return []
+            nodes = set(triple_idx.get((chunk_str, canon[0], canon[1]), ()))
+        else:
+            nodes = set()
+            for (lem, cng) in pairs:
+                nodes.update(triple_idx.get((chunk_str, lem, cng), ()))
         if repair is not None and nodes and nodes.isdisjoint(repair["wired"]):
             # Every node this gold word matched is edge-less, so no path can
             # ever run through it. That is not a disagreement about the word:
@@ -497,7 +664,9 @@ def reconstruct_gold_path(gold_entries, triple_idx, succ, sources, sinks,
 def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gold.npz",
                    index_filename="sentence_index.json", limit=0, filepaths=None,
                    progress_every=1000, vocab_prefix="",
-                   repair_orphan_gold=False, reach_repair=False, edge_order="id"):
+                   repair_orphan_gold=False, reach_repair=False, edge_order="id",
+                   edge_keys="1", lemma_variants="base", orphan_inherit=False,
+                   prefer_exact=False):
     """Ingest a corpus into one .npz archive.
 
     `filepaths` overrides the directory scan with an explicit, already-ordered
@@ -510,10 +679,14 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
     edges, and every other emitted array are bit-identical either way -- so the
     two settings can be diffed directly.
 
-    `edge_order` selects how the symmetric key=1 relation is oriented; see
-    `forward_edge_filter`. Unlike `repair_orphan_gold` this one does change the
-    emitted edges (rowptr/colidx), though not the node set or any node field.
-    Default 'id' reproduces existing archives byte for byte.
+    `edge_order` selects how the symmetric adjacency relation is oriented and
+    `edge_keys` selects which SHR `key` values are traversable; see
+    `forward_edge_filter`. Unlike `repair_orphan_gold` both change the emitted
+    edges (rowptr/colidx), though not the node set or any node field.
+
+    `lemma_variants='extended'` widens gold-lemma candidate generation; that
+    affects gold resolution only. The defaults ('id', '1', 'base') reproduce
+    existing archives byte for byte.
     """
     print(f"scanning graphml directory: {graphml_dir}")
     print(f"scanning gold-path directory: {p_dir}")
@@ -587,6 +760,9 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
     n_without_pfile = 0
     resolved_sentences = 0
     n_cyclic = 0
+    n_orphan_hosts = 0
+    n_orphan_nodes = 0
+    exact_stats = defaultdict(int)
     # Stays all-zero unless repair_orphan_gold is on, which is how a run
     # advertises whether the redirect actually fired.
     repair_stats = defaultdict(int)
@@ -601,7 +777,7 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
 
         # ----- locate matching .p file by sent_id (filename stem) -----
         p_filepath = os.path.join(p_dir, f"{stem}.p")
-        gold_entries = load_gold_entries(p_filepath)
+        gold_entries = load_gold_entries(p_filepath, lemma_variants)
         if gold_entries is None:
             n_without_pfile += 1
         else:
@@ -615,8 +791,20 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
             sentence_index.pop()
             continue
 
-        # ----- force DAG: keep key=1 edges, oriented by `edge_order` -----
-        forward_edge_filter(G, edge_order)
+        # ----- force DAG: keep the selected keys, oriented by `edge_order` -----
+        # `G` becomes the TRAVERSABLE graph: its edges are what gets emitted,
+        # what topolevel is computed over, and what the gold DP walks.
+        # `G_struct` keeps key=1 only and is used for nothing but sources and
+        # sinks -- see below.
+        # Captured BEFORE filtering: forward_edge_filter removes key=-1 edges,
+        # and this is the only record of which orphan analyses belong to which
+        # positioned node. Empty dict when the flag is off, so every downstream
+        # step is a no-op and the archive is bit-identical to a run without it.
+        orphan_hosts_raw = orphan_host_map(G) if orphan_inherit else {}
+
+        G_struct = (forward_edge_filter(G.copy(), edge_order, "1")
+                    if edge_keys != "1" else None)
+        forward_edge_filter(G, edge_order, edge_keys)
 
         # ----- consistent node ordering -----
         # Node id, independent of `edge_order`: this is only a stable labelling
@@ -658,11 +846,50 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
         for i, n in enumerate(node_list):
             for tgt in G.successors(n):
                 succ[i].add(local_id_map[tgt])
+
+        # Re-attach the key=-1 orphans as alternatives at their host's position.
+        # Applied to the traversable graph AND, below, to the structural one:
+        # if a host is a sentence-initial source its orphan must be a source
+        # too, or a sentence-initial participle stays unreachable.
+        orphans_of = defaultdict(list)
+        for host, orphs in orphan_hosts_raw.items():
+            if host not in local_id_map:
+                continue
+            for o in orphs:
+                if o in local_id_map:
+                    orphans_of[local_id_map[host]].append(local_id_map[o])
+        if orphans_of:
+            n_orphan_hosts += len(orphans_of)
+            n_orphan_nodes += sum(len(v) for v in orphans_of.values())
+            inherit_orphan_edges(succ, orphans_of)
+
         has_in = set()
         for i in succ:
             has_in.update(succ[i])
-        sources = {i for i in range(num_word) if i not in has_in}
-        sinks = {i for i in range(num_word) if not succ[i]}
+
+        # Sources and sinks come from the key=1 graph ONLY, even when key=2 is
+        # traversable. A key=2 edge is a sandhi-internal join, so it gives
+        # interior nodes both in- and out-edges; deriving endpoints from the
+        # union makes the first gold word stop being a source and the last stop
+        # being a sink, and resolution collapses (measured: 400/400 resolved
+        # sentences drop to 98/400). Extra edges cannot break a path that
+        # already existed -- they can only break the endpoint conditions, and
+        # that is exactly what happens. Sentence boundaries are a key=1
+        # property; sandhi joins are not.
+        if G_struct is None:
+            succ_struct, has_in_struct = succ, has_in
+        else:
+            succ_struct = {i: set() for i in range(num_word)}
+            for i, n in enumerate(node_list):
+                for tgt in G_struct.successors(n):
+                    succ_struct[i].add(local_id_map[tgt])
+            if orphans_of:
+                inherit_orphan_edges(succ_struct, orphans_of)
+            has_in_struct = set()
+            for i in succ_struct:
+                has_in_struct.update(succ_struct[i])
+        sources = {i for i in range(num_word) if i not in has_in_struct}
+        sinks = {i for i in range(num_word) if not succ_struct[i]}
 
         # ----- resolve the gold path (list of local word ids) -----
         gold_local = []
@@ -676,9 +903,27 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
             repair = (build_repair_index(node_attrs, succ, has_in)
                       if repair_orphan_gold else None)
             before = repair_stats["gold_words_redirected"]
-            gold_local = reconstruct_gold_path(
-                gold_entries, triple_idx, succ, sources, sinks,
-                repair=repair, stats=repair_stats)
+            # Exact-match first pass. Candidate sets for a gold word mix DCS's
+            # own (lemma, cng) with generated spelling variants, and the DP
+            # returns whichever path it finds first -- so a variant or a repair
+            # redirect can win even when a node matching DCS exactly is
+            # reachable. Trying the strict candidates first makes the exact
+            # analysis preferred; if no such path exists the permissive pass
+            # below runs unchanged, so this can only improve agreement with DCS,
+            # never lose a sentence that previously resolved.
+            gold_local = []
+            if prefer_exact:
+                gold_local = reconstruct_gold_path(
+                    gold_entries, triple_idx, succ, sources, sinks,
+                    exact_only=True)
+                if gold_local:
+                    exact_stats["resolved_exact"] += 1
+            if not gold_local:
+                if prefer_exact:
+                    exact_stats["fell_back"] += 1
+                gold_local = reconstruct_gold_path(
+                    gold_entries, triple_idx, succ, sources, sinks,
+                    repair=repair, stats=repair_stats)
             if repair_stats["gold_words_redirected"] > before:
                 repair_stats["sentences_touched"] += 1
                 if gold_local:
@@ -888,6 +1133,8 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
     print(f"total sentences:        {n_sent:,}")
     print(f"unique morph tags:      {len(morph_vocab):,}")
     print(f"edge orientation:       {edge_order}")
+    print(f"traversable edge keys:  {edge_keys}")
+    print(f"lemma variants:         {lemma_variants}")
     print(f"sentences dropped as cyclic: {n_cyclic:,}")
     print()
     print("--- gold-path coverage ---")
@@ -897,6 +1144,16 @@ def process_corpus(graphml_dir, p_dir, output_filename="cushr_data_full_with_gol
     print(f"sentences with a fully resolved gold path: "
           f"{resolved_sentences:,} / {n_sent:,}  ({rate:.2f}%)")
     print(f"total gold nodes flagged: {int(gold_mask_np.sum()):,}")
+    if prefer_exact:
+        print()
+        print("--- exact-DCS-match preference ---")
+        print(f"resolved by the strict pass: {exact_stats['resolved_exact']:,}")
+        print(f"fell back to variants/repair: {exact_stats['fell_back']:,}")
+    if orphan_inherit:
+        print()
+        print("--- key=-1 orphan edge inheritance ---")
+        print(f"host nodes with orphans: {n_orphan_hosts:,}")
+        print(f"orphan nodes re-attached: {n_orphan_nodes:,}")
     if repair_orphan_gold:
         print()
         print("--- orphan-gold repair ---")
@@ -935,6 +1192,25 @@ if __name__ == "__main__":
                          "orients by (chunk_no, position), which stops genuine "
                          "edges being reversed into dead ends (see "
                          "forward_edge_filter)")
+    ap.add_argument("--edge-keys", choices=("1", "12"), default="1",
+                    help="which SHR key values are traversable. '1' (default) "
+                         "reproduces existing archives; '12' also traverses "
+                         "key=2, the sandhi-junction adjacency where two words "
+                         "share the merged character (see forward_edge_filter)")
+    ap.add_argument("--lemma-variants", choices=("base", "extended"), default="base",
+                    help="'extended' additionally generates the anusvara "
+                         "(saMjaya~saYjaya) and f-grade (mfd~mard) lemma "
+                         "families; gold resolution only")
+    ap.add_argument("--prefer-exact-gold", action="store_true",
+                    help="try resolving with DCS's own (lemma, cng) alone "
+                         "before falling back to spelling variants and the "
+                         "orphan repair. Strictly a preference: a sentence that "
+                         "resolved before still resolves.")
+    ap.add_argument("--orphan-inherit", action="store_true",
+                    help="re-attach key=-1 orphan analyses by giving them their "
+                         "host's edges, so DCS's root-lemma analyses become "
+                         "reachable (see orphan_host_map). Adds edges only; the "
+                         "node set and every node field are unchanged.")
     ap.add_argument("--reach-repair", action="store_true",
                     help="on sentences the strict pass cannot resolve, retry "
                          "with every gold word widened to same-surface wired "
@@ -952,4 +1228,8 @@ if __name__ == "__main__":
         repair_orphan_gold=args.repair_orphan_gold,
         reach_repair=args.reach_repair,
         edge_order=args.edge_order,
+        edge_keys=args.edge_keys,
+        lemma_variants=args.lemma_variants,
+        orphan_inherit=args.orphan_inherit,
+        prefer_exact=args.prefer_exact_gold,
     )
