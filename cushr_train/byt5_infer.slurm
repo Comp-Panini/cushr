@@ -75,12 +75,19 @@ VENV="${SCRATCH:-$PWD}/byt5_venv"
 # That happens when the interpreter is old enough that no modern torch wheel
 # matches. Load TACC's python3 module first so the venv starts from a recent
 # interpreter, and fail loudly rather than silently running on a stale stack.
-# Job 3346304: `module load python3` did not exist, so this fell back to
-# /usr/bin/python3 = Python 3.6.8, for which the newest torch wheel is
-# 1.10.2+cu102. Try several names; PYMOD can override from the command line:
+# Job 3346304 ran on Python 3.6.8 and could only get torch 1.10.2+cu102.
+#
+# Cause: `module purge` above. python3/3.9.7 IS loaded by default on Lonestar6,
+# but it lives in the Intel/MPI hierarchy
+# (/opt/apps/intel19/impi19_0/modulefiles), and purging drops that directory out
+# of MODULEPATH -- so `module load python3` then fails to find anything and the
+# shell falls back to /usr/bin/python3.
+#
+# python/3.12.11 lives in the CORE path (/opt/apps/modulefiles), which survives
+# a purge, so it is tried first. The hierarchy names are kept as fallbacks in
+# case the core module is unavailable; PYMOD overrides everything:
 #     sbatch --export=ALL,PYMOD=python3/3.9.7 byt5_infer.slurm
-for m in ${PYMOD:-} python3 python/3.9 python3/3.9 python3/3.10 python3/3.11 \
-         intel-python3 conda miniconda3; do
+for m in ${PYMOD:-} python/3.12.11 python3/3.9.7 python python3; do
     [ -z "$m" ] && continue
     if module load "$m" 2>/dev/null; then
         echo "loaded module: $m"
