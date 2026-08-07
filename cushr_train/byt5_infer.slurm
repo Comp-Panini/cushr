@@ -146,6 +146,16 @@ if [ "$VENV_OK" = "0" ]; then
     "$VENV/bin/pip" install --quiet --upgrade pip
     # pandas is imported by their run_inf_batch.py and was the actual crash in
     # job 3343791; the rest are transformers' runtime deps.
+    # numpy is pinned below 2. Job 3347243 installed a numpy 2.x wheel whose
+    # compiled baseline is x86-64-v2, and this node's numpy CPU check rejects
+    # it:
+    #     RuntimeError: NumPy was built with baseline optimizations:
+    #     (X86_V2) but your machine doesn't support: (X86_V2).
+    # numpy then fails to import, which takes torch, transformers AND pandas
+    # down with it -- three [FAIL]s from one broken dependency. The 1.26.x
+    # wheels use a lower baseline and load here. Installed FIRST so pip cannot
+    # pull numpy 2 in as a transitive dependency of torch.
+    "$VENV/bin/pip" install --quiet "numpy<2"
     "$VENV/bin/pip" install --quiet \
         torch transformers sentencepiece accelerate pandas protobuf
 fi
@@ -205,6 +215,18 @@ if [ "$PREFLIGHT" = "1" ]; then
         fi
     }
 
+    # CPU identity, printed because job 3347243 failed on a numpy wheel whose
+    # x86-64-v2 baseline this node's numpy check rejected. If that recurs, these
+    # two lines say whether the CPU genuinely lacks the feature or numpy's
+    # detection is at fault.
+    echo "---- cpu ----"
+    lscpu 2>/dev/null | grep -iE "^model name|^architecture|^flags" | cut -c1-200
+    echo
+
+    # numpy FIRST: torch, transformers and pandas all import it, so when numpy
+    # is broken they all fail and it looks like three separate problems.
+    chk "numpy imports" $PY -c \
+        "import numpy; print(numpy.__version__, numpy.__file__)"
     chk "python >= 3.9" $PY -c \
         "import sys; assert sys.version_info>=(3,9), sys.version; print(sys.version.split()[0])"
     chk "torch >= 2 and CUDA visible" $PY -c \
