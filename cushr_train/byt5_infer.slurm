@@ -46,10 +46,27 @@
 ###SBATCH -A your_allocation
 #----------------------------------------------------------------------
 
-set -euo pipefail
+# NOTE: `set -e` is deliberately NOT enabled here. Under PREFLIGHT=1 every check
+# must run and report even after an earlier one fails -- otherwise each job
+# reveals exactly one problem, which is what turned this into three wasted
+# submissions. It is turned on for the real run further down.
+set -uo pipefail
 
-module purge
+# `module reset`, NOT `module purge`. THIS WAS THE ROOT CAUSE of jobs 3343791,
+# 3346304 and their successors.
+#
+# python3/3.9.7 is loaded BY DEFAULT on Lonestar6 (`module avail python` shows
+# it flagged L). It lives in /opt/apps/intel19/impi19_0/modulefiles, and that
+# directory is only on MODULEPATH because the intel19 + impi19_0 modules put it
+# there. `module purge` unloads those, so python3 becomes UNFINDABLE rather than
+# merely unloaded -- `module load python3` then fails, the shell falls back to
+# /usr/bin/python3 = 3.6.8, and the newest torch wheel for 3.6 is 1.10.2+cu102.
+# Every "old torch" symptom traced back to this one line.
+#
+# `module reset` restores the system default set, which is what TACC recommends.
+module reset 2>/dev/null || module purge
 module load cuda
+PREFLIGHT="${PREFLIGHT:-0}"
 
 cd "$SLURM_SUBMIT_DIR"
 
@@ -70,22 +87,10 @@ echo
 export HF_HOME="${SCRATCH:-$PWD}/hf_cache"
 VENV="${SCRATCH:-$PWD}/byt5_venv"
 
-# Job 3343791 built a venv from the default python3 and pip resolved
-# torch 1.10.2+cu102 -- a 2022 build against CUDA 10.2 on a CUDA 12.8 node.
-# That happens when the interpreter is old enough that no modern torch wheel
-# matches. Load TACC's python3 module first so the venv starts from a recent
-# interpreter, and fail loudly rather than silently running on a stale stack.
-# Job 3346304 ran on Python 3.6.8 and could only get torch 1.10.2+cu102.
-#
-# Cause: `module purge` above. python3/3.9.7 IS loaded by default on Lonestar6,
-# but it lives in the Intel/MPI hierarchy
-# (/opt/apps/intel19/impi19_0/modulefiles), and purging drops that directory out
-# of MODULEPATH -- so `module load python3` then fails to find anything and the
-# shell falls back to /usr/bin/python3.
-#
-# python/3.12.11 lives in the CORE path (/opt/apps/modulefiles), which survives
-# a purge, so it is tried first. The hierarchy names are kept as fallbacks in
-# case the core module is unavailable; PYMOD overrides everything:
+# Belt-and-braces after the `module reset` fix above: with reset, python3/3.9.7
+# is already loaded and this loop is a no-op. It stays because it is the thing
+# that makes a wrong interpreter LOUD rather than silent, and PYMOD lets a
+# specific version be forced from the command line:
 #     sbatch --export=ALL,PYMOD=python3/3.9.7 byt5_infer.slurm
 for m in ${PYMOD:-} python/3.12.11 python3/3.9.7 python python3; do
     [ -z "$m" ] && continue
@@ -154,16 +159,13 @@ import torch, transformers, pandas
 print("torch       ", torch.__version__, "cuda:", torch.cuda.is_available())
 print("transformers", transformers.__version__)
 print("pandas      ", pandas.__version__)
-major = int(torch.__version__.split('.')[0])
-if major < 2:
-    raise SystemExit(
-        f"torch {torch.__version__} is too old to load this checkpoint "
-        "reliably. Delete $SCRATCH/byt5_venv and re-run after loading a "
-        "newer python3 module.")
-if not torch.cuda.is_available():
-    raise SystemExit("no CUDA visible -- this would fall back to CPU and "
-                     "take hours instead of minutes.")
 EOF
+echo
+
+# ---- module state, printed so the root cause cannot recur silently ----
+echo "==== module state ===="
+module list 2>&1 | head -20
+echo "MODULEPATH=$MODULEPATH" | tr ':' '\n' | head -8
 echo
 
 # ---- their inference code -------------------------------------------
@@ -182,6 +184,71 @@ APP="$CLONE/applications/segmentation-lemma-tagging"
 echo "==== preparing input ===="
 $PY make_byt5_input.py --out-dir byt5_in --stem "$STEM" --limit "$LIMIT"
 echo
+
+# ---- preflight: run EVERY check, report, do not abort -----------------
+# The point is that one job answers every open question. Each check prints
+# [ok] or [FAIL] and execution continues regardless, so a single log tells us
+# what to fix instead of revealing one problem per five-minute cycle.
+if [ "$PREFLIGHT" = "1" ]; then
+    echo "======================= PREFLIGHT ======================="
+    FAILED=0
+    chk () {  # chk "<label>" <command...>
+        local label="$1"; shift
+        local out
+        if out=$("$@" 2>&1); then
+            echo "[ok]   $label"
+            [ -n "$out" ] && echo "$out" | sed 's/^/         /' | head -6
+        else
+            echo "[FAIL] $label"
+            echo "$out" | sed 's/^/         /' | head -12
+            FAILED=1
+        fi
+    }
+
+    chk "python >= 3.9" $PY -c \
+        "import sys; assert sys.version_info>=(3,9), sys.version; print(sys.version.split()[0])"
+    chk "torch >= 2 and CUDA visible" $PY -c \
+        "import torch; assert int(torch.__version__.split('.')[0])>=2, torch.__version__; assert torch.cuda.is_available(); print(torch.__version__, torch.cuda.get_device_name(0))"
+
+    # pypi and huggingface are tested SEPARATELY: a compute node can reach one
+    # and not the other, and pip already worked, so HF is the real question.
+    chk "network: pypi.org" $PY -c \
+        "import urllib.request; urllib.request.urlopen('https://pypi.org/simple/', timeout=20); print('reachable')"
+    chk "network: huggingface.co" $PY -c \
+        "import urllib.request; urllib.request.urlopen('https://huggingface.co', timeout=20); print('reachable')"
+
+    # The real thing: pull the 2.3 GB checkpoint. Never attempted before.
+    chk "load chronbmm/sanskrit5-multitask" $PY -c "
+import time, transformers
+t=time.time()
+tok=transformers.AutoTokenizer.from_pretrained('chronbmm/sanskrit5-multitask')
+m=transformers.AutoModelForSeq2SeqLM.from_pretrained('chronbmm/sanskrit5-multitask')
+print('loaded in %.1fs, %.0fM params'%(time.time()-t, sum(p.numel() for p in m.parameters())/1e6))"
+
+    echo "         HF cache: $(du -sh "$HF_HOME" 2>/dev/null | cut -f1)"
+
+    # Two sentences end to end through THEIR script. Settles both output-format
+    # unknowns: where the .tsv lands, and what the `analyzed` column looks like.
+    echo
+    echo "---- 2-sentence end-to-end ----"
+    PFD="$SCRATCH/byt5_preflight"; rm -rf "$PFD"; mkdir -p "$PFD"
+    head -n 2 "byt5_in/$STEM.txt" > "$PFD/pf.txt" 2>/dev/null || \
+        printf 'cikṣepa me suto rājan\naham saubhapateḥ senām\n' > "$PFD/pf.txt"
+    cat "$PFD/pf.txt"
+    ( cd "$APP" && $PY run_inf_batch.py --input-folder "$PFD" \
+        --mode segmentation-lemma-morphosyntax --batch-size 2 ) 2>&1 | tail -15
+    echo "---- files produced ----"
+    ls -la "$PFD"
+    echo "---- .tsv verbatim ----"
+    cat "$PFD"/*.tsv 2>/dev/null || echo "(no .tsv produced)"
+
+    echo
+    echo "======================= PREFLIGHT DONE (FAILED=$FAILED) ======="
+    exit $FAILED
+fi
+
+# Real run from here on: now abort on the first error.
+set -e
 
 # ---- inference ------------------------------------------------------
 # Two modes. `segmentation` gives the S number on its own; the combined mode is
