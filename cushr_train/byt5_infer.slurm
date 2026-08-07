@@ -156,8 +156,16 @@ if [ "$VENV_OK" = "0" ]; then
     # wheels use a lower baseline and load here. Installed FIRST so pip cannot
     # pull numpy 2 in as a transitive dependency of torch.
     "$VENV/bin/pip" install --quiet "numpy<2"
+    # torch from the cu126 index, NOT the default. Job 3347274 got
+    # torch 2.13.0+cu130 from PyPI's default wheel, which needs a CUDA 13.0
+    # driver; this node has 12.8 (570.195), so CUDA silently turned off and the
+    # model ran on CPU -- 13.9 s for two sentences, i.e. ~8 h for the corpus.
+    # CUDA minor-version compatibility means a cu126 build runs fine on a 12.8
+    # driver. Override with TORCH_INDEX if the node ever moves to a newer one.
+    "$VENV/bin/pip" install --quiet torch \
+        --index-url "${TORCH_INDEX:-https://download.pytorch.org/whl/cu126}"
     "$VENV/bin/pip" install --quiet \
-        torch transformers sentencepiece accelerate pandas protobuf
+        transformers sentencepiece accelerate pandas protobuf
 fi
 PY="$VENV/bin/python"
 

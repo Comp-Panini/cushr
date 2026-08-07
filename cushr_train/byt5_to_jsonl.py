@@ -28,28 +28,48 @@ from translit import iast_to_slp1
 
 
 def parse_analyzed(text, mode):
-    """-> (words, lemmas, tags), each a list, whatever the mode omits empty.
+    """-> (words, lemmas, tags), parsed from the model's real output format.
 
-    Serialization per the paper (Fig. 1-2): words are space separated, and a
-    morphosyntactic tag is suffixed to its lemma with '_'. Only the LAST
-    underscore is treated as the separator, because Sanskrit lemmas can contain
-    one (compound joins) while the tag codes cannot.
+    OBSERVED FORMAT (job 3347274, mode segmentation-lemma-morphosyntax), which
+    is NOT what the paper's Figure 1-2 suggested:
+
+        cikṣepa_kṣip_Tense=Past|Mood=Ind|Person=3|Number=Sing
+        atha_atha_                       <- indeclinable: empty feature field
+        saubha-_saubha_Case=Cpd          <- compound: trailing hyphen on form
+
+    Three underscore-separated fields, `form_lemma_features` -- not
+    `lemma_TAG`. An earlier version of this function did `rsplit("_", 1)` and
+    would have silently turned `cikṣepa_kṣip_Tense=...` into
+    form=`cikṣepa_kṣip`, tag=`Tense=...`, mangling every token.
+
+    Two further points the real output settled:
+
+    * Features arrive as FULL UD bundles (`Case=Nom|Gender=Masc|Number=Sing`),
+      not the compressed IAST codes (`SNM`) of the paper's figures -- so
+      `data/sanskrit_tags.tsv` is not needed to read this output at all.
+    * `split("_", 2)` (maxsplit) is correct rather than `rsplit`: the feature
+      bundle uses `|` and `=` internally and never `_`, while splitting from
+      the right would break the moment a lemma contained one.
+
+    The trailing `-` on a compound member is stripped, because the reference
+    (`sighum_test_4200.tsv`) writes `sOBa`, not `sOBa-`. That is a deliberate
+    normalisation, not incidental cleanup.
     """
-    toks = text.split()
     words, lemmas, tags = [], [], []
-    for t in toks:
-        if "morphosyntax" in mode and "_" in t:
-            stem, tag = t.rsplit("_", 1)
+    for t in text.split():
+        parts = t.split("_", 2)
+        if len(parts) == 3:
+            form, lemma, feat = parts
+        elif len(parts) == 2:
+            form, lemma, feat = parts[0], parts[1], ""
         else:
-            stem, tag = t, ""
-        if mode == "segmentation":
-            words.append(stem)
-        elif mode.startswith("segmentation-lemma"):
-            words.append(stem)
-            lemmas.append(stem)
-        else:
-            lemmas.append(stem)
-        tags.append(tag)
+            # `segmentation` mode emits bare word forms with no underscores.
+            form, lemma, feat = parts[0], "", ""
+        form = form.rstrip("-")
+        if form:
+            words.append(form)
+        lemmas.append(lemma)
+        tags.append(feat)
     return words, lemmas, tags
 
 
