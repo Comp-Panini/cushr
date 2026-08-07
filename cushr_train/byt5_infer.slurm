@@ -124,18 +124,37 @@ EOF
 # upgrade an env already built from the old one.
 VENV_OK=0
 if [ -x "$VENV/bin/python" ]; then
+    # The probe must test EVERY property the run depends on, or a venv that is
+    # broken in an untested way gets reused and the fix silently never applies.
+    # This has now bitten twice:
+    #   job 3346304 -> probe lacked a python-version test; a 3.6 venv survived
+    #   job 3347295 -> probe lacked a CUDA test; a torch 2.13.0+cu130 venv
+    #                  survived, so the cu126 reinstall never ran and the log
+    #                  still read `cuda: False`
+    # torch.cuda.is_available() is the check that matters: it is false both when
+    # the GPU is absent and when the wheel's CUDA version outruns the driver,
+    # which is exactly the cu130-on-a-12.8-driver case.
     if "$VENV/bin/python" - <<'EOF' 2>/dev/null
 import sys
 assert sys.version_info >= (3, 9), sys.version
 import torch, transformers, pandas          # noqa: F401
 assert int(torch.__version__.split('.')[0]) >= 2, torch.__version__
+assert torch.cuda.is_available(), f"{torch.__version__} cannot see the GPU"
 EOF
     then
         VENV_OK=1
         echo "reusing venv at $VENV ($("$VENV/bin/python" --version 2>&1))"
     else
-        echo "existing venv is unusable ($("$VENV/bin/python" --version 2>&1)," \
-             "or missing/old torch) -- rebuilding"
+        echo "existing venv is unusable -- rebuilding. reason:"
+        "$VENV/bin/python" - <<'EOF' 2>&1 | sed 's/^/    /' | tail -4
+import sys
+print("python", sys.version.split()[0])
+try:
+    import torch
+    print("torch", torch.__version__, "cuda:", torch.cuda.is_available())
+except Exception as e:
+    print("torch import failed:", e)
+EOF
         rm -rf "$VENV"
     fi
 fi
