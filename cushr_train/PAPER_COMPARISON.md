@@ -19,9 +19,14 @@ not share a test set and are not meant to.
 
 - **§1 TransLIST** — word-level segmentation on the SIGHUM 4,200 test set. Both
   papers report there, so this is a true head-to-head.
-- **§3 ByT5-Sanskrit** — the S / L / S+M / L+M / S+L+M ladder. Same metric
-  definitions, **different corpus** (theirs is DCS April-2024). Category
-  alignment, not a head-to-head.
+- **§3 ByT5-Sanskrit** — the S / L / S+M / L+M / S+L+M ladder. **Now a measured
+  head-to-head**: the released `chronbmm/sanskrit5-multitask` was run on these
+  same 4,200 sentences and scored through the identical reference and code path
+  as cuSHR. cuSHR leads on segmentation (91.52 vs 81.38, though see the
+  compound-convention caveat) and loses decisively on lemmatisation
+  (65.62 vs 90.55, beyond cuSHR's own 70.07 ceiling). The paper's published
+  ladder is retained beside it as literature context only, since it is a
+  different corpus.
 
 **Model**: `model95_ctx_ex4200` — `ngrams80 + hybrid_tag + char_bilstm`, 8
 epochs, seed 0, CPU. Trained on `cushr_data_g95.npz` (96.61% gold coverage),
@@ -168,7 +173,7 @@ where they previously differed by 9 points. **cuSHR is no longer
 oracle-limited on this benchmark**; the distance to TransLIST is now model
 quality, not search-space coverage.
 
-## 3. The S/L/M ladder — comparable to ByT5's Table 7 *in category only*
+## 3. The S/L/M ladder — a measured head-to-head
 
 `eval_slm.py` scores at ByT5-Sanskrit's task levels. A cuSHR lattice node is
 `(form, lemma, cng)`, so choosing a path commits to all three at once and the
@@ -180,13 +185,70 @@ cuSHR, and both exist whether or not ingest resolved a path. Verified: the
 pickle's flattened `(lemmas, cng)` sequence matches the TSV word count for
 4,200/4,200.
 
-| level | cuSHR | **ORACLE** | ByT5-Sanskrit *(DCS 2024, Sen)* |
-|---|---:|---:|---:|
-| S | **91.52** | 98.00 | 84.61 |
-| L | 65.62 | 70.07 | **79.88** |
-| S+M | 45.69 | 68.23 | **63.86** |
-| L+M | 45.45 | 68.18 | **62.00** |
-| S+L+M | 45.29 | 67.97 | **61.27** |
+**ByT5 has now been run on these same 4,200 sentences** — the released
+`chronbmm/sanskrit5-multitask`, decoded on an A100, scored through the identical
+`score()` and reference as cuSHR. The column marked *measured* is a genuine
+head-to-head; the *paper* column is retained only as literature context and is a
+different corpus.
+
+| level | cuSHR | **ORACLE** | **ByT5 (measured, same 4,200)** | ByT5 paper *(DCS 2024, Sen)* |
+|---|---:|---:|---:|---:|
+| S | **91.52** | 98.00 | 81.38 | 84.61 |
+| L | 65.62 | 70.07 | **90.55** | 79.88 |
+| L(tol) | 66.05 | 70.64 | **90.74** | – |
+| S+M | 45.69 | 68.23 | n/a | 63.86 |
+| L+M | 45.45 | 68.18 | n/a | 62.00 |
+| S+L+M | 45.29 | 67.97 | n/a | 61.27 |
+
+### L: a clean loss for cuSHR, and the ceiling explains it
+
+**65.62 against 90.55.** ByT5 beats cuSHR's *oracle* (70.07) by more than 20
+points, so no amount of better path selection closes this. Both sides are scored
+against DCS lemmas and both use DCS conventions, so nothing here is confounded —
+this is the architectural limit stated in §2 made quantitative. cuSHR can only
+emit a lemma that exists on a reachable lattice node; a sequence model simply
+generates the string. If one number in this document argues for the seq2seq
+approach over lattice reranking, it is this one.
+
+### S: cuSHR leads by 10 points, and the lead should not be claimed
+
+91.52 against 81.38 — but inspecting all 782 ByT5 failures shows they are
+overwhelmingly **compound-boundary conventions, not segmentation errors**:
+
+```
+ByT5: droRaputraH      gold: droRa putraH     (did not split)
+ByT5: a SaNkamAnaH     gold: aSaNkamAnaH      (over-split)
+ByT5: narADipa         gold: nara aDipa       (did not split)
+```
+
+| failure mode | share of all 4,200 |
+|---|---:|
+| same word count, different forms | 13.2% |
+| predicted fewer words | 3.1% |
+| same characters, different split | 2.0% |
+| **predicted more words** | **0.2%** |
+
+Only 0.2% over-generate. The released multitask checkpoint learned **DCS**
+compound conventions; this reference uses **SIGHUM's**. Their published 93.83 on
+SIGHUM comes from a model *fine-tuned on SIGHUM*, which learned that convention —
+this is the off-the-shelf model, so the S column understates it. cuSHR meanwhile
+is scored against the convention its pipeline was built around.
+
+**The honest reading: cuSHR is competitive on segmentation and clearly behind on
+lemmatisation.** Quoting the S row as a win would be the same error as §1's
+earlier data-efficiency overreach.
+
+### M is still unscored
+
+ByT5 emits full UD bundles (`Case=Nom|Gender=Masc|Number=Sing`); the reference is
+DCS `cng` integers (`29`, `-153`). Scoring them directly would read as total
+tagging failure rather than an unmapped vocabulary, so those rows are `n/a`
+rather than a misleading zero.
+
+One useful surprise from the real output: it is **not** the compressed `SNM`
+codes of the paper's Figure 1, so `data/sanskrit_tags.tsv` is not needed. The
+remaining bridge is `cng` ↔ feature bundle, buildable from the training split
+alone.
 
 > **The ByT5 column is a different corpus.** Their ladder is measured on a DCS
 > April-2024 split (601,403 sentences, 8,398 test), not SIGHUM; their only
@@ -197,9 +259,30 @@ pickle's flattened `(lemmas, cng)` sequence matches the TSV word count for
 > pseudo-paragraphs of up to 512 characters, a different input granularity from
 > our per-sentence decode.
 >
-> **§5 is what would replace this table with a real head-to-head**: fine-tuning
-> ByT5 on our split puts both systems on one corpus, one granularity and one
-> scorer, at every level of this ladder.
+> That caveat applies to the **paper** column only. The *measured* column above
+> already is a head-to-head — same 4,200 sentences, same reference, same
+> `score()`. What §5 would add is a *matched-training* comparison: fine-tuning
+> ByT5 on our split would remove the compound-convention mismatch that depresses
+> its S column here.
+
+**Reproducing the measured column:**
+
+```bash
+# on Lonestar6 -- preflight first, it exits non-zero if any check fails
+sbatch --export=ALL,PREFLIGHT=1 byt5_infer.slurm
+sbatch --export=ALL,LIMIT=20    byt5_infer.slurm     # 20-sentence self-test
+sbatch                          byt5_infer.slurm     # full 4,200
+
+# locally, once byt5_preds_*_sighum_test.jsonl are back
+python eval_slm.py --cache ./cache95_ctx_ex4200 --model model95_ctx_ex4200.npz \
+    --pred-jsonl byt5_preds_segmentation-lemma-morphosyntax_sighum_test.jsonl \
+    --pred-name ByT5
+```
+
+The raw predictions are committed, so the table can be re-scored without
+re-running the model. Two things the run pinned down that the paper's figures do
+not: the output format is `form_lemma_features` (not `lemma_TAG`), and the
+features are full UD bundles (not compressed `SNM` codes).
 
 ### ORACLE is the column that matters
 

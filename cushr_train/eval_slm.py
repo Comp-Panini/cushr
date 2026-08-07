@@ -343,10 +343,13 @@ def main():
               f"external reference\n  and the same score() as cuSHR -- this "
               f"column IS a head-to-head.")
         if not ext_tags_usable:
-            print(f"  M levels are n/a: {args.pred_name} emits compressed IAST "
-                  f"tags (SNM) while the\n  reference is DCS cng integers. "
-                  f"Scoring them directly would read as a total\n  tagging "
-                  f"failure rather than an unmapped vocabulary.")
+            print(f"  M levels are n/a: {args.pred_name} emits full UD feature "
+                  f"bundles\n  (Case=Nom|Gender=Masc|Number=Sing) while the "
+                  f"reference is DCS cng integers\n  (29, -153). Scoring them "
+                  f"directly would read as total tagging failure rather\n  than "
+                  f"an unmapped vocabulary. NOTE the observed output is NOT the "
+                  f"compressed\n  SNM codes of the paper's figures, so "
+                  f"sanskrit_tags.tsv is not needed to bridge it.")
     print(f"\n  ORACLE = our own gold path scored against the same external "
           f"reference, over the {n_oracle:,} sentences that have one.")
     print("  It is a CEILING, and it is not 100: DCS lemmatises participles to "
@@ -354,8 +357,19 @@ def main():
           "S+L+M measure\n  convention agreement as much as model quality. Read "
           "every cuSHR number\n  against its oracle, not against ByT5.")
     print("  (tol) = lemma matched through ingest.lemma_candidates; upper bound.")
-    print("  ByT5 column is a DIFFERENT CORPUS (DCS April-2024, 8,398 test) and "
-          "is\n  shown for category alignment, not as a head-to-head result.")
+    print("  'ByT5 paper' is a DIFFERENT CORPUS (DCS April-2024, 8,398 test), "
+          "shown for\n  category alignment only. It is NOT the --pred-jsonl "
+          "column, which is measured\n  here on these 4,200 sentences.")
+    if n_ext:
+        print(f"\n  CAVEAT on the {args.pred_name} S column: the released "
+              f"chronbmm/sanskrit5-multitask\n  is trained on DCS compound "
+              f"conventions, while this reference uses SIGHUM's.\n  Most of its "
+              f"segmentation errors are compound-boundary disagreements\n"
+              f"  (droRaputraH vs droRa putraH, alOlyena vs a lOlyena), not "
+              f"failures to\n  segment. Their published 93.83 on SIGHUM comes "
+              f"from a model fine-tuned ON\n  SIGHUM; this is the off-the-shelf "
+              f"multitask checkpoint, so the S column\n  understates it. L is "
+              f"unaffected -- both sides use DCS lemma conventions.")
 
     res = [int(s) for s in sids if has_gold[int(s)]]
     print(f"\n  ingest resolved a gold path for {len(res):,} / {len(sids):,} "
