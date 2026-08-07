@@ -111,7 +111,31 @@ if sys.version_info < (3, 9):
         "  Also: rm -rf $SCRATCH/byt5_venv, or the stale env is reused.")
 EOF
 
-if [ ! -d "$VENV" ]; then
+# Rebuild the venv when it is unusable, rather than trusting that the directory
+# existing means it is good. Job 3346304 built one from Python 3.6.8; on the
+# next run the `-d "$VENV"` test passed, the stale env was reused, and the job
+# failed with the identical error -- indistinguishable from "the fix did not
+# land". The venv carries its OWN interpreter, so upgrading the module does not
+# upgrade an env already built from the old one.
+VENV_OK=0
+if [ -x "$VENV/bin/python" ]; then
+    if "$VENV/bin/python" - <<'EOF' 2>/dev/null
+import sys
+assert sys.version_info >= (3, 9), sys.version
+import torch, transformers, pandas          # noqa: F401
+assert int(torch.__version__.split('.')[0]) >= 2, torch.__version__
+EOF
+    then
+        VENV_OK=1
+        echo "reusing venv at $VENV ($("$VENV/bin/python" --version 2>&1))"
+    else
+        echo "existing venv is unusable ($("$VENV/bin/python" --version 2>&1)," \
+             "or missing/old torch) -- rebuilding"
+        rm -rf "$VENV"
+    fi
+fi
+
+if [ "$VENV_OK" = "0" ]; then
     echo "==== creating venv ===="
     python3 -m venv "$VENV"
     "$VENV/bin/pip" install --quiet --upgrade pip
