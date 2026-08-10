@@ -227,7 +227,17 @@ APP="$CLONE/applications/segmentation-lemma-tagging"
 # ---- prepare input (SLP1 -> IAST, order pinned by a manifest) --------
 echo "==== preparing input ===="
 if [ "$TRAINMODE" = "1" ]; then
-    $PY make_byt5_input.py --out-dir byt5_in --stem "$STEM"         --from-split splits95_ex4200.json --split train --sample "$TRAINSAMPLE"
+    # Pre-generated and COMMITTED, not built here. Job 3355718 died at
+    #   FileNotFoundError: '../data/sentence_index_repaired.json'
+    # because building the training input needs sentence_index_repaired.json
+    # and cushr_data_g95.npz, both of which are gitignored and therefore absent
+    # from the cluster -- it only ever has the repo. The .txt + manifest are
+    # 312 KB, so they ship in the repo and this job needs no corpus data at all.
+    # Regenerate locally with:
+    #   python make_byt5_input.py --from-split splits95_ex4200.json     #       --split train --sample 5000 --out-dir byt5_train_input --stem train_tag
+    mkdir -p byt5_in
+    cp byt5_train_input/"$STEM".txt byt5_train_input/"$STEM".manifest.json byt5_in/
+    echo "using committed training input: $(wc -l < byt5_in/$STEM.txt) sentences"
 else
     $PY make_byt5_input.py --out-dir byt5_in --stem "$STEM" --limit "$LIMIT"
 fi
