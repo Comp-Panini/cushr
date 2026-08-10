@@ -72,8 +72,15 @@ cd "$SLURM_SUBMIT_DIR"
 
 LIMIT="${LIMIT:-0}"          # 0 = full 4,200; set to 20 for the self-test
 BATCH="${BATCH:-32}"
+# TRAINMODE=1 runs a sample of TRAINING sentences instead of the test set, to
+# learn ByT5's morphosyntactic tag convention for the cng <-> bundle bridge.
+# Training-only by construction, so the bridge touches no test sentence:
+#     sbatch --export=ALL,TRAINMODE=1 byt5_infer.slurm
+TRAINMODE="${TRAINMODE:-0}"
+TRAINSAMPLE="${TRAINSAMPLE:-5000}"
 STEM="sighum_test"
 [ "$LIMIT" != "0" ] && STEM="sighum_selftest"
+[ "$TRAINMODE" = "1" ] && STEM="train_tag"
 
 echo "==== node / gpu ===="
 hostname
@@ -219,7 +226,11 @@ APP="$CLONE/applications/segmentation-lemma-tagging"
 
 # ---- prepare input (SLP1 -> IAST, order pinned by a manifest) --------
 echo "==== preparing input ===="
-$PY make_byt5_input.py --out-dir byt5_in --stem "$STEM" --limit "$LIMIT"
+if [ "$TRAINMODE" = "1" ]; then
+    $PY make_byt5_input.py --out-dir byt5_in --stem "$STEM"         --from-split splits95_ex4200.json --split train --sample "$TRAINSAMPLE"
+else
+    $PY make_byt5_input.py --out-dir byt5_in --stem "$STEM" --limit "$LIMIT"
+fi
 echo
 
 # ---- preflight: run EVERY check, report, do not abort -----------------
@@ -303,7 +314,10 @@ set -e
 # Two modes. `segmentation` gives the S number on its own; the combined mode is
 # what S+L+M is scored from. Running both means a disagreement between them is
 # visible rather than averaged away.
-for MODE in segmentation segmentation-lemma-morphosyntax; do
+MODES="segmentation segmentation-lemma-morphosyntax"
+# The bridge only needs tags, so TRAINMODE skips the segmentation-only pass.
+[ "$TRAINMODE" = "1" ] && MODES="segmentation-lemma-morphosyntax"
+for MODE in $MODES; do
     echo "==== mode=$MODE ===="
     RUN="byt5_out/$MODE"
     mkdir -p "$RUN"
@@ -319,7 +333,7 @@ done
 
 # ---- convert to the scorer's JSONL ----------------------------------
 echo "==== converting to JSONL ===="
-for MODE in segmentation segmentation-lemma-morphosyntax; do
+for MODE in $MODES; do
     $PY byt5_to_jsonl.py \
         --tsv "byt5_out/$MODE/$STEM.tsv" \
         --manifest "byt5_in/$STEM.manifest.json" \
