@@ -144,6 +144,11 @@ def main():
                          "and cuSHR is where the predictions came from")
     ap.add_argument("--pred-name", default="ByT5",
                     help="column label for --pred-jsonl")
+    ap.add_argument("--lemma-map", default="",
+                    help="lemma_map.json from build_lemma_map.py. Rewrites "
+                         "cuSHR's SHR-convention lemmas into DCS's before "
+                         "scoring. Applied to cuSHR and its ORACLE only, never "
+                         "to --pred-jsonl.")
     args = ap.parse_args()
 
     rows = list(csv.DictReader(open(args.tsv, encoding="utf-8-sig"),
@@ -238,9 +243,29 @@ def main():
         into["S+L+M(tol)"] += s_ok and l_tol and m_ok
         return s_ok, l_strict, m_ok
 
+    # SHR -> DCS lemma rewrite, applied to cuSHR's output only.
+    #
+    # cuSHR reports the lemma on the node it selected, in SHR's convention;
+    # the reference is DCS's. For participles they disagree systematically
+    # (ukta/vac, gata/gam, kfta/kf), and that one pattern costs most of the L
+    # gap. The table is built from the TRAINING split by build_lemma_map.py.
+    #
+    # NOT applied to --pred-jsonl: ByT5 already emits DCS lemmas, so the table
+    # (keyed on SHR strings) could only fire on coincidental collisions and
+    # would corrupt correct output.
+    lemma_map = {}
+    if args.lemma_map:
+        blob = json.load(open(args.lemma_map, encoding="utf-8"))
+        lemma_map = blob["map"] if "map" in blob else blob
+        prov = blob.get("_provenance", {})
+        print(f"lemma map: {len(lemma_map):,} rules from {args.lemma_map}"
+              + (f" (built on {prov.get('train_sentences_used', '?')} train "
+                 f"sentences)" if prov else ""))
+
     def analysis(nodes):
         return ([forms[fid[g]] for g in nodes],
-                [lemmas_v[lid[g]] for g in nodes],
+                [lemma_map.get(lemmas_v[lid[g]], lemmas_v[lid[g]])
+                 for g in nodes],
                 [cng_of.get(g, "") for g in nodes])
 
     # ---- oracle ceiling: score the GOLD PATH itself at every level --------
