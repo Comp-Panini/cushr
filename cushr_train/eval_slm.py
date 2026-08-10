@@ -77,6 +77,7 @@ from dataset import LatticeStore, collate
 from model import BiaffineEdgeScorer
 from train import batches, to_torch
 from viterbi import viterbi, predicted_nodes
+from kbest import kbest, predicted_nodes_k
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "..", "ingest"))
@@ -137,6 +138,18 @@ def main():
     ap.add_argument("--graphml-dir", default="../../SIGHUM_database/After_graphml")
     ap.add_argument("--p-dir", default="../../SIGHUM_database_gold_path/DCS_pick")
     ap.add_argument("--dump", default="")
+    ap.add_argument("--kbest", type=int, default=0,
+                    help="also report recall@k -- is the correct analysis "
+                         "anywhere in the top-k paths? This is a hard upper "
+                         "bound on any reranker, since a reranker can only "
+                         "choose among candidates the base decoder produced. "
+                         "0 (default) leaves the 1-best path untouched.")
+    ap.add_argument("--rerank-ceiling", action="store_true",
+                    help="with --kbest: how much of recall@k is reachable by a "
+                         "reranker scoring ROLE COUNTS. Where a correct "
+                         "candidate has the same role-feature vector as an "
+                         "incorrect one, no such reranker can separate them.")
+    ap.add_argument("--morph-vocab", default="../data/morph_vocabulary.txt")
     ap.add_argument("--pred-jsonl", default="",
                     help="score an EXTERNAL system's predictions (byt5_to_jsonl.py "
                          "output) through this same reference and the same "
@@ -374,13 +387,34 @@ def main():
             continue
         score(*analysis(nodes), g_form, g_lem, g_cng, oracle)
         n_oracle += 1
+    kb_first = {lv: [] for lv in LEVELS} if args.kbest else None
+    n_kb = 0
+    # F3 tallies: can role-count features even distinguish right from wrong?
+    mt = None
+    ceil = Counter()
+    if args.rerank_ceiling:
+        if not args.kbest:
+            raise SystemExit("--rerank-ceiling requires --kbest")
+        from morph_table import MorphTable
+        mt = MorphTable(z, args.morph_vocab)
+
+    def role_key(nodes):
+        c = mt.counts(nodes)
+        return tuple(sorted(c.items())) + (mt.agrees(nodes),)
     for chunk in batches(sids, 128, shuffle=False):
         b = collate(store, chunk)
         t = to_torch(b, dev)
-        pe, pmask, _ = viterbi(t, net(t["feats"], t["src"], t["dst"],
-                                      t.get("ids"), t))
+        w = net(t["feats"], t["src"], t["dst"], t.get("ids"), t)
+        pe, pmask, _ = viterbi(t, w)
         pred_local = predicted_nodes(t, pe, pmask)
         gn = np.asarray(b["global_node"])
+        kb_nodes = None
+        if args.kbest:
+            # A separate k-best decode over the same scores. The 1-best path
+            # above is left exactly as it was so the reported numbers cannot
+            # move; test_kbest.py asserts kbest(K=1) == viterbi() anyway.
+            ke, km, _, kv = kbest(t, w, args.kbest)
+            kb_nodes = predicted_nodes_k(t, ke, km, kv)
         for i, s in enumerate(chunk):
             nodes = sorted((int(gn[x]) for x in pred_local[i]),
                            key=lambda g: int(cstart[g]))
@@ -390,6 +424,37 @@ def main():
             s_ok, l_strict, m_ok = score(p_form, p_lem, p_cng,
                                          g_form, g_lem, g_cng, hit)
             n += 1
+            if kb_first is not None:
+                # First rank at which each level becomes correct. One K=64
+                # decode yields the whole recall curve, since recall@k is just
+                # "did the first hit land before k".
+                first = dict.fromkeys(LEVELS, None)
+                keys_ok, keys_bad = set(), set()
+                for k_i, k_nodes in enumerate(kb_nodes[i]):
+                    kn = sorted((int(gn[x]) for x in k_nodes),
+                                key=lambda g: int(cstart[g]))
+                    kn = [g for g in kn if forms[fid[g]]]
+                    one = Counter()
+                    score(*analysis(kn), g_form, g_lem, g_cng, one)
+                    for lv in LEVELS:
+                        if first[lv] is None and one[lv]:
+                            first[lv] = k_i
+                    if mt is not None:
+                        (keys_ok if one["S+M"] else keys_bad).add(role_key(kn))
+                    elif all(v is not None for v in first.values()):
+                        break     # F3 needs every candidate, not just the hits
+                if mt is not None and first["S+M"] is not None:
+                    ceil["winnable"] += 1
+                    if first["S+M"] > 0:
+                        ceil["needs_rerank"] += 1
+                        # separable iff some correct candidate has a role
+                        # signature no incorrect candidate shares
+                        if keys_ok - keys_bad:
+                            ceil["separable"] += 1
+                for lv, r in first.items():
+                    if r is not None:
+                        kb_first[lv].append(r)
+                n_kb += 1
             if args.dump:
                 dump.append({"id": index[int(s)], "S": s_ok, "L": l_strict,
                              "M": m_ok, "pred_form": p_form, "gold_form": g_form,
@@ -465,6 +530,52 @@ def main():
                      else f"{100 * ext[k] / n_ext:10.2f}")
         line += (f"      {b_:>6.2f}" if b_ is not None else "         --")
         print(line)
+    if kb_first is not None:
+        ks = [k for k in (1, 2, 4, 8, 16, 32, 64) if k <= args.kbest]
+        if ks and ks[-1] != args.kbest:
+            ks.append(args.kbest)
+        print(f"\nrecall@k over {n_kb:,} sentences -- is the correct analysis "
+              f"ANYWHERE in the top-k paths?")
+        print("  A hard upper bound on any reranker: it can only pick from "
+              "these candidates.")
+        print(f"\n{'level':<12}" + "".join(f"{('@' + str(k)):>8}" for k in ks)
+              + f"{'ORACLE':>9}")
+        for lv in LEVELS:
+            r = kb_first[lv]
+            line = f"  {lv:<10}" + "".join(
+                f"{100 * sum(1 for x in r if x < k) / n_kb:8.2f}" for k in ks)
+            line += (f"{100 * oracle[lv] / n_oracle:9.2f}" if n_oracle else "       --")
+            print(line)
+        print(f"\n  recall@1 must equal the cuSHR column above -- kbest(K=1) is "
+              f"asserted\n  identical to viterbi() in test_kbest.py, so any "
+              f"disagreement is a bug.")
+        print("  NOTE this is the TRAINED contextual model. The recall@64 = "
+              "0.3679 in\n  cushr_gpu/BATCHED_BENCHMARK.md is the hand-tuned "
+              "LogLinearScorer (recall@1\n  8.31%) and the two must never be "
+              "quoted together.")
+
+    if ceil:
+        w_, nr, sep = ceil["winnable"], ceil["needs_rerank"], ceil["separable"]
+        print(f"\nF3  role-count separability of the recall@{args.kbest} "
+              f"headroom  (S+M)")
+        print(f"  correct analysis somewhere in the beam : {w_:6,}  "
+              f"({100*w_/n_kb:5.2f}% = recall@{args.kbest})")
+        print(f"    of which rank 1 already has it       : {w_-nr:6,}  "
+              f"({100*(w_-nr)/n_kb:5.2f}% = the current score)")
+        print(f"    of which a reranker must FIND it     : {nr:6,}  "
+              f"({100*nr/n_kb:5.2f}% = the headroom)")
+        print(f"      separable by role counts alone     : {sep:6,}  "
+              f"({100*sep/max(1,nr):5.1f}% of headroom)")
+        print(f"\n  => ceiling for a reranker over role counts: "
+              f"{100*(w_-nr+sep)/n_kb:.2f}% S+M   (now {100*hit['S+M']/n:.2f})")
+        print("  'Separable' means some correct candidate carries a role "
+              "signature that no\n  incorrect candidate in the same beam "
+              "shares. Where none does, the features\n  are tied and no "
+              "weighting of them can break the tie -- this is a property of\n"
+              "  the feature set, not of training, so it bounds the linear "
+              "reranker before\n  one is built. It is still OPTIMISTIC: one "
+              "global weight vector must work\n  for every sentence at once.")
+
     if n_ext:
         print(f"\n  {args.pred_name}: {n_ext:,} sentences from "
               f"{os.path.basename(args.pred_jsonl)}, scored against the SAME "
