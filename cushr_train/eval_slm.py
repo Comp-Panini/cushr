@@ -155,6 +155,13 @@ def main():
                          "--pred-jsonl's UD bundles into DCS cng so M can be "
                          "scored. Applied to the external system only; the "
                          "reference and cuSHR stay in cng.")
+    ap.add_argument("--convention-map", default="",
+                    help="convention_map.json from build_convention_map.py. "
+                         "Rewrites cuSHR's (lemma, cng) PAIR into DCS's "
+                         "conventions, so it fixes L and M together where "
+                         "--lemma-map could only fix L. Applied to cuSHR and "
+                         "its ORACLE only, never to --pred-jsonl. Mutually "
+                         "exclusive with --lemma-map.")
     ap.add_argument("--lemma-map", default="",
                     help="lemma_map.json from build_lemma_map.py. Rewrites "
                          "cuSHR's SHR-convention lemmas into DCS's before "
@@ -294,6 +301,29 @@ def main():
     # NOT applied to --pred-jsonl: ByT5 already emits DCS lemmas, so the table
     # (keyed on SHR strings) could only fire on coincidental collisions and
     # would corrupt correct output.
+    # The two maps COMPOSE rather than compete, and the reason is count
+    # fragmentation. Keying on (lemma, cng) splits a lemma's occurrences across
+    # its cng values, so `kfta` -- common overall -- can fall below the >=3
+    # threshold for every individual pair. Built on 6,000 sentences the joint
+    # table therefore carried only 152 lemma rewrites against the lemma-only
+    # table's 589, and L dropped from 84.00 to 73.83 even as M rose.
+    #
+    # Backoff keeps both: use the joint rule when the pair was seen often
+    # enough (fixes lemma AND cng together), otherwise fall back to the
+    # lemma-only rule (fixes the lemma, leaves cng alone). Strictly better than
+    # either alone -- neither map can make the other's output worse.
+    conv_map = {}
+    if args.convention_map:
+        cb = json.load(open(args.convention_map, encoding="utf-8"))
+        conv_map = {k: tuple(v) for k, v in
+                    (cb["map"] if "map" in cb else cb).items()}
+        cp = cb.get("_provenance", {})
+        print(f"convention map: {len(conv_map):,} (lemma,cng) rules from "
+              f"{args.convention_map}"
+              + (f" ({cp.get('rules_changing_cng')} change the cng, built on "
+                 f"{cp.get('train_sentences_used')} train sentences)"
+                 if cp else ""))
+
     lemma_map = {}
     if args.lemma_map:
         blob = json.load(open(args.lemma_map, encoding="utf-8"))
@@ -304,10 +334,26 @@ def main():
                  f"sentences)" if prov else ""))
 
     def analysis(nodes):
-        return ([forms[fid[g]] for g in nodes],
-                [lemma_map.get(lemmas_v[lid[g]], lemmas_v[lid[g]])
-                 for g in nodes],
-                [cng_of.get(g, "") for g in nodes])
+        form = [forms[fid[g]] for g in nodes]
+        lem = [lemmas_v[lid[g]] for g in nodes]
+        cng = [cng_of.get(g, "") for g in nodes]
+        if conv_map or lemma_map:
+            # Rewrite the PAIR where a joint rule exists. Applying a cng map
+            # independently would be wrong: 71 -> -190 holds only for
+            # participles, so a standalone cng rule would wreck every ordinary
+            # neuter accusative. Where no joint rule exists, back off to the
+            # lemma-only rule and leave cng untouched.
+            out_l, out_c = [], []
+            for l, c in zip(lem, cng):
+                hit = conv_map.get(l + "	" + c)
+                if hit is not None:
+                    out_l.append(hit[0])
+                    out_c.append(hit[1])
+                else:
+                    out_l.append(lemma_map.get(l, l))
+                    out_c.append(c)
+            lem, cng = out_l, out_c
+        return (form, lem, cng)
 
     # ---- oracle ceiling: score the GOLD PATH itself at every level --------
     # Nothing about the model enters this. It is how well our own gold agrees

@@ -1,0 +1,670 @@
+{
+ "_provenance": {
+  "built_from": "training split only",
+  "direction": "(SHR lemma, SHR cng) -> (DCS lemma, DCS cng)",
+  "keys_already_identical": 12056,
+  "keys_ambiguous": 50,
+  "keys_seen": 13564,
+  "min_count": 3,
+  "min_ratio": 0.9,
+  "rules": 163,
+  "rules_changing_cng": 145,
+  "rules_changing_lemma": 152,
+  "splits_file": "splits95_ex4200.json",
+  "train_sentences_used": 6000
+ },
+ "map": {
+  "BIta\t29": [
+   "BI",
+   "-190"
+  ],
+  "BUta\t71": [
+   "BU",
+   "-190"
+  ],
+  "Bagna\t3": [
+   "BaYj",
+   "-190"
+  ],
+  "Binna\t3": [
+   "Bid",
+   "-190"
+  ],
+  "KyA\t-35": [
+   "KyA",
+   "-190"
+  ],
+  "SAs\t-38": [
+   "SAs",
+   "-190"
+  ],
+  "SaNkara\t29": [
+   "SaMkara",
+   "29"
+  ],
+  "SaNkara\t49": [
+   "SaMkara",
+   "49"
+  ],
+  "SaNkara\t69": [
+   "SaMkara",
+   "69"
+  ],
+  "Sita\t101": [
+   "SA",
+   "-190"
+  ],
+  "SoDita\t29": [
+   "SoDay",
+   "-190"
+  ],
+  "Srotavya\t71": [
+   "Sru",
+   "-210"
+  ],
+  "Sruta\t29": [
+   "Sru",
+   "-190"
+  ],
+  "Sruta\t71": [
+   "Sru",
+   "-190"
+  ],
+  "SudDa\t71": [
+   "SuD",
+   "-190"
+  ],
+  "aagata\t29": [
+   "Agam",
+   "-190"
+  ],
+  "aagata\t30": [
+   "Agam",
+   "-190"
+  ],
+  "aagata\t60": [
+   "Agam",
+   "-190"
+  ],
+  "aagata\t71": [
+   "Agam",
+   "-190"
+  ],
+  "aagata\t80": [
+   "Agam",
+   "-190"
+  ],
+  "aarogya\t3": [
+   "Arogya",
+   "3"
+  ],
+  "arindama\t49": [
+   "ariMdama",
+   "49"
+  ],
+  "avAptavat\t29": [
+   "avAp",
+   "-200"
+  ],
+  "avasTita\t71": [
+   "avasTA",
+   "-190"
+  ],
+  "badDa\t29": [
+   "banD",
+   "-190"
+  ],
+  "badDa\t3": [
+   "banD",
+   "-190"
+  ],
+  "bruvARa\t71": [
+   "brU",
+   "-10"
+  ],
+  "dA\t-35": [
+   "dA",
+   "-190"
+  ],
+  "dIpta\t71": [
+   "dIp",
+   "-190"
+  ],
+  "dIpyamAna\t71": [
+   "dIp",
+   "-10"
+  ],
+  "dagDa\t71": [
+   "dah",
+   "-190"
+  ],
+  "dahyamAna\t80": [
+   "dah",
+   "-240"
+  ],
+  "deya\t71": [
+   "dA",
+   "-210"
+  ],
+  "dfzwa\t29": [
+   "dfS",
+   "-190"
+  ],
+  "dfzwa\t71": [
+   "dfS",
+   "-190"
+  ],
+  "gata\t181": [
+   "gam",
+   "-190"
+  ],
+  "gata\t29": [
+   "gam",
+   "-190"
+  ],
+  "gata\t3": [
+   "gam",
+   "-190"
+  ],
+  "gata\t30": [
+   "gam",
+   "-190"
+  ],
+  "gata\t55": [
+   "gam",
+   "-190"
+  ],
+  "gata\t71": [
+   "gam",
+   "-190"
+  ],
+  "gata\t75": [
+   "gam",
+   "-190"
+  ],
+  "gata\t80": [
+   "gam",
+   "-190"
+  ],
+  "gfhIta\t29": [
+   "grah",
+   "-190"
+  ],
+  "grAha\t40": [
+   "grah",
+   "-210"
+  ],
+  "grAhya\t71": [
+   "grah",
+   "-210"
+  ],
+  "hIna\t29": [
+   "hA",
+   "-190"
+  ],
+  "han\t-16": [
+   "han",
+   "-190"
+  ],
+  "han\t-35": [
+   "han",
+   "-190"
+  ],
+  "hata\t80": [
+   "han",
+   "-190"
+  ],
+  "jAnat\t29": [
+   "jYA",
+   "-10"
+  ],
+  "jAta\t151": [
+   "jan",
+   "-190"
+  ],
+  "jAta\t29": [
+   "jan",
+   "-190"
+  ],
+  "jAta\t3": [
+   "jan",
+   "-190"
+  ],
+  "jAta\t71": [
+   "jan",
+   "-190"
+  ],
+  "jIvat\t29": [
+   "jIv",
+   "-10"
+  ],
+  "jYeya\t29": [
+   "jYA",
+   "-210"
+  ],
+  "jYeya\t71": [
+   "jYA",
+   "-210"
+  ],
+  "jita\t3": [
+   "ji",
+   "-190"
+  ],
+  "jita\t30": [
+   "ji",
+   "-190"
+  ],
+  "kArya\t71": [
+   "kf",
+   "-210"
+  ],
+  "kaTita\t29": [
+   "kaTay",
+   "-190"
+  ],
+  "kartavya\t71": [
+   "kf",
+   "-210"
+  ],
+  "kf\t-303": [
+   "kf",
+   "-190"
+  ],
+  "kft\t69": [
+   "kf",
+   "-190"
+  ],
+  "kfta\t29": [
+   "kf",
+   "-190"
+  ],
+  "kfta\t30": [
+   "kf",
+   "-190"
+  ],
+  "kfta\t71": [
+   "kf",
+   "-190"
+  ],
+  "kfta\t80": [
+   "kf",
+   "-190"
+  ],
+  "krudDa\t29": [
+   "kruD",
+   "-190"
+  ],
+  "krudDa\t75": [
+   "kruD",
+   "-190"
+  ],
+  "kurvARa\t29": [
+   "kf",
+   "-10"
+  ],
+  "kurvat\t29": [
+   "kf",
+   "-10"
+  ],
+  "labDa\t3": [
+   "laB",
+   "-190"
+  ],
+  "mUQa\t3": [
+   "muh",
+   "-190"
+  ],
+  "mahant\t3": [
+   "mahA",
+   "2"
+  ],
+  "mata\t29": [
+   "man",
+   "-190"
+  ],
+  "mfta\t71": [
+   "mf",
+   "-190"
+  ],
+  "mohita\t29": [
+   "mohay",
+   "-190"
+  ],
+  "mudita\t80": [
+   "mud",
+   "-190"
+  ],
+  "nazwa\t3": [
+   "naS",
+   "-190"
+  ],
+  "niSita\t101": [
+   "niSA",
+   "-190"
+  ],
+  "nihan\t-16": [
+   "nihan",
+   "-190"
+  ],
+  "nirmita\t71": [
+   "nirmA",
+   "-190"
+  ],
+  "niviS\t-23": [
+   "niveSay",
+   "-23"
+  ],
+  "nivid\t-230": [
+   "niveday",
+   "-230"
+  ],
+  "niyata\t3": [
+   "niyam",
+   "-190"
+  ],
+  "niyata\t71": [
+   "niyam",
+   "-190"
+  ],
+  "niyukta\t29": [
+   "niyuj",
+   "-190"
+  ],
+  "pUjyamAna\t29": [
+   "pUjay",
+   "-240"
+  ],
+  "parantapa\t29": [
+   "paraMtapa",
+   "29"
+  ],
+  "parantapa\t49": [
+   "paraMtapa",
+   "49"
+  ],
+  "parikIrtita\t80": [
+   "parikIrtay",
+   "-190"
+  ],
+  "parivf\t-230": [
+   "parivAray",
+   "-230"
+  ],
+  "parivf\t-49": [
+   "parivAray",
+   "-49"
+  ],
+  "paryAp\t-115": [
+   "paryAp",
+   "-190"
+  ],
+  "patita\t71": [
+   "pat",
+   "-190"
+  ],
+  "pfzwa\t29": [
+   "pracC",
+   "-190"
+  ],
+  "prAp\t-115": [
+   "prAp",
+   "-190"
+  ],
+  "prAp\t-118": [
+   "prAp",
+   "-190"
+  ],
+  "prApta\t29": [
+   "prAp",
+   "-190"
+  ],
+  "prIta\t29": [
+   "prI",
+   "-190"
+  ],
+  "praTita\t71": [
+   "praT",
+   "-190"
+  ],
+  "prakIrtita\t60": [
+   "prakIrtay",
+   "-190"
+  ],
+  "pranam\t-230": [
+   "praRam",
+   "-230"
+  ],
+  "prasanna\t29": [
+   "prasad",
+   "-190"
+  ],
+  "pravizwa\t29": [
+   "praviS",
+   "-190"
+  ],
+  "prokta\t29": [
+   "pravac",
+   "-190"
+  ],
+  "prokta\t71": [
+   "pravac",
+   "-190"
+  ],
+  "rata\t29": [
+   "ram",
+   "-190"
+  ],
+  "sTita\t29": [
+   "sTA",
+   "-190"
+  ],
+  "sTita\t30": [
+   "sTA",
+   "-190"
+  ],
+  "sTita\t71": [
+   "sTA",
+   "-190"
+  ],
+  "sTita\t80": [
+   "sTA",
+   "-190"
+  ],
+  "saNKya\t171": [
+   "saMKya",
+   "171"
+  ],
+  "saYjaya\t29": [
+   "saMjaya",
+   "29"
+  ],
+  "saYjaya\t49": [
+   "saMjaya",
+   "49"
+  ],
+  "sammata\t60": [
+   "samman",
+   "-190"
+  ],
+  "sammata\t71": [
+   "samman",
+   "-190"
+  ],
+  "sampanna\t29": [
+   "sampad",
+   "-190"
+  ],
+  "sampanna\t80": [
+   "sampad",
+   "-190"
+  ],
+  "samprApta\t29": [
+   "samprAp",
+   "-190"
+  ],
+  "sandeha\t29": [
+   "saMdeha",
+   "29"
+  ],
+  "sat\t171": [
+   "as",
+   "-10"
+  ],
+  "sat\t29": [
+   "as",
+   "-10"
+  ],
+  "sevita\t71": [
+   "sev",
+   "-190"
+  ],
+  "smfta\t29": [
+   "smf",
+   "-190"
+  ],
+  "smfta\t60": [
+   "smf",
+   "-190"
+  ],
+  "smfta\t71": [
+   "smf",
+   "-190"
+  ],
+  "smfta\t80": [
+   "smf",
+   "-190"
+  ],
+  "tfpta\t29": [
+   "tfp",
+   "-190"
+  ],
+  "tuzwa\t29": [
+   "tuz",
+   "-190"
+  ],
+  "tuzwa\t80": [
+   "tuz",
+   "-190"
+  ],
+  "tyakta\t3": [
+   "tyaj",
+   "-190"
+  ],
+  "uBa\t34": [
+   "uB",
+   "34"
+  ],
+  "udaahf\t-19": [
+   "udAhf",
+   "-19"
+  ],
+  "ukta\t29": [
+   "vac",
+   "-190"
+  ],
+  "ukta\t3": [
+   "vac",
+   "-190"
+  ],
+  "ukta\t30": [
+   "vac",
+   "-190"
+  ],
+  "ukta\t71": [
+   "vac",
+   "-190"
+  ],
+  "ukta\t75": [
+   "vac",
+   "-190"
+  ],
+  "ukta\t80": [
+   "vac",
+   "-190"
+  ],
+  "uktavat\t29": [
+   "vac",
+   "-200"
+  ],
+  "upasTita\t29": [
+   "upasTA",
+   "-190"
+  ],
+  "vaktavya\t71": [
+   "vac",
+   "-210"
+  ],
+  "varjita\t29": [
+   "varjay",
+   "-190"
+  ],
+  "varjita\t71": [
+   "varjay",
+   "-190"
+  ],
+  "vartamAna\t29": [
+   "vft",
+   "-10"
+  ],
+  "vfta\t29": [
+   "vf",
+   "-190"
+  ],
+  "viBUzita\t71": [
+   "viBUzay",
+   "-190"
+  ],
+  "viBakta\t80": [
+   "viBaj",
+   "-190"
+  ],
+  "viKyA\t-16": [
+   "viKyA",
+   "-190"
+  ],
+  "viSruta\t29": [
+   "viSru",
+   "-190"
+  ],
+  "viSruta\t71": [
+   "viSru",
+   "-190"
+  ],
+  "vidDa\t29": [
+   "vyaD",
+   "-190"
+  ],
+  "vidita\t71": [
+   "vid",
+   "-190"
+  ],
+  "vihita\t71": [
+   "viDA",
+   "-190"
+  ],
+  "vyavasTita\t29": [
+   "vyavasTA",
+   "-190"
+  ],
+  "yukta\t151": [
+   "yuj",
+   "-190"
+  ],
+  "yukta\t29": [
+   "yuj",
+   "-190"
+  ],
+  "yukta\t30": [
+   "yuj",
+   "-190"
+  ],
+  "yukta\t71": [
+   "yuj",
+   "-190"
+  ],
+  "yukta\t80": [
+   "yuj",
+   "-190"
+  ]
+ }
+}
