@@ -144,6 +144,11 @@ def main():
                          "and cuSHR is where the predictions came from")
     ap.add_argument("--pred-name", default="ByT5",
                     help="column label for --pred-jsonl")
+    ap.add_argument("--tag-bridge", default="",
+                    help="tag_bridge.json from build_tag_bridge.py. Translates "
+                         "--pred-jsonl's UD bundles into DCS cng so M can be "
+                         "scored. Applied to the external system only; the "
+                         "reference and cuSHR stay in cng.")
     ap.add_argument("--lemma-map", default="",
                     help="lemma_map.json from build_lemma_map.py. Rewrites "
                          "cuSHR's SHR-convention lemmas into DCS's before "
@@ -312,7 +317,19 @@ def main():
     # ---- external system, scored through the identical reference + score() ---
     ext = Counter()
     n_ext = 0
-    ext_tags_usable = False
+    tag_bridge = {}
+    if args.tag_bridge:
+        tb = json.load(open(args.tag_bridge, encoding="utf-8"))
+        tag_bridge = tb["map"] if "map" in tb else tb
+        prov = tb.get("_provenance", {})
+        print(f"tag bridge: {len(tag_bridge):,} bundles -> cng from "
+              f"{args.tag_bridge}"
+              + (f" (purity {prov.get('purity_over_supported')}%, "
+                 f"{prov.get('sentences_aligned')} train sentences)"
+                 if prov else ""))
+        if prov and not prov.get("usable", True):
+            print("  WARNING: this bridge did not pass its own purity gate")
+    ext_tags_usable = bool(tag_bridge)
     if args.pred_jsonl:
         preds = {}
         with open(args.pred_jsonl, encoding="utf-8") as f:
@@ -330,13 +347,17 @@ def main():
             g_form, g_lem, g_cng = ref[s]
             p_form = rec.get("words") or []
             p_lem = [ig.normalize_lemma(x) for x in (rec.get("lemmas") or [])]
-            # Their tags are compressed IAST codes (SNM); ours are DCS cng
-            # integers. Comparing them directly would score every word wrong and
-            # look like a catastrophic tagging failure, so M is left unscored
-            # until a validated cng<->bundle bridge exists. Passing a sentinel
-            # that can never equal g_cng keeps the M columns honestly at zero
-            # rather than silently plausible.
-            p_cng = ["<unmapped>"] * len(p_form)
+            # Their tags are UD bundles; the reference is DCS cng. With a
+            # validated bridge the bundles are translated INTO cng, so all
+            # three (reference, cuSHR, external) are compared in one space and
+            # the reference is never weakened. Without one, a sentinel that can
+            # never equal g_cng keeps the M columns honestly unscored rather
+            # than silently plausible.
+            if tag_bridge:
+                p_cng = [tag_bridge.get(t, "<unmapped:" + t + ">")
+                         for t in (rec.get("tags") or [])]
+            else:
+                p_cng = ["<unmapped>"] * len(p_form)
             score(p_form, p_lem, p_cng, g_form, g_lem, g_cng, ext)
             n_ext += 1
         if missing:

@@ -66,6 +66,14 @@ def parse_analyzed(text, mode):
             # `segmentation` mode emits bare word forms with no underscores.
             form, lemma, feat = parts[0], "", ""
         form = form.rstrip("-")
+        # "No morphological features" arrives in two shapes:
+        #     atha_atha_        -> feat ''      (3 fields)
+        #     tathā_tathā__     -> feat '_'     (trailing separator)
+        # `_` is the CoNLL-U empty marker, so both mean the same thing. Left
+        # unnormalised they become two distinct bundles: on the training sample
+        # that is 2,330 tokens tagged '_' against 2,194 tagged '', which would
+        # split one class in two and corrupt the cng<->bundle bridge.
+        feat = feat.strip("_").strip()
         if form:
             words.append(form)
         lemmas.append(lemma)
