@@ -94,14 +94,23 @@ head-to-head omparison.
 The 'paper' column is only a literature context and is a
 different corpus.
 
-| level | cuSHR | ORACLE | ByT5 (measured, same 4,200) | ByT5 paper *(DCS 2024, Sen)* |
-|---|---:|---:|---:|---:|
-| S | 91.52 | 98.00 | 81.38 | 84.61 |
-| L | 65.62 | 70.07 | 90.55 | 79.88 |
-| L(tol) | 66.05 | 70.64 | 90.74 | – |
-| S+M | 45.69 | 68.23 | n/a | 63.86 |
-| L+M | 45.45 | 68.18 | n/a | 62.00 |
-| S+L+M | 45.29 | 67.97 | n/a | 61.27 |
+| level | cuSHR | cuSHR +lemma map | ORACLE | ByT5 (measured, same 4,200) | ByT5 paper *(DCS 2024)* |
+|---|---:|---:|---:|---:|---:|
+| S | **91.52** | 91.52 | 98.00 | 81.38 | 84.61 |
+| L | 65.62 | **84.00** | 89.80 | **90.55** | 79.88 |
+| S+M | 45.69 | 45.69 | 68.23 | 67.79 | 63.86 |
+| L+M | 45.45 | 45.55 | 68.35 | **76.50** | 62.00 |
+| S+L+M | 45.29 | 45.38 | 68.09 | **66.90** | 61.27 |
+
+M is scored by translating ByT5's UD bundles into DCS `cng`
+(`build_tag_bridge.py`), so all three columns sit in the reference's own space
+and neither the reference nor cuSHR is weakened to make the comparison possible.
+The direction was chosen by measurement: `bundle -> cng` is 96.69% pure where
+`cng -> bundle` is 93.18%, because DCS's negative `cng` are underspecified —
+one value such as -190 spans many case/gender/number bundles. The bridge is
+built from 1,153 exact-word-aligned **training** sentences; 6.3% of its tokens
+fall in bundles under 90% pure, so ByT5's M carries a point or so of bridge
+noise that cuSHR's, scored natively, does not.
 
 ### L: cuSHR loses, but it is a convention mismatch, not an architectural limit
 
@@ -164,13 +173,21 @@ keeping entries seen ≥3 times with ≥90% consistency, gives **589 rules** —
 the lattice, the model, or the search. The L deficit was cuSHR reporting SHR's
 lemma convention while being scored against DCS's.
 
-**What this does and does not establish.** It raises the *ceiling* from 70.07 to
-89.80; that is measured. The **model's** L score after the same rewrite is not
-yet measured — it should rise similarly, since this is pure output
-post-processing, but that number has to be produced before it is quoted. Ninety
-percent of the L gap being convention rather than capability is the finding; the
-remaining ~0.8 points, plus whatever the model loses against its own ceiling, is
-the real difference.
+**Measured on the model, not just the ceiling.** `eval_slm.py --lemma-map`
+gives **cuSHR L 65.62 → 84.00** and ORACLE 70.07 → 89.80, against ByT5's 90.55.
+The model keeps 93.5% of its ceiling either way (65.62/70.07 vs 84.00/89.80), so
+the rewrite lifts floor and ceiling together rather than flattering the model.
+Sanity check: forcing the same table onto ByT5 fires on 0.05% of its tokens and
+*costs* it 0.12 points, confirming it encodes SHR's convention specifically.
+
+**But read it against M before calling it a fix.** The rewrite changes the lemma
+*string*; it cannot change which node the path selected. Those are the same
+1,438 words where DCS wants a participle read verbally and our path chose the
+nominal reading — so the tag stays nominal and **M does not move** (45.69 →
+45.69, S+L+M 45.29 → 45.38). L is now a fair measure of the lemma cuSHR reports,
+and the unchanged S+L+M is the joint metric correctly refusing to credit an
+analysis that is still wrong underneath. Both statements are true at once, and
+quoting L alone would hide the second.
 
 ### S: cuSHR leads by 10 points, and the lead should not be claimed
 
@@ -294,10 +311,38 @@ nowhere near 100:
   *lattice* can express in SHR's own convention; it does not cap what the system
   can *report* once that convention is mapped.
 
-- **S+M is capped at 68.23 while S is capped at 98.00.** Orphan repair
-  substitutes a same-surface node without regard to `cng`, so repaired words
-  carry SHR's tag rather than DCS's. Most of the gap between S and S+M at the
-  oracle is corpus construction, not model error.
+- **M is capped at ~68 while S is capped at 98.00 — and it is now the binding
+  constraint.** An earlier version blamed orphan repair ("substitutes a
+  same-surface node without regard to `cng`"). **Measured, that is false:
+  0.0% of the 1,544 disagreeing words sit on a `position = -1` orphan node.**
+
+  The real cause is node selection, and it is the *same* disagreement that
+  drives the L gap. Per-word, our gold path's `cng` agrees with DCS 94.57% of
+  the time, which compounds to 0.9457^6.78 = 0.685 against an observed 68.76 —
+  so M behaves exactly like L, a small per-word rate raised to the sentence
+  length. The disagreements are one-directional:
+
+  | ours | DCS | n | | ours | DCS | n |
+  |---|---|---:|---|---|---|---:|
+  | 71 | **-190** | 293 | | 30 | **-190** | 60 |
+  | 29 | **-190** | 268 | | 29 | **-10** | 47 |
+  | 3 | **-190** | 132 | | 80 | **-190** | 45 |
+  | 71 | **-210** | 81 | | 75 | **-190** | 37 |
+
+  DCS wants a **negative** `cng` — its code for a participle read verbally —
+  where our path selects the positive `cng` of the nominal reading. Crosstabbing
+  lemma against tag makes the identity explicit:
+
+  | | words | share |
+  |---|---:|---:|
+  | both lemma and `cng` wrong | 1,438 | 5.05% |
+  | only `cng` wrong | 106 | 0.37% |
+  | only lemma wrong | 34 | 0.12% |
+  | both right | 26,876 | 94.45% |
+
+  **93% of tag errors coincide with a lemma error, and 100% of those want a
+  negative `cng`.** L and M are not two problems. They are one decision — which
+  node the path selects — surfacing in two metrics.
 
 > **Methodological note.** The first version of this diagnostic reported S
 > feasibility at 48.7% against an ORACLE of 98.00 — a contradiction, since a path
