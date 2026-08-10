@@ -94,13 +94,19 @@ head-to-head omparison.
 The 'paper' column is only a literature context and is a
 different corpus.
 
-| level | cuSHR | cuSHR +lemma map | ORACLE | ByT5 (measured, same 4,200) | ByT5 paper *(DCS 2024)* |
+| level | cuSHR | cuSHR +maps | ORACLE +maps | ByT5 (measured, same 4,200) | ByT5 paper *(DCS 2024)* |
 |---|---:|---:|---:|---:|---:|
 | S | **91.52** | 91.52 | 98.00 | 81.38 | 84.61 |
-| L | 65.62 | **84.00** | 89.80 | **90.55** | 79.88 |
-| S+M | 45.69 | 45.69 | 68.23 | 67.79 | 63.86 |
-| L+M | 45.45 | 45.55 | 68.35 | **76.50** | 62.00 |
-| S+L+M | 45.29 | 45.38 | 68.09 | **66.90** | 61.27 |
+| L | 65.62 | **85.40** | **91.75** | 90.55 | 79.88 |
+| S+M | 45.69 | **52.26** | 77.65 | **67.79** | 63.86 |
+| L+M | 45.45 | **52.38** | 78.05 | **76.50** | 62.00 |
+| S+L+M | 45.29 | **51.95** | 77.50 | **66.90** | 61.27 |
+
+**+maps** = the two convention tables described below, both derived from the
+training split only and applied to cuSHR's output. They translate SHR's
+analytical vocabulary into DCS's; they do not change which node the model
+picked. ByT5 needs no such translation — it emits DCS conventions natively — so
+its column is unaffected by them.
 
 M is scored by translating ByT5's UD bundles into DCS `cng`
 (`build_tag_bridge.py`), so all three columns sit in the reference's own space
@@ -173,21 +179,66 @@ keeping entries seen ≥3 times with ≥90% consistency, gives **589 rules** —
 the lattice, the model, or the search. The L deficit was cuSHR reporting SHR's
 lemma convention while being scored against DCS's.
 
-**Measured on the model, not just the ceiling.** `eval_slm.py --lemma-map`
-gives **cuSHR L 65.62 → 84.00** and ORACLE 70.07 → 89.80, against ByT5's 90.55.
-The model keeps 93.5% of its ceiling either way (65.62/70.07 vs 84.00/89.80), so
-the rewrite lifts floor and ceiling together rather than flattering the model.
-Sanity check: forcing the same table onto ByT5 fires on 0.05% of its tokens and
-*costs* it 0.12 points, confirming it encodes SHR's convention specifically.
+**Measured on the model, not just the ceiling.** `--lemma-map` gives cuSHR
+L 65.62 → 84.00 and ORACLE 70.07 → 89.80. Sanity check: forcing the same table
+onto ByT5 fires on 0.05% of its tokens and *costs* it 0.12 points, confirming it
+encodes SHR's convention specifically rather than generically better lemmas.
 
-**But read it against M before calling it a fix.** The rewrite changes the lemma
-*string*; it cannot change which node the path selected. Those are the same
-1,438 words where DCS wants a participle read verbally and our path chose the
-nominal reading — so the tag stays nominal and **M does not move** (45.69 →
-45.69, S+L+M 45.29 → 45.38). L is now a fair measure of the lemma cuSHR reports,
-and the unchanged S+L+M is the joint metric correctly refusing to credit an
-analysis that is still wrong underneath. Both statements are true at once, and
-quoting L alone would hide the second.
+**But the lemma table alone could not touch M** — it rewrites a *string* and
+cannot change which node the path selected, so the tag stayed nominal and S+M
+sat unmoved at 45.69. Since 93% of tag errors coincide with a lemma error and
+100% of those want a negative `cng`, the two fields disagree *together* and want
+one table over the pair.
+
+### The joint convention table, and why the two compose
+
+`build_convention_map.py` keys on **(SHR lemma, SHR cng) → (DCS lemma, DCS cng)**.
+Measured on training data, the pair is *more* functional than the lemma alone,
+because `cng` disambiguates the key:
+
+```
+SHR lemma        -> DCS lemma          99.26% functional over  4,748 keys
+(SHR lemma, cng) -> (DCS lemma, cng)   99.75% functional over 10,259 keys
+```
+
+Typical rules — both fields moving together:
+
+```
+(ukta,  71)  ->  (vac, -190)        (Binna, 3)   ->  (Bid, -190)
+(jita,  30)  ->  (ji,  -190)        (Sita, 101)  ->  (SA,  -190)
+```
+
+**The two tables compose by backoff rather than replacing each other**, and the
+reason is count fragmentation. Keying on the pair splits a lemma's occurrences
+across its `cng` values, so `kfta` — common overall — can fall below the ≥3
+support threshold for every individual pair. Built on 6,000 sentences the joint
+table therefore carried only 152 lemma rewrites against the lemma table's 589,
+and **L fell from 84.00 to 73.83 even as M rose**. Backoff takes the joint rule
+where the pair had support and the lemma-only rule otherwise:
+
+| level | base | lemma only | joint only | **backoff** |
+|---|---:|---:|---:|---:|
+| L | 65.62 | 84.00 | 73.83 | **85.40** |
+| S+M | 45.69 | 45.69 | 52.26 | **52.26** |
+| S+L+M | 45.29 | 45.38 | 51.86 | **51.95** |
+
+Backoff wins everywhere, and L exceeds the lemma-only table (85.40 vs 84.00)
+because joint rules repair lemmas the lemma-only table missed.
+
+**What this does and does not buy.** It is the first thing to move M at all:
+**+6.57 on the model, +9.53 on the oracle**, and ORACLE L (91.75) now exceeds
+ByT5's 90.55. But it translates the *reported analysis*, not the *node chosen* —
+legitimate here because "nominative of the participial stem `dfzwa`" and "past
+passive participle of `√dfS`" are the same claim in two traditions, not two
+competing claims. It does nothing for the 74.3% of model errors that are
+wrong-node syncretism, and the model↔oracle gap actually **widened** (52.26 vs
+77.65) because the ceiling rose faster than the model did. That residual is the
+scorer's problem, not the vocabulary's.
+
+**Caveat on the size of the table.** The joint map is built on 6,000 training
+sentences where the lemma map used 25,000 — two larger builds were killed by the
+environment. More data yields more joint rules, so these are a **floor**, not a
+converged number.
 
 ### S: cuSHR leads by 10 points, and the lead should not be claimed
 
@@ -236,13 +287,13 @@ So instead: score **both systems on the 3,418 of 4,200 sentences (81.4%) where
 ByT5's segmentation already equals the reference**, with
 `eval_slm.py --restrict-agreeing-seg`.
 
-| level | cuSHR | cuSHR +map | ORACLE | ORACLE +map | ByT5 |
+| level | cuSHR | cuSHR +maps | ORACLE | ORACLE +maps | ByT5 |
 |---|---:|---:|---:|---:|---:|
 | S | 94.21 | 94.21 | 99.24 | 99.24 | *100.00 — by construction* |
-| L | 67.26 | **84.84** | 71.14 | 89.90 | **95.99** |
-| S+M | 47.28 | 47.28 | 69.47 | 69.47 | **83.29** |
-| L+M | 46.93 | 47.02 | 69.20 | 69.32 | **82.21** |
-| S+L+M | 46.90 | 46.99 | 69.20 | 69.29 | **82.21** |
+| L | 67.26 | **86.34** | 71.14 | 92.01 | **95.99** |
+| S+M | 47.28 | **54.39** | 69.47 | 79.45 | **83.29** |
+| L+M | 46.93 | **54.24** | 69.20 | 79.36 | **82.21** |
+| S+L+M | 46.90 | **54.10** | 69.20 | 79.27 | **82.21** |
 
 > **Read this table with three caveats.**
 >
@@ -251,7 +302,7 @@ ByT5's segmentation already equals the reference**, with
 >    cannot be anything else. It is shown only to make the construction visible;
 >    it must never be quoted.
 > 2. **The subset is biased easy for both systems.** cuSHR's own numbers rise on
->    it (S 91.52 → 94.21, L 65.62 → 67.26, L+map 84.00 → 84.84) purely because these are the
+>    it (S 91.52 → 94.21, L 65.62 → 67.26, L+maps 85.40 → 86.34) purely because these are the
 >    shorter, less compound-heavy sentences. Absolute values here are not
 >    comparable to the full-set table above.
 > 3. **The comparison between the two systems is still fair**, because both are
@@ -260,15 +311,22 @@ ByT5's segmentation already equals the reference**, with
 
 **What it shows.** Removing the convention penalty makes ByT5 *better*, not
 worse — confirming the S column in the full table understates it. Conditional on
-both systems seeing the same segmentation, ByT5 leads on lemma (95.99 vs 84.84)
-and decisively on joint analysis (**82.21 vs 46.99** at S+L+M).
+both systems seeing the same segmentation, ByT5 leads on lemma (95.99 vs 86.34)
+and decisively on joint analysis (**82.21 vs 54.10** at S+L+M).
 
-The sharpest number here: **ByT5's 82.21 exceeds cuSHR's own ORACLE of 69.29.**
-On these sentences a perfect cuSHR path — one that selected the best node
-available in the lattice at every position — would still lose to ByT5 on joint
-segmentation, lemma and morphology by 13 points. That is the clearest evidence
-in this document for the sequence-generation approach over lattice reranking,
-and it is not explained by conventions, contamination, or the scorer.
+The sharpest number here: **ByT5's 82.21 still exceeds cuSHR's own ORACLE of
+79.27.** On these sentences a perfect cuSHR path — one that selected the best
+node available in the lattice at every position — would still lose to ByT5 on
+joint segmentation, lemma and morphology. That is the clearest evidence in this
+document for the sequence-generation approach over lattice reranking, and it is
+not explained by conventions, contamination, or the scorer.
+
+*Revised down by the convention tables.* Before them this gap read as 13 points
+(82.21 vs an ORACLE of 69.29); it is now **2.9**. Most of what looked like a
+ceiling deficit was untranslated vocabulary, and the remainder is a genuine but
+much narrower lattice-reachability limit. The model↔ceiling gap on this subset
+is far larger than the ceiling↔ByT5 gap — 25.2 points against 2.9 — which puts
+the burden on the scorer, not the lattice.
 
 ### How M is scored across two tagsets
 
@@ -373,14 +431,17 @@ nowhere near 100:
   lemmatisation ability** — the mechanism is edge structure, not a missing lemma.
 
   **This ceiling is real but it is not binding**, which §3's L subsection
-  establishes: a rewrite table derived from the training split alone lifts the
-  oracle from 70.07 to **89.80** by translating SHR's participial stems into
+  establishes: rewrite tables derived from the training split alone lift the
+  oracle from 70.07 to **91.75** by translating SHR's participial stems into
   DCS's verbal roots at output time. The unreachable-node ceiling caps what the
   *lattice* can express in SHR's own convention; it does not cap what the system
   can *report* once that convention is mapped.
 
 - **M is capped at ~68 while S is capped at 98.00 — and it is now the binding
-  constraint.** An earlier version blamed orphan repair ("substitutes a
+  constraint.** (This bullet diagnoses the untranslated ceiling; §3's joint
+  table then acts on the diagnosis and raises it to 77.65. The analysis below is
+  what made that fix findable, so it is kept as measured.) An earlier version
+  blamed orphan repair ("substitutes a
   same-surface node without regard to `cng`"). **Measured, that is false:
   0.0% of the 1,544 disagreeing words sit on a `position = -1` orphan node.**
 
@@ -412,6 +473,12 @@ nowhere near 100:
   negative `cng`.** L and M are not two problems. They are one decision — which
   node the path selects — surfacing in two metrics.
 
+  **This is what the joint `(lemma, cng)` table in §3 was built from**, and it
+  is why a lemma-only table could not move M: the two fields fail together, so
+  they had to be rewritten together. Acting on it took ORACLE S+M from 68.23 to
+  **77.65** and the model from 45.69 to **52.26** — the first change in this
+  document to move M at all.
+
 > **Methodological note.** The first version of this diagnostic reported S
 > feasibility at 48.7% against an ORACLE of 98.00 — a contradiction, since a path
 > the gold already follows must be findable. The cause was deriving
@@ -425,18 +492,27 @@ nowhere near 100:
 
 Reading each level against its own ceiling rather than across the table:
 
-| level | cuSHR / ORACLE |
-|---|---:|
-| S | 91.52 / 98.00 = **93%** of ceiling |
-| L | 65.62 / 70.07 = **94%** |
-| S+M | 45.69 / 68.23 = **67%** |
-| S+L+M | 45.29 / 67.97 = **67%** |
+| level | cuSHR / ORACLE | with the convention tables |
+|---|---:|---:|
+| S | 91.52 / 98.00 = **93%** | 91.52 / 98.00 = **93%** |
+| L | 65.62 / 70.07 = **94%** | 85.40 / 91.75 = **93%** |
+| S+M | 45.69 / 68.23 = **67%** | 52.26 / 77.65 = **67%** |
+| S+L+M | 45.29 / 67.97 = **67%** | 51.95 / 77.50 = **67%** |
 
 Segmentation and lemma selection run close to their ceilings; **morphology does
 not**. Conditional on getting the segmentation right, the model picks the correct
-`cng` for every word in only ~50% of sentences (45.69/91.52), where the gold path
-manages ~70% (68.23/98.00). That is a real, unforced model weakness and the
+`cng` for every word in only ~57% of sentences (52.26/91.52), where the gold path
+manages ~79% (77.65/98.00). That is a real, unforced model weakness and the
 clearest thing to work on next — it is not explained by the corpus.
+
+**The tables do not change that diagnosis; they sharpen it.** The right-hand
+column is the load-bearing observation: translating conventions raises floor and
+ceiling by almost exactly the same factor, leaving the fraction-of-ceiling
+figures unmoved at 93 / 93 / 67 / 67. So the convention gap and the model gap
+are **independent, multiplicative** deficits. Fixing vocabulary was worth +6.6
+absolute points on M and buys nothing further; the remaining 33% is entirely the
+scorer's, and closing it is now worth **+25.4 points** on S+M rather than the
++22.5 estimated before the tables existed.
 
 The tolerant-lemma variants (`L(tol)` 66.05, `S+L+M(tol)` 45.48) match the lemma
 through `ingest.lemma_candidates` rather than exactly. They move the numbers by
@@ -538,7 +614,25 @@ python eval_surface.py --cache ./cache95_ctx_ex4200 --model model95_ctx_ex4200.n
     --index ../data/sentence_index_g95.json --raw ../data/cushr_data_g95.npz   # §1, §2
 python eval_slm.py     --cache ./cache95_ctx_ex4200 --model model95_ctx_ex4200.npz \
     --index ../data/sentence_index_g95.json --raw ../data/cushr_data_g95.npz   # §3
+
+# §3 convention tables -- all three derive from splits95_ex4200.json's TRAIN ids
+# only, and each asserts dev/test membership is absent before writing.
+python build_lemma_map.py      --sample 25000 --out lemma_map.json
+python build_convention_map.py --sample  6000 --out convention_map.json
+python build_tag_bridge.py     --out tag_bridge.json
+
+# the +maps columns, and the ByT5 head-to-head in the same run
+python eval_slm.py --cache ./cache95_ctx_ex4200 --model model95_ctx_ex4200.npz \
+    --pred-jsonl byt5_preds_segmentation-lemma-morphosyntax_sighum_test.jsonl \
+    --pred-name ByT5 --lemma-map lemma_map.json \
+    --convention-map convention_map.json --tag-bridge tag_bridge.json
+# add --restrict-agreeing-seg for the 3,418-sentence agreement subset
 ```
+
+`--convention-map` and `--lemma-map` **compose by backoff, and both should be
+passed**: the joint rule wins where the `(lemma, cng)` pair had support and the
+lemma-only rule applies otherwise. Passing the joint map alone scores *worse* on
+L than the lemma map alone (73.83 vs 84.00) — see §3.
 
 `--materialize` is required: without it the learned embedding tables are never
 persisted, `model*.npz` holds only the scorer, and both eval scripts fail with a
