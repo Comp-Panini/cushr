@@ -221,17 +221,85 @@ from cuSHR reporting SHR's lemma convention while being scored against DCS's
 Quoting either raw column as a win would be the same error as §1's earlier
 data-efficiency overreach.
 
-### M is still unscored
+### Removing the convention confound: the agreement subset
 
-ByT5 emits full UD bundles (`Case=Nom|Gender=Masc|Number=Sing`); the reference is
-DCS `cng` integers (`29`, `-153`). Scoring them directly would read as total
-tagging failure rather than an unmapped vocabulary, so those rows are `n/a`
-rather than a misleading zero.
+The S column above penalises ByT5 for a convention difference rather than an
+error, and that penalty propagates into L and M — when the two systems split a
+compound differently the word sequences stop corresponding, and the sentence is
+lost outright at every level. The clean fix would be a SIGHUM-fine-tuned
+checkpoint, but **none was ever released**: `chronbmm/sanskrit5-multitask` is
+the multitask model, `chronbmm/byt5-sanskrit-analyzer-hackathon` targets the
+*other* benchmark, and the per-dataset checkpoints behind the paper's Table 3
+were not published.
 
-One useful surprise from the real output: it is **not** the compressed `SNM`
-codes of the paper's Figure 1, so `data/sanskrit_tags.tsv` is not needed. The
-remaining bridge is `cng` ↔ feature bundle, buildable from the training split
-alone.
+So instead: score **both systems on the 3,418 of 4,200 sentences (81.4%) where
+ByT5's segmentation already equals the reference**, with
+`eval_slm.py --restrict-agreeing-seg`.
+
+| level | cuSHR | cuSHR +map | ORACLE | ORACLE +map | ByT5 |
+|---|---:|---:|---:|---:|---:|
+| S | 94.21 | 94.21 | 99.24 | 99.24 | *100.00 — by construction* |
+| L | 67.26 | **84.84** | 71.14 | 89.90 | **95.99** |
+| S+M | 47.28 | 47.28 | 69.47 | 69.47 | **83.29** |
+| L+M | 46.93 | 47.02 | 69.20 | 69.32 | **82.21** |
+| S+L+M | 46.90 | 46.99 | 69.20 | 69.29 | **82.21** |
+
+> **Read this table with three caveats.**
+>
+> 1. **ByT5's S of 100.00 is a tautology, not a result.** The subset is
+>    *defined* as the sentences where its segmentation matches, so that cell
+>    cannot be anything else. It is shown only to make the construction visible;
+>    it must never be quoted.
+> 2. **The subset is biased easy for both systems.** cuSHR's own numbers rise on
+>    it (S 91.52 → 94.21, L 65.62 → 67.26, L+map 84.00 → 84.84) purely because these are the
+>    shorter, less compound-heavy sentences. Absolute values here are not
+>    comparable to the full-set table above.
+> 3. **The comparison between the two systems is still fair**, because both are
+>    scored on the identical 3,418 sentences with the identical reference and
+>    scorer. Only the cross-table comparison is invalid.
+
+**What it shows.** Removing the convention penalty makes ByT5 *better*, not
+worse — confirming the S column in the full table understates it. Conditional on
+both systems seeing the same segmentation, ByT5 leads on lemma (95.99 vs 84.84)
+and decisively on joint analysis (**82.21 vs 46.99** at S+L+M).
+
+The sharpest number here: **ByT5's 82.21 exceeds cuSHR's own ORACLE of 69.29.**
+On these sentences a perfect cuSHR path — one that selected the best node
+available in the lattice at every position — would still lose to ByT5 on joint
+segmentation, lemma and morphology by 13 points. That is the clearest evidence
+in this document for the sequence-generation approach over lattice reranking,
+and it is not explained by conventions, contamination, or the scorer.
+
+### How M is scored across two tagsets
+
+ByT5 emits full UD bundles (`Case=Nom|Gender=Masc|Number=Sing`); the reference
+is DCS `cng` integers (`29`, `-153`). Compared directly these agree on nothing,
+which would read as total tagging failure rather than an unmapped vocabulary —
+so M was `n/a` until a validated bridge existed. `build_tag_bridge.py` builds
+one and the M rows above are its output.
+
+Three decisions in it are worth stating, because each could have quietly
+distorted the numbers:
+
+- **Direction, chosen by measurement.** `bundle -> cng` is 96.69% pure;
+  `cng -> bundle` is 93.18%. The latter fails because DCS's *negative* `cng` are
+  underspecified — `-190` ("participle read verbally") legitimately spans many
+  case/gender/number bundles. Split by sign, `cng -> bundle` is 96.80% pure on
+  positive `cng` and only 74.53% on negative.
+- **Mapping into `cng`, not out of it.** The reference and cuSHR keep their
+  native representation, so their published numbers stay valid and only ByT5 is
+  translated. Mapping everything into bundle space would instead have collapsed
+  distinct `cng` together and made M easier for *both* systems.
+- **Alignment by exact word match, not word count.** Equal counts with different
+  splits pair the wrong tag with the wrong `cng`. Requiring the words to match
+  lifted purity from 87.52% to 93.18%.
+
+Built from 1,153 exact-aligned **training** sentences. 6.3% of its tokens sit in
+bundles under 90% pure, so ByT5's M carries roughly a point of bridge noise that
+cuSHR's — scored natively — does not.
+
+A useful surprise from the real output: it is **not** the compressed `SNM` codes
+of the paper's Figure 1, so `data/sanskrit_tags.tsv` was never needed.
 
 > **The ByT5 column is a different corpus.** Their ladder is measured on a DCS
 > April-2024 split (601,403 sentences, 8,398 test), not SIGHUM; their only

@@ -144,6 +144,12 @@ def main():
                          "and cuSHR is where the predictions came from")
     ap.add_argument("--pred-name", default="ByT5",
                     help="column label for --pred-jsonl")
+    ap.add_argument("--restrict-agreeing-seg", action="store_true",
+                    help="score BOTH systems only on sentences where "
+                         "--pred-jsonl's segmentation already equals the "
+                         "reference. Removes the compound-convention penalty "
+                         "from L and M. Biased-easy subset, but identical for "
+                         "both systems.")
     ap.add_argument("--tag-bridge", default="",
                     help="tag_bridge.json from build_tag_bridge.py. Translates "
                          "--pred-jsonl's UD bundles into DCS cng so M can be "
@@ -194,6 +200,36 @@ def main():
           f"external reference ({missing:,} unusable)")
 
     sids = np.asarray(sorted(ref), dtype=np.int64)
+
+    # Optionally restrict to sentences where the external system's segmentation
+    # already equals the reference.
+    #
+    # Motivation: the released chronbmm/sanskrit5-multitask learned DCS compound
+    # conventions while this reference uses SIGHUM's, so most of its S failures
+    # are convention (droRaputraH vs droRa putraH), not mis-segmentation. That
+    # penalty propagates into L and M -- a different split makes the word
+    # sequences non-comparable and the sentence is lost outright. No
+    # SIGHUM-trained checkpoint was ever released, so this subset is the only
+    # way to remove the confound without fine-tuning one.
+    #
+    # BOTH systems are scored on the SAME restricted set, so the comparison
+    # between them stays fair even though the subset is biased easy in absolute
+    # terms. Report it beside the full-set numbers, never instead of them.
+    if args.restrict_agreeing_seg:
+        if not args.pred_jsonl:
+            raise SystemExit("--restrict-agreeing-seg needs --pred-jsonl")
+        _p = {}
+        with open(args.pred_jsonl, encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    r_ = json.loads(line)
+                    _p[str(r_["id"])] = r_
+        keep = [s for s in sids
+                if _p.get(str(index[int(s)]), {}).get("words") == ref[int(s)][0]]
+        print(f"--restrict-agreeing-seg: {len(keep):,} of {len(sids):,} "
+              f"sentences ({100 * len(keep) / len(sids):.1f}%) where "
+              f"{args.pred_name}'s segmentation equals the reference")
+        sids = np.asarray(keep, dtype=np.int64)
 
     # ---- cng per node, straight from the graphml --------------------------
     print("reading cng from graphml for the test sentences ...", flush=True)
