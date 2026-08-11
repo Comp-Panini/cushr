@@ -1,0 +1,130 @@
+=== A: morph + lemma ===
+train 104,159 sentences (99,613 with a correct candidate = 95.64%)
+dev   5,607 sentences (5,322 usable)
+  4,546 train sentences dropped: the beam holds no correct
+  candidate, so they carry no ranking signal.
+
+  865,667 reranker parameters  (dropout 0.3, weight decay 1e-05)
+
+epoch 0 (untrained)  dev top-1  69.93   base  69.93   beam ceiling  94.92   |ctx| 0.0000
+    ep1 15,968/99,613 loss 1.1311
+    ep1 31,968/99,613 loss 1.0853
+    ep1 47,968/99,613 loss 1.0650
+    ep1 63,968/99,613 loss 1.0510
+    ep1 79,968/99,613 loss 1.0414
+    ep1 95,968/99,613 loss 1.0313
+epoch 1  loss 1.0283  dev top-1  70.95  (base  69.93, ceiling  94.92)  w_base 2.001  |ctx| 0.7695  152s
+    saved reranker_full.pt
+    ep2 15,968/99,613 loss 0.9727
+    ep2 31,968/99,613 loss 0.9767
+    ep2 47,968/99,613 loss 0.9786
+    ep2 63,968/99,613 loss 0.9750
+    ep2 79,968/99,613 loss 0.9724
+    ep2 95,968/99,613 loss 0.9710
+epoch 2  loss 0.9728  dev top-1  71.54  (base  69.93, ceiling  94.92)  w_base 1.993  |ctx| 0.8154  149s
+    saved reranker_full.pt
+    ep3 15,968/99,613 loss 0.9495
+    ep3 31,968/99,613 loss 0.9539
+    ep3 47,968/99,613 loss 0.9553
+    ep3 63,968/99,613 loss 0.9587
+    ep3 79,968/99,613 loss 0.9576
+    ep3 95,968/99,613 loss 0.9562
+epoch 3  loss 0.9559  dev top-1  71.95  (base  69.93, ceiling  94.92)  w_base 2.004  |ctx| 0.9137  154s
+    saved reranker_full.pt
+    ep4 15,968/99,613 loss 0.9490
+    ep4 31,968/99,613 loss 0.9459
+    ep4 47,968/99,613 loss 0.9401
+    ep4 63,968/99,613 loss 0.9403
+    ep4 79,968/99,613 loss 0.9376
+    ep4 95,968/99,613 loss 0.9399
+epoch 4  loss 0.9390  dev top-1  72.41  (base  69.93, ceiling  94.92)  w_base 2.001  |ctx| 0.9996  167s
+    saved reranker_full.pt
+    ep5 15,968/99,613 loss 0.9184
+    ep5 31,968/99,613 loss 0.9307
+    ep5 47,968/99,613 loss 0.9234
+    ep5 63,968/99,613 loss 0.9230
+    ep5 79,968/99,613 loss 0.9227
+    ep5 95,968/99,613 loss 0.9198
+epoch 5  loss 0.9198  dev top-1  72.71  (base  69.93, ceiling  94.92)  w_base 2.020  |ctx| 1.2279  166s
+    saved reranker_full.pt
+    ep6 15,968/99,613 loss 0.9004
+    ep6 31,968/99,613 loss 0.9043
+    ep6 47,968/99,613 loss 0.9011
+    ep6 63,968/99,613 loss 0.9004
+    ep6 79,968/99,613 loss 0.8981
+    ep6 95,968/99,613 loss 0.8991
+epoch 6  loss 0.8990  dev top-1  73.03  (base  69.93, ceiling  94.92)  w_base 2.007  |ctx| 1.1871  176s
+    saved reranker_full.pt
+
+best dev top-1 (gold-path match): 73.03
+test  top-1  68.33   base  64.37   beam ceiling  92.66   (+3.96)
+
+  These are GOLD-PATH match, the reranker's own objective.
+  The reported metric is S+M against the external reference --
+  run eval_slm.py --rerank to get it; the two differ by the
+  SHR/DCS convention gap, which the maps handle separately.
+
+=== B: morph only ===
+train 104,159 sentences (99,613 with a correct candidate = 95.64%)
+dev   5,607 sentences (5,322 usable)
+  4,546 train sentences dropped: the beam holds no correct
+  candidate, so they carry no ranking signal.
+
+  77,443 reranker parameters  (dropout 0.3, weight decay 1e-05)
+
+epoch 0 (untrained)  dev top-1  69.93   base  69.93   beam ceiling  94.92   |ctx| 0.0000
+    ep1 15,968/99,613 loss 1.1279
+    ep1 31,968/99,613 loss 1.0823
+    ep1 47,968/99,613 loss 1.0610
+    ep1 63,968/99,613 loss 1.0477
+    ep1 79,968/99,613 loss 1.0381
+    ep1 95,968/99,613 loss 1.0282
+epoch 1  loss 1.0252  dev top-1  70.96  (base  69.93, ceiling  94.92)  w_base 1.997  |ctx| 0.6957  197s
+    saved reranker_morph.pt
+    ep2 15,968/99,613 loss 0.9737
+    ep2 31,968/99,613 loss 0.9774
+    ep2 47,968/99,613 loss 0.9796
+    ep2 63,968/99,613 loss 0.9773
+    ep2 79,968/99,613 loss 0.9752
+    ep2 95,968/99,613 loss 0.9740
+epoch 2  loss 0.9756  dev top-1  71.54  (base  69.93, ceiling  94.92)  w_base 1.991  |ctx| 0.7227  218s
+    saved reranker_morph.pt
+    ep3 15,968/99,613 loss 0.9580
+    ep3 31,968/99,613 loss 0.9607
+    ep3 47,968/99,613 loss 0.9629
+    ep3 63,968/99,613 loss 0.9667
+    ep3 79,968/99,613 loss 0.9657
+    ep3 95,968/99,613 loss 0.9649
+epoch 3  loss 0.9644  dev top-1  71.38  (base  69.93, ceiling  94.92)  w_base 2.003  |ctx| 0.7668  155s
+    ep4 15,968/99,613 loss 0.9628
+    ep4 31,968/99,613 loss 0.9624
+    ep4 47,968/99,613 loss 0.9569
+    ep4 63,968/99,613 loss 0.9570
+    ep4 79,968/99,613 loss 0.9545
+    ep4 95,968/99,613 loss 0.9571
+epoch 4  loss 0.9566  dev top-1  71.89  (base  69.93, ceiling  94.92)  w_base 1.999  |ctx| 0.7922  126s
+    saved reranker_morph.pt
+    ep5 15,968/99,613 loss 0.9447
+    ep5 31,968/99,613 loss 0.9557
+    ep5 47,968/99,613 loss 0.9509
+    ep5 63,968/99,613 loss 0.9519
+    ep5 79,968/99,613 loss 0.9526
+    ep5 95,968/99,613 loss 0.9499
+epoch 5  loss 0.9500  dev top-1  72.09  (base  69.93, ceiling  94.92)  w_base 2.012  |ctx| 1.0093  123s
+    saved reranker_morph.pt
+    ep6 15,968/99,613 loss 0.9475
+    ep6 31,968/99,613 loss 0.9521
+    ep6 47,968/99,613 loss 0.9486
+    ep6 63,968/99,613 loss 0.9470
+    ep6 79,968/99,613 loss 0.9449
+    ep6 95,968/99,613 loss 0.9467
+epoch 6  loss 0.9464  dev top-1  72.18  (base  69.93, ceiling  94.92)  w_base 2.006  |ctx| 0.9046  123s
+    saved reranker_morph.pt
+
+best dev top-1 (gold-path match): 72.18
+test  top-1  67.26   base  64.37   beam ceiling  92.66   (+2.89)
+
+  These are GOLD-PATH match, the reranker's own objective.
+  The reported metric is S+M against the external reference --
+  run eval_slm.py --rerank to get it; the two differ by the
+  SHR/DCS convention gap, which the maps handle separately.

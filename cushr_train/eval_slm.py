@@ -150,6 +150,11 @@ def main():
                          "candidate has the same role-feature vector as an "
                          "incorrect one, no such reranker can separate them.")
     ap.add_argument("--morph-vocab", default="../data/morph_vocabulary.txt")
+    ap.add_argument("--rerank", default="",
+                    help="rerank.py checkpoint. With --kbest K, the top-1 path "
+                         "becomes the candidate the reranker scores highest "
+                         "instead of the one Viterbi scored highest. This is "
+                         "the only flag that CHANGES the cuSHR column.")
     ap.add_argument("--pred-jsonl", default="",
                     help="score an EXTERNAL system's predictions (byt5_to_jsonl.py "
                          "output) through this same reference and the same "
@@ -388,7 +393,7 @@ def main():
         score(*analysis(nodes), g_form, g_lem, g_cng, oracle)
         n_oracle += 1
     kb_first = {lv: [] for lv in LEVELS} if args.kbest else None
-    n_kb = 0
+    n_kb = n_moved = 0
     # F3 tallies: can role-count features even distinguish right from wrong?
     mt = None
     ceil = Counter()
@@ -401,6 +406,38 @@ def main():
     def role_key(nodes):
         c = mt.counts(nodes)
         return tuple(sorted(c.items())) + (mt.agrees(nodes),)
+
+    ranker = None
+    if args.rerank:
+        if not args.kbest:
+            raise SystemExit("--rerank requires --kbest")
+        from rerank import PathRanker
+        ck = torch.load(args.rerank, weights_only=False)
+        ranker = PathRanker(ck["n_morph"], ck["n_lemma"], hidden=ck["hidden"],
+                            use_lemma=ck.get("use_lemma", True))
+        ranker.load_state_dict(ck["state"])
+        ranker.eval()
+        r_morph = np.asarray(z["node_features"]).ravel().astype(np.int64)
+        r_lemma = np.asarray(z["node_lemma_id"]).ravel().astype(np.int64)
+        print(f"reranker: {args.rerank}, rescoring the top {args.kbest} paths")
+
+    def rerank_pick(cand_seqs, cand_scores):
+        """Index of the candidate the reranker scores highest."""
+        T = max(1, max(len(s) for s in cand_seqs))
+        mo = np.zeros((len(cand_seqs), T), dtype=np.int64)
+        le = np.zeros((len(cand_seqs), T), dtype=np.int64)
+        ln = np.ones(len(cand_seqs), dtype=np.int64)
+        for j, seq in enumerate(cand_seqs):
+            if seq:
+                mo[j, :len(seq)] = r_morph[seq]
+                le[j, :len(seq)] = r_lemma[seq]
+                ln[j] = len(seq)
+        with torch.no_grad():
+            sc = ranker(torch.as_tensor(mo), torch.as_tensor(le),
+                        torch.as_tensor(ln),
+                        torch.as_tensor(np.asarray(cand_scores, np.float32)))
+        return int(sc.argmax())
+
     for chunk in batches(sids, 128, shuffle=False):
         b = collate(store, chunk)
         t = to_torch(b, dev)
@@ -413,12 +450,27 @@ def main():
             # A separate k-best decode over the same scores. The 1-best path
             # above is left exactly as it was so the reported numbers cannot
             # move; test_kbest.py asserts kbest(K=1) == viterbi() anyway.
-            ke, km, _, kv = kbest(t, w, args.kbest)
+            ke, km, ksc, kv = kbest(t, w, args.kbest)
             kb_nodes = predicted_nodes_k(t, ke, km, kv)
         for i, s in enumerate(chunk):
             nodes = sorted((int(gn[x]) for x in pred_local[i]),
                            key=lambda g: int(cstart[g]))
             nodes = [g for g in nodes if forms[fid[g]]]
+            # Candidate sequences in the same cleaned form as `nodes`, so the
+            # reranker and the recall@k tally below see identical inputs.
+            cseqs = None
+            if kb_nodes is not None:
+                cseqs = []
+                for loc in kb_nodes[i]:
+                    q = sorted((int(gn[x]) for x in loc),
+                               key=lambda g: int(cstart[g]))
+                    cseqs.append([g for g in q if forms[fid[g]]])
+            if ranker is not None and cseqs:
+                # THE substitution: top-1 becomes the reranker's pick.
+                pick = rerank_pick(cseqs, [float(ksc[i, j])
+                                           for j in range(len(cseqs))])
+                nodes = cseqs[pick]
+                n_moved += pick != 0
             p_form, p_lem, p_cng = analysis(nodes)
             g_form, g_lem, g_cng = ref[int(s)]
             s_ok, l_strict, m_ok = score(p_form, p_lem, p_cng,
@@ -430,10 +482,7 @@ def main():
                 # "did the first hit land before k".
                 first = dict.fromkeys(LEVELS, None)
                 keys_ok, keys_bad = set(), set()
-                for k_i, k_nodes in enumerate(kb_nodes[i]):
-                    kn = sorted((int(gn[x]) for x in k_nodes),
-                                key=lambda g: int(cstart[g]))
-                    kn = [g for g in kn if forms[fid[g]]]
+                for k_i, kn in enumerate(cseqs):
                     one = Counter()
                     score(*analysis(kn), g_form, g_lem, g_cng, one)
                     for lv in LEVELS:
@@ -553,6 +602,14 @@ def main():
               "0.3679 in\n  cushr_gpu/BATCHED_BENCHMARK.md is the hand-tuned "
               "LogLinearScorer (recall@1\n  8.31%) and the two must never be "
               "quoted together.")
+
+    if ranker is not None:
+        print(f"\n  reranker moved the top-1 path on {n_moved:,} / {n:,} "
+              f"sentences ({100*n_moved/n:.1f}%).")
+        print(f"  The cuSHR column above IS the reranked result. Its ceiling is "
+              f"recall@{args.kbest},\n  not the ORACLE: the reranker can only "
+              f"choose among the {args.kbest} candidates the base\n  decoder "
+              f"produced.")
 
     if ceil:
         w_, nr, sep = ceil["winnable"], ceil["needs_rerank"], ceil["separable"]

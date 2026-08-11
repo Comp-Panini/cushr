@@ -1,0 +1,53 @@
+sighum_test_4200.tsv: 4,200 rows, 4,200 with a complete external reference (0 unusable)
+reading cng from graphml for the test sentences ...
+  layout verified against node_form_id on all test sentences
+convention map: 163 (lemma,cng) rules from convention_map.json (145 change the cng, built on 6000 train sentences)
+lemma map: 589 rules from lemma_map.json (built on 25000 train sentences)
+reranker: reranker_full.pt, rescoring the top 16 paths
+
+sentence-level perfect match over 4,200 sentences (all scored, gold path or not)
+level          cuSHR   ORACLE      ByT5-Sanskrit (Sen, DCS 2024)
+  S           92.00   98.00       84.61
+  L           86.14   91.75       79.88
+  L(tol)      86.48   92.25         --
+  S+M         57.36   77.65       63.86
+  L+M         57.52   78.05       62.00
+  L+M(tol)    57.86   78.46         --
+  S+L+M       57.05   77.50       61.27
+  S+L+M(tol)  57.12   77.57         --
+
+recall@k over 4,200 sentences -- is the correct analysis ANYWHERE in the top-k paths?
+  A hard upper bound on any reranker: it can only pick from these candidates.
+
+level             @1      @2      @4      @8     @16   ORACLE
+  S            91.52   93.43   95.10   96.71   97.74    98.00
+  L            85.40   87.64   89.69   91.40   92.33    91.75
+  L(tol)       85.71   87.86   89.83   91.52   92.36    92.25
+  S+M          52.26   60.21   65.93   70.95   73.67    77.65
+  L+M          52.38   60.45   66.33   71.40   74.29    78.05
+  L+M(tol)     52.69   60.67   66.48   71.50   74.31    78.46
+  S+L+M        51.95   59.93   65.79   70.81   73.60    77.50
+  S+L+M(tol)   52.02   60.00   65.81   70.83   73.60    77.57
+
+  recall@1 must equal the cuSHR column above -- kbest(K=1) is asserted
+  identical to viterbi() in test_kbest.py, so any disagreement is a bug.
+  NOTE this is the TRAINED contextual model. The recall@64 = 0.3679 in
+  cushr_gpu/BATCHED_BENCHMARK.md is the hand-tuned LogLinearScorer (recall@1
+  8.31%) and the two must never be quoted together.
+
+  reranker moved the top-1 path on 629 / 4,200 sentences (15.0%).
+  The cuSHR column above IS the reranked result. Its ceiling is recall@16,
+  not the ORACLE: the reranker can only choose among the 16 candidates the base
+  decoder produced.
+
+  ORACLE = our own gold path scored against the same external reference, over the 4,196 sentences that have one.
+  It is a CEILING, and it is not 100: DCS lemmatises participles to the verbal
+  root where SHR gives the participial stem, so L / L+M / S+L+M measure
+  convention agreement as much as model quality. Read every cuSHR number
+  against its oracle, not against ByT5.
+  (tol) = lemma matched through ingest.lemma_candidates; upper bound.
+  'ByT5 paper' is a DIFFERENT CORPUS (DCS April-2024, 8,398 test), shown for
+  category alignment only. It is NOT the --pred-jsonl column, which is measured
+  here on these 4,200 sentences.
+
+  ingest resolved a gold path for 4,196 / 4,200 of these sentences

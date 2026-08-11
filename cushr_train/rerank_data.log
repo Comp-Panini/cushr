@@ -1,0 +1,19 @@
+K=16   label = candidate node sequence equals the gold path
+
+split     sentences  recall@1  recall@16
+    ... 20,000 sentences
+    ... 40,000 sentences
+    ... 60,000 sentences
+    ... 80,000 sentences
+    ... 100,000 sentences
+train       104,159    71.55%     95.64%
+        -> rerank_k16_train.npz  (1,635,764 candidates)
+dev           5,607    69.93%     94.92%
+        -> rerank_k16_dev.npz  (88,104 candidates)
+test          5,681    64.37%     92.66%
+        -> rerank_k16_test.npz  (89,482 candidates)
+
+jackknife check: train recall@1 - dev recall@1 = +1.61 pts
+  Small. The base scorer has not memorised the train split, so
+  its candidate lists there are representative and can be used
+  to train the reranker directly -- no 5-fold decoding needed.

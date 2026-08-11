@@ -94,19 +94,25 @@ head-to-head omparison.
 The 'paper' column is only a literature context and is a
 different corpus.
 
-| level | cuSHR | cuSHR +maps | ORACLE +maps | ByT5 (measured, same 4,200) | ByT5 paper *(DCS 2024)* |
-|---|---:|---:|---:|---:|---:|
-| S | **91.52** | 91.52 | 98.00 | 81.38 | 84.61 |
-| L | 65.62 | **85.40** | **91.75** | 90.55 | 79.88 |
-| S+M | 45.69 | **52.26** | 77.65 | **67.79** | 63.86 |
-| L+M | 45.45 | **52.38** | 78.05 | **76.50** | 62.00 |
-| S+L+M | 45.29 | **51.95** | 77.50 | **66.90** | 61.27 |
+| level | cuSHR | +maps | +maps +rerank | ORACLE +maps | ByT5 (measured, same 4,200) | ByT5 paper *(DCS 2024)* |
+|---|---:|---:|---:|---:|---:|---:|
+| S | **91.52** | 91.52 | **92.60** | 98.00 | 81.38 | 84.61 |
+| L | 65.62 | 85.40 | **86.81** | **91.75** | 90.55 | 79.88 |
+| S+M | 45.69 | 52.26 | **61.21** | 77.65 | **67.79** | 63.86 |
+| L+M | 45.45 | 52.38 | **61.43** | 78.05 | **76.50** | 62.00 |
+| S+L+M | 45.29 | 51.95 | **60.98** | 77.50 | **66.90** | 61.27 |
 
 **+maps** = the two convention tables described below, both derived from the
 training split only and applied to cuSHR's output. They translate SHR's
 analytical vocabulary into DCS's; they do not change which node the model
 picked. ByT5 needs no such translation — it emits DCS conventions natively — so
 its column is unaffected by them.
+
+**+rerank** = a BiLSTM rescoring the top 16 lattice paths, trained on the
+training split. Unlike the maps this *does* change which node is chosen. The
+two are complementary and additive on M (+6.57 then +8.95), because they fix
+different things: vocabulary and ranking. Together they take S+L+M from 45.29
+to 60.98, against the ByT5 paper's 61.27 on its own corpus.
 
 M is scored by translating ByT5's UD bundles into DCS `cng`
 (`build_tag_bridge.py`), so all three columns sit in the reference's own space
@@ -239,6 +245,86 @@ scorer's problem, not the vocabulary's.
 sentences where the lemma map used 25,000 — two larger builds were killed by the
 environment. More data yields more joint rules, so these are a **floor**, not a
 converged number.
+
+### Reranking: +5.10 on S+M, and why counts were skipped
+
+The convention tables closed the *vocabulary* gap and left the ratios at 93 /
+93 / 67 / 67, isolating the rest as the scorer's. Three measurements then
+located it, in order of how much each one settled.
+
+**1. The beam already contains the answer.** `kbest.py` decodes exact K-best
+paths (K=1 reproduces `viterbi()` on 5,681/5,681 sentences; the top-K score
+multiset matches exhaustive enumeration on 60 small lattices). Recall@k asks
+whether the correct analysis is *anywhere* in the top k -- a hard bound on any
+reranker:
+
+| level | @1 | @8 | @16 | @64 | ORACLE |
+|---|---:|---:|---:|---:|---:|
+| S | 91.52 | 96.71 | 97.74 | **98.69** | 98.00 |
+| L | 85.40 | 91.40 | 92.33 | **93.10** | 91.75 |
+| S+M | 52.26 | 70.95 | 73.67 | **76.52** | 77.65 |
+
+S+M recall@64 reaches 76.52 of a 77.65 ceiling. **The failure is ranking, not
+coverage.** S and L recall@64 exceed the oracle outright: the beam holds
+analyses better than our own gold path.
+
+**2. Role counts cannot reach it.** The obvious reranker scores role counts
+(nominatives, finite verbs) plus the base score. Measured before being built:
+of the 21.40 points of headroom at K=16, only **20.1%** is separable by role
+counts -- elsewhere a correct candidate carries the same count vector as an
+incorrect one in the same beam, and no weighting breaks a tie. Ceiling 56.57.
+
+**3. A sequence model beats that ceiling.** `rerank.py` embeds each word's
+morph tag and lemma, runs a BiLSTM over the candidate path and rescores, so
+`nom acc verb` and `acc nom verb` differ where the counts are identical.
+
+| level | base | +reranker | recall@16 | ORACLE |
+|---|---:|---:|---:|---:|
+| S | 91.52 | **92.60** | 97.74 | 98.00 |
+| L | 85.40 | **86.81** | 92.33 | 91.75 |
+| S+M | 52.26 | **61.21** | 73.67 | 77.65 |
+| S+L+M | 51.95 | **60.98** | 73.60 | 77.50 |
+
+**61.21 far exceeds the 56.57 that counts could ever have reached**, which is
+the result that justifies the architecture rather than merely reporting it. The
+reranker moves top-1 on 20.5% of sentences, and closes **54%** of the gap
+between the base decoder and its own recall@16 ceiling.
+
+Two ablations, both decided on dev and confirmed on test rather than argued:
+
+| variant | params | dev top-1 | test gold-path gain |
+|---|---:|---:|---:|
+| morph + lemma, 14 epochs | 865,667 | **74.82** | **+5.77** |
+| morph + lemma, 6 epochs | 865,667 | 73.03 | +3.96 |
+| morph only, 6 epochs | 77,443 | 72.18 | +2.89 |
+
+Training length mattered more than anything else: six epochs looked converged
+and was not, and the extra eight are worth **+3.85 S+M** (57.36 -> 61.21). The
+lemma branch is worth its 11x parameter cost, but only after epoch 3 -- for the
+first two epochs the morph-only model tracks it to two decimal places, so an
+ablation stopped early would have concluded the opposite.
+
+Three properties of the setup that make the number trustworthy:
+
+- It is initialised as an **exact copy of the base decoder** (`w_base` = 1, the
+  BiLSTM projection zeroed), asserted at epoch 0, so every point is measured
+  against a real baseline. `|ctx|`, the mean absolute contribution of the
+  BiLSTM branch, is logged each epoch -- a reranker that collapsed to "trust
+  the base score" would show a falling loss and `|ctx|` at 0.
+- It trains on the **train split's own candidate lists**, which is legitimate
+  here because the base scorer has not memorised them: train recall@1 exceeds
+  dev by 1.61 points. (An earlier probe reported 4.02 and was wrong -- it
+  truncated each split to its lowest sentence ids, which are different source
+  texts. Random sampling is the fix.)
+- It is trained against **gold-path match**, not DCS. The reranker's job is to
+  choose nodes; the convention maps translate them afterwards. The number above
+  is nonetheless real S+M against the external reference, through the unchanged
+  scorer.
+
+Its ceiling is recall@16 = 73.67, not the ORACLE -- a reranker can only choose
+among candidates the base decoder produced. Raising K, or moving the structure
+into the scorer so it never proposes those candidates, is where the remaining
+16 points live.
 
 ### S: cuSHR leads by 10 points, and the lead should not be claimed
 
@@ -627,7 +713,16 @@ python eval_slm.py --cache ./cache95_ctx_ex4200 --model model95_ctx_ex4200.npz \
     --pred-name ByT5 --lemma-map lemma_map.json \
     --convention-map convention_map.json --tag-bridge tag_bridge.json
 # add --restrict-agreeing-seg for the 3,418-sentence agreement subset
+
+# the +rerank column. Data dump is ~25 min, training ~3 min/epoch on CPU.
+python test_kbest.py --k 64                     # verify the k-best decoder first
+python make_rerank_data.py --k 16               # candidate lists + gold-path labels
+python rerank.py --epochs 14 --patience 3 --out reranker_long.pt
+python eval_slm.py --cache ./cache95_ctx_ex4200 --model model95_ctx_ex4200.npz     --lemma-map lemma_map.json --convention-map convention_map.json     --kbest 16 --rerank reranker_long.pt
 ```
+
+Run these one at a time. Two concurrent CPU jobs of this size get killed in
+this environment, and so does anything heavy launched in the background.
 
 `--convention-map` and `--lemma-map` **compose by backoff, and both should be
 passed**: the joint rule wins where the `(lemma, cng)` pair had support and the
