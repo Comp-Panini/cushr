@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 
 # python to Cuda bridge
-# produces model_biaffine.bin that will be read by cuda scorer
-# edge_score.npy precomputes biaffine score for every edge so gpu doesnt have to do it
+# produces model_biaffine.bin, the CSB3 weight file read by BOTH the C++
+# BiaffineScorer (cushr_cpu/src/scorer.cpp) and the K4 CUDA kernels
+# (cushr_gpu/score_edges.cu).
+#
+# --edge-scores writes edge_score.npy, a precomputed biaffine score for every
+# edge. That used to be how the GPU got its scores. As of week 10 it is NOT:
+# K4 computes them on the device from the .bin, and cushr_batched never reads
+# this file. It is still worth producing for check_export.py, which uses it to
+# verify the exported weights reproduce the trained model's edge scores.
 
 import argparse
 import struct

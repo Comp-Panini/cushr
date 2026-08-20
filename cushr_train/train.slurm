@@ -52,8 +52,10 @@ python3 train.py \
     --out model_biaffine.npz \
     --log train_log.json
 
-# Flat blob for cushr_cpu's BiaffineScorer, plus the full per-edge score table
-# that week 10 uploads as GpuLattice::edge_score.
+# Flat blob for cushr_cpu's BiaffineScorer and for the week-10 K4 kernels, which
+# read the same CSB3 .bin. The --edge-scores table is NOT what the GPU consumes
+# -- K4 computes edge scores on the device -- but check_export.py uses it to
+# confirm the exported weights reproduce the trained model.
 python3 export_weights.py \
     --model model_biaffine.npz \
     --bin model_biaffine.bin \

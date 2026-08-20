@@ -83,13 +83,24 @@ static std::vector<int> strip_boundaries(const std::vector<int>& path) {
 static std::unique_ptr<EdgeScorer> make_scorer(const std::string& name,
                                                const Lattice& lat,
                                                const std::vector<float>& weights,
-                                               float bias) {
+                                               float bias,
+                                               const std::string& model_path) {
     if (name == "uniform") return std::make_unique<UniformScorer>();
     if (name == "length")  return std::make_unique<LengthScorer>();
     if (name == "log_linear") {
         std::vector<float> w = weights;
         if (w.empty()) w.assign(lat.feat_dim(), 1.0f);
         return std::make_unique<LogLinearScorer>(std::move(w), bias);
+    }
+    // Week 10 parity with host_driver_batched.cu. K2 has no K4: it scores
+    // on the host and uploads, which is exactly what makes it the reference
+    // the device path is compared against.
+    if (name == "biaffine") {
+        if (model_path.empty()) {
+            std::fprintf(stderr, "--scorer biaffine requires --model <CSB3 .bin>\n");
+            std::exit(1);
+        }
+        return std::make_unique<BiaffineScorer>(BiaffineScorer::load(model_path));
     }
     std::fprintf(stderr, "unknown scorer '%s'\n", name.c_str());
     std::exit(1);
@@ -98,7 +109,8 @@ static std::unique_ptr<EdgeScorer> make_scorer(const std::string& name,
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::fprintf(stderr,
-            "usage: %s <lattice.npz> [--scorer uniform|length|log_linear]\n"
+            "usage: %s <lattice.npz> [--scorer uniform|length|log_linear|biaffine]\n"
+            "          [--model m.bin]   (required by --scorer biaffine)\n"
             "          [--weights w0,w1,...] [--bias b] [--K 1,5,16,32,64]\n"
             "          [--limit N | -1 for all] [--csv out.csv]\n", argv[0]);
         return 1;
@@ -111,6 +123,7 @@ int main(int argc, char** argv) {
     float bias = 0.0f;
     int   limit = 1000;
     std::string csv_path;                   // when set, append one row per K
+    std::string model_path;                 // CSB3 weights for --scorer biaffine
     std::vector<int> Ks = {1, 5, 16, 32, 64};   // default beam widths to check
 
     for (int i = 2; i < argc; ++i) {
@@ -119,6 +132,7 @@ int main(int argc, char** argv) {
         else if (a == "--bias"   && i + 1 < argc) bias = std::atof(argv[++i]);
         else if (a == "--limit"  && i + 1 < argc) limit = std::atoi(argv[++i]);
         else if (a == "--csv"    && i + 1 < argc) csv_path = argv[++i];
+        else if (a == "--model"  && i + 1 < argc) model_path = argv[++i];
         else if (a == "--weights" && i + 1 < argc) {
             char* s = argv[++i];
             for (char* tok = std::strtok(s, ","); tok; tok = std::strtok(nullptr, ","))
@@ -139,7 +153,7 @@ int main(int argc, char** argv) {
     const int S = lat.num_sentences();
     std::printf("  nodes=%d edges=%d sentences=%d feat_dim=%d\n", N, E, S, lat.feat_dim());
 
-    auto scorer = make_scorer(scorer_name, lat, weights, bias);
+    auto scorer = make_scorer(scorer_name, lat, weights, bias, model_path);
     std::printf("  scorer=%s\n", scorer->name().c_str());
     if (!lat.has_explicit_gold())
         std::fprintf(stderr, "  WARNING: npz has no explicit gold paths; "

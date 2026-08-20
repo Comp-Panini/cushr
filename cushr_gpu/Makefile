@@ -30,7 +30,7 @@ GPU_SRC  = viterbi_k1.cu host_driver.cu
 # Device + test sources for the unit-test binary.
 TEST_SRC = viterbi_k1.cu tests/test_viterbi_k1.cu
 
-.PHONY: all test test-kbest bench clean
+.PHONY: all test test-kbest test-score bench clean
 
 all: cushr_viterbi_k1
 
@@ -43,9 +43,10 @@ cushr_viterbi_tests: $(TEST_SRC)
 	$(NVCC) $(NVCCFLAGS) -o $@ $(TEST_SRC) $(LDLIBS)
 
 # Run BOTH the K=1 (viterbi) and K-best unit suites.
-test: cushr_viterbi_tests cushr_kbest_tests
+test: cushr_viterbi_tests cushr_kbest_tests cushr_score_tests
 	./cushr_viterbi_tests
 	./cushr_kbest_tests
+	./cushr_score_tests
 
 # ---- Week-6 K-best (K2) --------------------------------------------------
 # K-best decode driver: runs the warp-level k-best merge over every sentence
@@ -65,9 +66,20 @@ test-kbest: cushr_kbest_tests
 # ---- Week-8 batched (K3 sweep + K5 paths) --------------------------------
 # Batched decode driver: one global topo sweep over memory-bounded sentence
 # chunks (--batch N), with top-K path reconstruction and CPU score-equivalence.
-BATCHED_SRC = kbest_merge_warp.cu host_driver_batched.cu
+BATCHED_SRC = kbest_merge_warp.cu score_edges.cu host_driver_batched.cu
 cushr_batched: $(BATCHED_SRC) $(CPU_SRC)
 	$(NVCC) $(NVCCFLAGS) -o $@ $(BATCHED_SRC) $(CPU_SRC) $(LDLIBS)
+
+# ---- Week-10 K4 (CP-5): learned scoring on the device -------------------
+# score_edges.cu is linked into cushr_batched above; --scorer biaffine --k4
+# twopass|fused picks the device path. The unit tests need neither the CPU
+# library nor an .npz.
+SCORE_TEST_SRC = score_edges.cu tests/test_score_edges.cu
+cushr_score_tests: $(SCORE_TEST_SRC)
+	$(NVCC) $(NVCCFLAGS) -o $@ $(SCORE_TEST_SRC) $(LDLIBS)
+
+test-score: cushr_score_tests
+	./cushr_score_tests
 
 # ---- Week-7 benchmarking (CP-4) ------------------------------------------
 # The actual runs happen on the cluster via slurm (nvcc/ncu are not local):
@@ -82,4 +94,4 @@ bench: cushr_kbest
 	@echo "then: python make_benchmark_md.py"
 
 clean:
-	rm -f cushr_viterbi_k1 cushr_viterbi_tests cushr_kbest cushr_kbest_tests cushr_batched
+	rm -f cushr_viterbi_k1 cushr_viterbi_tests cushr_kbest cushr_kbest_tests cushr_batched cushr_score_tests
