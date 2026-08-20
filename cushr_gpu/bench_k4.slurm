@@ -117,14 +117,24 @@ echo
 # scorer, so this is a tolerance comparison (--tol, default 1e-4) rather than
 # the bit-exact one the log_linear path uses; the path and count comparisons
 # are still exact.
+#
+# --K 32 ONLY here, not KLIST. host_driver_batched.cu:366 runs
+#     cpu.decode(lat, K, *scorer)
+# over ALL 119,503 sentences once PER K, regardless of how small --check is.
+# With the biaffine that is the most expensive thing in this job by far, and
+# passing the 7-value KLIST would mean 7 full-corpus CPU decodes per smoke run
+# (14 across the two). K4 correctness does not depend on K at all -- K4 writes
+# edge_score, K3 consumes it -- so one K proves exactly as much for a seventh
+# of the cost. The K sweep happens in the --check 0 throughput rows below,
+# where the CPU oracle never runs.
 echo "==== smoke: biaffine + K4 twopass, batch=8192, check 2000 ===="
 ./cushr_batched "$DATA" --scorer biaffine --model "$MODEL" --k4 twopass \
-    --K "$KLIST" --batch 8192 --check 2000 --csv k4_bench_smoke.csv
+    --K 32 --batch 8192 --check 2000 --csv k4_bench_smoke.csv
 echo
 
 echo "==== smoke: biaffine + K4 fused (must match twopass exactly) ===="
 ./cushr_batched "$DATA" --scorer biaffine --model "$MODEL" --k4 fused \
-    --K "$KLIST" --batch 8192 --check 2000 --csv k4_bench_smoke_fused.csv
+    --K 32 --batch 8192 --check 2000 --csv k4_bench_smoke_fused.csv
 echo
 
 # ---- the four throughput rows, whole-corpus sweep ----
