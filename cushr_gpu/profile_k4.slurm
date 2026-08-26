@@ -79,7 +79,7 @@ module load cuda
 
 cd "$SLURM_SUBMIT_DIR"
 
-DATA=/scratch/11503/njhavar/cushr/data/g95_ctx_mat.npz
+DATA=/work/11503/njhavar/ls6/cushr/data/g95_ctx_mat.npz
 MODEL=../cushr_train/model95_ctx.bin
 
 TAG="${TAG:-$(date +%Y%m%d_%H%M)}"

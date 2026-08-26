@@ -1,0 +1,22 @@
+=== K4 score_edges tests ===
+headline dims (nodes=4096 fan=3 feat_dim=192 hidden=128)
+  [ ok ]  twopass matches the host reference (worst rel 0.000002)
+  [ ok ]  fused matches the host reference (worst rel 0.000002)
+  [ ok ]  fused == twopass bitwise (0 differing edges)
+ragged dims (nodes=1000 fan=5 feat_dim=43 hidden=100)
+  [ ok ]  twopass matches the host reference (worst rel 0.000000)
+  [ ok ]  fused matches the host reference (worst rel 0.000000)
+  [ ok ]  fused == twopass bitwise (0 differing edges)
+narrow hidden (nodes=300 fan=2 feat_dim=16 hidden=8)
+  [ ok ]  twopass matches the host reference (worst rel 0.000000)
+  [ ok ]  fused matches the host reference (worst rel 0.000000)
+  [ ok ]  fused == twopass bitwise (0 differing edges)
+tiny (nodes=1 fan=3 feat_dim=32 hidden=32)
+  [ ok ]  twopass matches the host reference (worst rel 0.000000)
+  [ ok ]  fused matches the host reference (worst rel 0.000000)
+  [ ok ]  fused == twopass bitwise (0 differing edges)
+weight loader
+  [ ok ]  CSB3 file round-trips
+  [ ok ]  CSB2 file is rejected (matches cushr_cpu/src/scorer.cpp)
+  [ ok ]  a file with no recognised magic is rejected
+=== all passed ===

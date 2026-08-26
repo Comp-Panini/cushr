@@ -1,0 +1,8 @@
+K,n_sentences,n_gold,recall_at_K,us_per_sent_loop,us_per_sent_kernel,sent_per_sec_kernel,gpu_table_MB,gpu_used_MB,score_mismatch,count_mismatch,n_check,n_chunks,n_launches,us_per_sent_k4,us_per_sent_k3,k4_mode,scorer
+1,119503,0,NA,13.839,13.839,72262.0,68.484,72.000,0,0,0,1,363,12.839,1.000,twopass,biaffine
+5,119503,0,NA,13.839,13.838,72262.7,273.935,276.000,0,0,0,1,363,12.831,1.007,twopass,biaffine
+16,119503,0,NA,13.848,13.847,72216.1,838.927,840.000,0,0,0,1,363,12.832,1.015,twopass,biaffine
+24,119503,0,NA,13.854,13.854,72183.6,1249.830,1254.000,0,0,0,1,363,12.831,1.023,twopass,biaffine
+32,119503,0,NA,13.837,13.837,72270.5,1660.732,1662.000,0,0,0,1,363,12.826,1.010,twopass,biaffine
+48,119503,0,NA,17.125,17.124,58395.9,2482.538,2484.000,0,0,0,1,363,12.818,4.307,twopass,biaffine
+64,119503,0,NA,17.226,17.226,58052.1,3304.344,3306.000,0,0,0,1,363,12.817,4.409,twopass,biaffine

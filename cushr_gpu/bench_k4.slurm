@@ -90,7 +90,7 @@ module load cuda
 cd "$SLURM_SUBMIT_DIR"
 
 # The MATERIALIZED lattice (prerequisite 1), not the raw one.
-DATA=/scratch/11503/njhavar/cushr/data/g95_ctx_mat.npz
+DATA=/work/11503/njhavar/ls6/cushr/data/g95_ctx_mat.npz
 MODEL=../cushr_train/model95_ctx.bin
 
 KLIST=1,5,16,24,32,48,64
