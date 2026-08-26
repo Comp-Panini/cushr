@@ -1,11 +1,4 @@
 
-// compute this formula for every edge in the lattice
-// score(u -> v) = < W_s x_u , W_d x_v > + b
-//
-// x_u, x_v are node feature vectors (feat_dim wide; 192 for the headline
-// model). W_s, W_d are [hidden x feat_dim] = [128 x 192]. 
-//Project both endpoints, take dot product of the two length-`hidden` results, add a bias
-
 #include "score_edges.cuh"
 
 #include <cstdint>    
@@ -65,7 +58,6 @@ BiaffineWeights BiaffineWeights::load(const std::string& bin_path) {
     w.bias = bias;
 
     const size_t n = (size_t)hidden * (size_t)feat_dim;
-    // we have our two 128x192 matrices
     // resize() allocates heap memory for 24576 floats before calling the in.read()
     // the raw bytes are put into src_proj and dest_proj
     w.src_proj.resize(n); 
@@ -112,7 +104,9 @@ __device__ __forceinline__ float row_dot(const float* __restrict__ W, int row, c
 
 }  // namespace
 
-// K4a: one warp per node, lane l owns hidden dims l, l+32, ...
+// K4a: node calculator. takes the 192 feature representation and compresses it into two smaller 128-feature vectors
+// one of them is the source and one is the destination
+// one warp per node, lane l owns hidden dims l, l+32, ...
 // each warp of 32 threads processes 1 node
 // thread 0 owns the hidden dimensions 0, 32, 64, 96
 // the warp loads the node's 192-length feature vector x into fast shared memory
@@ -155,7 +149,9 @@ __global__ void project_nodes(GpuBiaffine bf, int tile_begin, int tile_end) {
     }
 }
 
-// K4b: one warp per reverse-CSR slot
+// K4b: edge scorer, scoring edges between words, relies on K4a
+// looks up the source vector and dest vector for the start and end nodes, multiply, add bias, output final edge score
+// one warp per reverse-CSR slot
 // tile_dst is an array containing IDs of destination nodes
 // slot0 tells kernel where to start readinf from arrays if batched
 // n_slots = total num edges this kernel will process
@@ -199,15 +195,17 @@ __global__ void score_edges_twopass(GpuBiaffine bf, const int* __restrict__ in_c
     }
 }
 
-// K4, fusion of project_nodes and score_edges_twopass
+// K4, does both steps at once
+// for every edge, grabs the 192 feature data for both endpoints, does all math and writes final score
+// lot of extra math
 // skips intermediate steps, needs 192-len feature vectors for both endpoints
 __global__ void score_edges_fused(GpuBiaffine bf, const int* __restrict__ in_col_idx, const int* __restrict__ in_edge_id,
                                   const int* __restrict__ tile_dst, int slot0, int n_slots, float* __restrict__ edge_score) {
     
     // shared memory fast
     extern __shared__ float smem[];
-    const int lane  = threadIdx.x & 31;
-    const int warp  = threadIdx.x >> 5;
+    const int lane = threadIdx.x & 31;
+    const int warp = threadIdx.x >> 5;
     const int gwarp = (blockIdx.x * (blockDim.x >> 5)) + warp;
     if (gwarp >= n_slots) return;
 
