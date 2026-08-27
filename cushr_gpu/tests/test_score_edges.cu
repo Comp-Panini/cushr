@@ -135,12 +135,18 @@ static void run_case(const std::string& label, int n_nodes, int fan,
     CHECK(cudaMalloc(&d_iei, sizeof(int) * g.n_edges));
     CHECK(cudaMalloc(&d_dst, sizeof(int) * g.n_edges));
     CHECK(cudaMemcpy(d_x,  x.data(),  sizeof(float) * x.size(),  cudaMemcpyHostToDevice));
-    CHECK(cudaMemcpy(d_ws, ws.data(), sizeof(float) * ws.size(), cudaMemcpyHostToDevice));
-    CHECK(cudaMemcpy(d_wd, wd.data(), sizeof(float) * wd.size(), cudaMemcpyHostToDevice));
+    // The device wants the projections transposed to [feat_dim][hidden] (see
+    // row_dot in score_edges.cu). host_scores() above used the row-major ws/wd
+    // directly, so this comparison also checks transpose_proj itself: if the
+    // transpose were wrong the kernels would disagree with the reference.
+    const std::vector<float> wsT = transpose_proj(ws, hidden, feat_dim);
+    const std::vector<float> wdT = transpose_proj(wd, hidden, feat_dim);
+    CHECK(cudaMemcpy(d_ws, wsT.data(), sizeof(float) * wsT.size(), cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(d_wd, wdT.data(), sizeof(float) * wdT.size(), cudaMemcpyHostToDevice));
     CHECK(cudaMemcpy(d_ici, g.in_col_idx.data(), sizeof(int) * g.n_edges, cudaMemcpyHostToDevice));
     CHECK(cudaMemcpy(d_iei, g.in_edge_id.data(), sizeof(int) * g.n_edges, cudaMemcpyHostToDevice));
     CHECK(cudaMemcpy(d_dst, g.in_dst.data(),     sizeof(int) * g.n_edges, cudaMemcpyHostToDevice));
-    bf.d_node_feat = d_x; bf.d_src_proj = d_ws; bf.d_dst_proj = d_wd;
+    bf.d_node_feat = d_x; bf.d_src_projT = d_ws; bf.d_dst_projT = d_wd;
     bf.d_S = d_S; bf.d_D = d_D;
 
     std::vector<float> got_two(g.n_edges), got_fused(g.n_edges);

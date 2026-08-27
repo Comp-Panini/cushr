@@ -34,13 +34,22 @@
 // each other. Neither agrees bitwise with the CPU scorer, which sums h in
 // order 0..hidden -- compare those with a tolerance.
 //
-// Tensor cores are deliberately not used, on the expectation that these kernels
-// are bound by streaming node features and edge scores rather than by math.
-// Note that the usual supporting argument -- "the projection matrices are tiny
-// and live in L1" -- does NOT hold at the headline dims: feat_dim=192,
-// hidden=128 puts W_s and W_d at 96 KiB each, 192 KiB together, which is the
-// A100's entire per-SM combined L1/shared budget. The expectation is therefore
-// untested; K4_BENCHMARK.md records what the profiler actually says.
+// Tensor cores are deliberately not used. That call now rests on a measurement
+// rather than an expectation, and the measurement says something different from
+// what was originally expected here.
+//
+// Nsight Compute on an A100 (see K4_BENCHMARK.md) found neither kernel compute
+// bound and neither DRAM bound. Both slow kernels saturate L1/TEX REQUEST
+// throughput:
+//     project_nodes        SM 5.98%   L1/TEX 99.24%   DRAM 0.14%
+//     score_edges_fused    SM 5.38%   L1/TEX 99.80%   DRAM 0.01%
+//     score_edges_twopass  SM 59.61%  L1/TEX 45.11%   DRAM 9.25%
+// So WMMA would accelerate a unit already sitting ~95% idle. The earlier worry
+// on this line -- that W_s+W_d at 192 KiB would thrash the A100's per-SM
+// L1/shared budget -- did not happen: L1 hit rate is 98.3% in project_nodes and
+// DRAM traffic is essentially zero. The bytes were always cached; the cost was
+// the NUMBER of sector requests, which is what the W transpose addresses (see
+// row_dot in score_edges.cu).
 
 #pragma once
 
@@ -51,7 +60,13 @@ namespace cushr {
 
 // Device-side biaffine weights + the per-tile projection scratch.
 //
-// d_src_proj / d_dst_proj are [hidden * feat_dim] row-major, uploaded once.
+// d_src_projT / d_dst_projT are [feat_dim * hidden] -- the TRANSPOSE of the
+// row-major [hidden * feat_dim] matrices stored in the CSB3 file. Upload them
+// through transpose_proj(); passing a row-major buffer here compiles fine and
+// silently computes the wrong scores, which is why the members carry the T.
+// The transpose exists purely to make the warp's loads coalesce; see row_dot in
+// score_edges.cu for the numbers.
+//
 // d_S / d_D are [tile_span * hidden] and are re-filled per tile; like the
 // k-best table in host_driver_batched.cu they are addressed with the pointer
 // biased by the tile base, so kernels stay global-node-indexed:
@@ -62,8 +77,8 @@ struct GpuBiaffine {
     float bias     = 0.0f;
 
     const float* d_node_feat = nullptr;  // [num_nodes * feat_dim], global
-    const float* d_src_proj  = nullptr;  // [hidden * feat_dim]
-    const float* d_dst_proj  = nullptr;  // [hidden * feat_dim]
+    const float* d_src_projT = nullptr;  // [feat_dim * hidden], transposed
+    const float* d_dst_projT = nullptr;  // [feat_dim * hidden], transposed
 
     float* d_S = nullptr;   // [.. * hidden], bias-adjusted (see above)
     float* d_D = nullptr;
@@ -82,6 +97,11 @@ struct BiaffineWeights {
 
     static BiaffineWeights load(const std::string& bin_path);
 };
+
+// Row-major [hidden][feat_dim] -> [feat_dim][hidden], for GpuBiaffine's
+// d_*_projT members. The CSB3 file and the CPU scorer keep the row-major
+// layout; only the device copy is transposed.
+std::vector<float> transpose_proj(const std::vector<float>& m, int hidden, int feat_dim);
 
 // K4a. One warp per node over [tile_begin, tile_end). Fills d_S and d_D.
 __global__ void project_nodes(GpuBiaffine bf, int tile_begin, int tile_end);

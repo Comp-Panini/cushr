@@ -73,6 +73,24 @@ BiaffineWeights BiaffineWeights::load(const std::string& bin_path) {
     return w;  
 }
 
+// Row-major [hidden][feat_dim] -> transposed [feat_dim][hidden].
+//
+// The CSB3 file on disk stays row-major -- that is what cushr_cpu's
+// BiaffineScorer reads, and model95_ctx.bin is already exported that way. Only
+// the GPU copy is transposed, because only the GPU cares: see the coalescing
+// note on row_dot above. Done once per run on the host, over hidden*feat_dim =
+// 24,576 floats at the headline dims, so the cost is nil against a 3.21 GiB
+// node-feature upload.
+std::vector<float> transpose_proj(const std::vector<float>& m, int hidden, int feat_dim) {
+    if (m.size() != (size_t)hidden * (size_t)feat_dim)
+        throw std::runtime_error("transpose_proj: size does not match hidden*feat_dim");
+    std::vector<float> t((size_t)feat_dim * (size_t)hidden);
+    for (int h = 0; h < hidden; ++h)
+        for (int i = 0; i < feat_dim; ++i)
+            t[(size_t)i * hidden + h] = m[(size_t)h * feat_dim + i];
+    return t;
+}
+
 // kernels
 
 namespace {
@@ -89,15 +107,45 @@ __device__ __forceinline__ float warp_sum(float v) {
     return v;
 }
 
-// dot(W[row], x) with x already in shared memory
-// computes a dot product
-// each thread multiplies a row of the 128 x 192 matrix against a length-192 feature vector of a node
-__device__ __forceinline__ float row_dot(const float* __restrict__ W, int row, const float* __restrict__ x, int feat_dim) {
+// dot(W[row], x) with x already in shared memory, W stored TRANSPOSED.
+//
+// WT is [feat_dim][hidden], NOT [hidden][feat_dim]. That transpose is the whole
+// point of this function's shape and it was put there to fix a measured
+// bottleneck, so the reasoning is worth spelling out.
+//
+// Callers assign lane l the hidden dims l, l+32, l+64, ... So at any instant the
+// 32 lanes of a warp are evaluating 32 DIFFERENT rows of W at the same column i.
+//
+//   Row-major W (the original code, and still the on-disk CSB3 layout):
+//       lane h reads W[h*feat_dim + i]
+//   Consecutive lanes are then feat_dim*4 = 768 B apart. One warp load touches
+//   32 separate 32-byte sectors -- fully uncoalesced. Nsight Compute measured
+//   the consequence on an A100: project_nodes ran at 99.24% of peak L1/TEX
+//   throughput with compute at 5.98% and DRAM at 0.14%, stalling ~211 cycles
+//   per warp on MIO throttle out of ~473 between issues. The data was cached
+//   (98.3% L1 hit) -- the wall was the REQUEST rate, not the bytes.
+//
+//   Transposed WT (what this reads):
+//       lane h reads WT[i*hidden + h]
+//   Consecutive lanes are now 4 B apart, so a warp's 32 loads fall in 128
+//   contiguous bytes = 4 sectors instead of 32. Same arithmetic, same operand
+//   values, 8x fewer sector requests per instruction.
+//
+// The transpose happens once on the host at upload (transpose_proj below), so
+// the CSB3 file and the CPU BiaffineScorer are untouched.
+//
+// Bitwise note: i still runs 0..feat_dim in order and the summation order is
+// unchanged, so this produces bit-identical results to the row-major version.
+// The fused-vs-twopass bitwise equality asserted in tests/test_score_edges.cu
+// therefore survives, as does agreement with the pre-transpose scores.
+__device__ __forceinline__ float row_dot(const float* __restrict__ WT, int row,
+                                         const float* __restrict__ x,
+                                         int feat_dim, int hidden) {
 
-    const float* w = W + (size_t)row * feat_dim; // index
+    const float* w = WT + row;        // column `row`, walked with stride `hidden`
     float acc = 0.0f;
     for (int i = 0; i < feat_dim; i++) {
-        acc += w[i] * x[i];
+        acc += w[(size_t)i * hidden] * x[i];
     }
     return acc;
 }
@@ -144,8 +192,8 @@ __global__ void project_nodes(GpuBiaffine bf, int tile_begin, int tile_end) {
 
     // lane-strided again across the hidden output dims: lane 0 computes dims 0, 32, 64, 96, etc.
     for (int h = lane; h < bf.hidden; h += 32) {
-        S[h] = row_dot(bf.d_src_proj, h, x, bf.feat_dim);
-        D[h] = row_dot(bf.d_dst_proj, h, x, bf.feat_dim);
+        S[h] = row_dot(bf.d_src_projT, h, x, bf.feat_dim, bf.hidden);
+        D[h] = row_dot(bf.d_dst_projT, h, x, bf.feat_dim, bf.hidden);
     }
 }
 
@@ -239,8 +287,8 @@ __global__ void score_edges_fused(GpuBiaffine bf, const int* __restrict__ in_col
 
         // this math is repeated ~17.6 times (as every node is connected to ~17.6 edges)
         // tradeoff: more math, but less memory bandwidth
-        const float s = row_dot(bf.d_src_proj, h, xu, bf.feat_dim);
-        const float d = row_dot(bf.d_dst_proj, h, xv, bf.feat_dim);
+        const float s = row_dot(bf.d_src_projT, h, xu, bf.feat_dim, bf.hidden);
+        const float d = row_dot(bf.d_dst_projT, h, xv, bf.feat_dim, bf.hidden);
 
         // multiply the scalars for the src and dest nodes and add them together
         acc += s * d;

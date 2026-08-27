@@ -22,12 +22,13 @@
 #      us_per_sent_k4 cannot separate project_nodes (the math) from
 #      score_edges_twopass (the streaming). ncu reports per kernel.
 #
-#   2. There is a real confound in the fused path. At feat_dim=192, W_s and W_d
-#      are 96 KiB each -- 192 KiB together, which is the A100's ENTIRE per-SM
-#      combined L1/shared budget, with 12 KiB already taken by this kernel's
-#      shared memory. So a slow fused kernel could be redundant FLOPs OR cache
-#      thrashing on W. Same wall-clock signature, completely different finding.
-#      l1tex__t_sector_hit_rate.pct is what separates them.
+#   2. There was a real confound in the fused path: a slow fused kernel could be
+#      redundant FLOPs OR cache thrashing on W (192 KiB of matrices against the
+#      A100's 192 KB per-SM L1/shared). Same wall-clock signature, completely
+#      different finding. RESOLVED by the first run: it is NEITHER. L1 hit rate
+#      is 82.6% on the fused kernel and 98.3% on project_nodes, DRAM throughput
+#      is 0.01%, and compute is 5.4%. Nothing thrashes and nothing computes --
+#      see the answer below.
 #
 #   3. "Memory bound" needs a number, not an assertion. The pair
 #      sm__throughput vs dram__throughput as percentages of peak is the actual
@@ -44,13 +45,29 @@
 #   l1tex__t_sector_hit_rate.pct                          is W actually cached?
 #   lts__t_sector_hit_rate.pct                            L2 fallback
 #
-# EXPECTED SHAPE OF THE ANSWER (stated so the run can contradict it)
-#   project_nodes        high sm__throughput, low dram -- it is the matmul
-#   score_edges_twopass  low sm__throughput, high dram -- it streams S and D
-#   score_edges_fused    high sm__throughput; if l1tex hit rate is also poor,
-#                        the redundancy story is incomplete and W thrashing is
-#                        a second, independent cost
-# If the numbers disagree, the numbers win and score_edges.cuh gets corrected.
+# THE ANSWER, from the run of 2026-08-20 (A100, --set full, 100/115 launches).
+# The three predictions originally written here were ALL WRONG; they are kept
+# below so the correction is legible.
+#
+#   kernel               duration    SM%    L1/TEX%   DRAM%   occ%   L1 hit%
+#   project_nodes         24.12 ms   5.98    99.24    0.14    92.8    98.3
+#   score_edges_twopass    0.35 ms  59.61    45.11    9.25    85.8    50.1
+#   score_edges_fused    413.42 ms   5.38    99.80    0.01    91.6    82.6
+#
+#   predicted: project_nodes compute bound (it is the matmul)
+#     ACTUAL:  5.98% compute. 1% of the device's fp32 peak.
+#   predicted: score_edges_twopass bandwidth bound (it streams S and D)
+#     ACTUAL:  the MOST compute-heavy of the three, 59.6% SM vs 9.25% DRAM.
+#   predicted: score_edges_fused compute bound (17.6x redundant FLOPs)
+#     ACTUAL:  5.38% compute, 0.01% DRAM.
+#
+# Both slow kernels are bound by L1/TEX REQUEST THROUGHPUT at ~99% of peak, with
+# the FMA pipes idle and DRAM untouched. Cause: row_dot gave lane l the hidden
+# dim l, so the 32 lanes of a warp read 32 different rows of W, 768 B apart --
+# 32 sectors per load instruction. project_nodes is 98.6% of twopass's K4 time.
+# Fixed by uploading W transposed (4 sectors per load); see the row_dot comment
+# in score_edges.cu and K4_BENCHMARK.md. THE TABLE ABOVE PREDATES THAT FIX --
+# re-run this job to find out what the new limiter is.
 #
 # Outputs (TAG keeps runs from clobbering each other):
 #   ncu_k4_twopass_<TAG>.ncu-rep / .csv   project_nodes + score_edges_twopass

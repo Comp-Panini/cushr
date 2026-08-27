@@ -287,11 +287,22 @@ int main(int argc, char** argv) {
             return 1;
         }
         bf.feat_dim = w.feat_dim; bf.hidden = w.hidden; bf.bias = w.bias;
+        // Upload the projections TRANSPOSED, [feat_dim][hidden] instead of the
+        // file's [hidden][feat_dim]. The kernels assign lane l the hidden dims
+        // l, l+32, ..., so with the row-major layout the 32 lanes of a warp
+        // read 32 rows 768 B apart -- 32 sectors per load instruction. ncu
+        // measured project_nodes pinned at 99.24% of peak L1/TEX throughput
+        // with compute at 5.98%. Transposed, consecutive lanes read consecutive
+        // floats: 4 sectors instead of 32, same arithmetic, bit-identical
+        // results. The CSB3 file stays row-major -- cushr_cpu's BiaffineScorer
+        // reads it and model95_ctx.bin needs no re-export.
         const size_t wn = (size_t)w.hidden * w.feat_dim;
+        const std::vector<float> wsT = transpose_proj(w.src_proj, w.hidden, w.feat_dim);
+        const std::vector<float> wdT = transpose_proj(w.dst_proj, w.hidden, w.feat_dim);
         CUDA_CHECK(cudaMalloc(&d_wsrc, sizeof(float)*wn));
         CUDA_CHECK(cudaMalloc(&d_wdst, sizeof(float)*wn));
-        CUDA_CHECK(cudaMemcpy(d_wsrc, w.src_proj.data(), sizeof(float)*wn, cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(d_wdst, w.dst_proj.data(), sizeof(float)*wn, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(d_wsrc, wsT.data(), sizeof(float)*wn, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(d_wdst, wdT.data(), sizeof(float)*wn, cudaMemcpyHostToDevice));
 
         CUDA_CHECK(cudaMalloc(&d_nf, sizeof(float)*(size_t)N*w.feat_dim));
         CUDA_CHECK(cudaMemcpy(d_nf, lat.node_feature_ptr(0),
@@ -299,7 +310,7 @@ int main(int argc, char** argv) {
         CUDA_CHECK(cudaMalloc(&d_in_dst, sizeof(int)*E));
         CUDA_CHECK(cudaMemcpy(d_in_dst, h_in_dst.data(), sizeof(int)*E, cudaMemcpyHostToDevice));
 
-        bf.d_node_feat = d_nf; bf.d_src_proj = d_wsrc; bf.d_dst_proj = d_wdst;
+        bf.d_node_feat = d_nf; bf.d_src_projT = d_wsrc; bf.d_dst_projT = d_wdst;
 
         if (k4 == K4Mode::TwoPass) {
             const size_t per_node = (size_t)2 * w.hidden * sizeof(float);
