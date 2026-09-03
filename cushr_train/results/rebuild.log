@@ -1,0 +1,25 @@
+[sighum_test/cushr_gpu_top1]
+  cached  eval_slm_b05ac887e30d528f.json
+  cached  eval_surface_ea48cc94386231e8.json
+[sighum_test/cushr_gpu_rerank]
+  cached  eval_slm_47acf1406486a864.json
+[sighum_test/byt5]
+  cached  eval_slm_14a755342b5696ca.json
+[sighum_test/cushr_cpu]
+  not produced -- em-dash
+[sighum_test/translist]
+[g95_heldout/cushr_gpu_top1]
+  running eval_slm.py --cache ./cache95_ctx_ex4200 --model model95_ctx_ex4200.npz --index ../data/sentence_index_g95.jso
+[g95_heldout/cushr_gpu_rerank]
+  not produced -- em-dash
+[g95_heldout/byt5]
+  not produced -- em-dash
+[g95_heldout/cushr_cpu]
+  not produced -- em-dash
+[g95_heldout/translist]
+  not produced -- em-dash
+wrote RESULTS_MATRIX.md
+wrote results/results_matrix.json
+wrote results/pareto_accuracy_throughput.png
+wrote results/recall_vs_k.png
+wrote results/memory_vs_k_batch.png

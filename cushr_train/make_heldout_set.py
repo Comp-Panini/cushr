@@ -41,8 +41,12 @@ import argparse
 import csv
 import json
 import os
+import sys
 
 import numpy as np
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "ingest"))
 
 
 def main():
@@ -113,14 +117,26 @@ def main():
     ids = [index[i] for i in rows]
     assert len(set(ids)) == len(ids), "duplicate id in the sample"
 
-    # Same column layout as sighum_test_4200.tsv so every --tsv consumer reads
-    # it unchanged. `output` is deliberately EMPTY -- see the module docstring.
-    # Only eval_slm.py --no-surface may consume this file.
+    # `input` is the sandhied sentence, taken from the DCS pickle's .sentence.
+    # That field reproduces sighum_test_4200.tsv's `input` column on 4,200 of
+    # 4,200 sentences exactly, so it is the same quantity and not a substitute
+    # for one. It is needed because make_byt5_input.py reads r["input"] and
+    # aborts on a blank line, and without it ByT5 could not be run here at all.
+    #
+    # `output` stays EMPTY -- see the module docstring. Only
+    # eval_slm.py --no-surface may consume this file.
+    import ingest as ig  # noqa: E402  (needs the sys.path set up in main)
     with open(args.out, "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f, delimiter="\t", lineterminator="\n")
         w.writerow(["DCS-ID", "input", "output"])
-        for i, sid in zip(rows, ids):
-            w.writerow([sid, "", ""])
+        for sid in ids:
+            with open(os.path.join(args.p_dir, f"{sid}.p"), "rb") as p:
+                d = ig._DCSUnpickler(p, encoding="utf-8").load()
+            sent = " ".join(str(d.sentence).split())
+            if not sent:
+                raise SystemExit(f"{sid}: empty .sentence would desynchronise "
+                                 "the ByT5 manifest")
+            w.writerow([sid, sent, ""])
     json.dump(ids, open(args.ids_out, "w"), indent=1)
 
     print(f"\nwrote {args.out}  ({args.n:,} sentences)")

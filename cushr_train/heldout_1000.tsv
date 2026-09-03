@@ -1,1001 +1,1001 @@
 DCS-ID	input	output
-10004		
-101106		
-101371		
-101654		
-101694		
-101764		
-102092		
-102506		
-102670		
-102887		
-103489		
-10439		
-105039		
-105070		
-105250		
-105278		
-105314		
-106331		
-106708		
-106960		
-107597		
-107708		
-107907		
-108388		
-108914		
-109645		
-109986		
-109994		
-111424		
-111522		
-111726		
-112070		
-11236		
-112634		
-11268		
-112992		
-113017		
-113752		
-113801		
-114456		
-114481		
-114483		
-114575		
-115115		
-115215		
-116252		
-116513		
-117057		
-117394		
-117487		
-117540		
-117985		
-118044		
-118415		
-118586		
-118717		
-119085		
-119119		
-119541		
-119717		
-120183		
-120620		
-120899		
-120948		
-121193		
-121204		
-121241		
-121309		
-12181		
-122008		
-122024		
-122101		
-122408		
-122692		
-123091		
-123650		
-123955		
-124018		
-124509		
-124549		
-124560		
-124602		
-124708		
-125433		
-126705		
-126742		
-127682		
-128183		
-128802		
-128876		
-129721		
-13014		
-13019		
-131446		
-132459		
-132814		
-133989		
-134054		
-134366		
-134429		
-134650		
-135673		
-135775		
-135845		
-13600		
-136012		
-136018		
-137000		
-137411		
-137699		
-137839		
-138036		
-138147		
-138173		
-138499		
-138708		
-139125		
-139412		
-140290		
-140383		
-141392		
-14165		
-141808		
-14181		
-141923		
-142134		
-142238		
-142579		
-142738		
-146276		
-147212		
-148016		
-148079		
-148178		
-148576		
-148696		
-148911		
-14895		
-150272		
-150541		
-150670		
-152690		
-153220		
-153532		
-153849		
-153959		
-154069		
-154596		
-154765		
-155476		
-155515		
-156416		
-156825		
-156861		
-156953		
-157618		
-157930		
-158107		
-158241		
-158642		
-158703		
-159147		
-159297		
-160055		
-160885		
-162056		
-162397		
-162541		
-162573		
-163140		
-163389		
-163786		
-163994		
-164022		
-165028		
-165482		
-165688		
-165854		
-166089		
-166361		
-166496		
-166771		
-166866		
-167030		
-167907		
-168459		
-168630		
-169298		
-169330		
-16949		
-169957		
-170869		
-17162		
-171803		
-173177		
-174561		
-175294		
-175773		
-175949		
-176293		
-176531		
-17689		
-177020		
-177071		
-177590		
-177899		
-179125		
-180360		
-180556		
-180743		
-181776		
-182059		
-182403		
-182765		
-183373		
-183507		
-184797		
-185231		
-18555		
-18636		
-187001		
-187627		
-187872		
-188685		
-189070		
-189645		
-189729		
-190151		
-190864		
-191159		
-19162		
-194563		
-195950		
-19607		
-196347		
-197138		
-198260		
-198404		
-19870		
-199970		
-200535		
-201734		
-201809		
-201997		
-203922		
-2041		
-204423		
-204752		
-205186		
-205470		
-205907		
-206275		
-207180		
-207665		
-208057		
-208567		
-209222		
-209338		
-20995		
-209969		
-210020		
-211047		
-211769		
-212113		
-212240		
-212333		
-212431		
-212543		
-212636		
-212743		
-213014		
-213049		
-213472		
-213485		
-213542		
-214176		
-214345		
-21459		
-216101		
-217329		
-218631		
-219925		
-220100		
-220102		
-220306		
-220426		
-220718		
-222630		
-224547		
-224676		
-22478		
-22646		
-227716		
-227844		
-229158		
-229514		
-22989		
-229892		
-229996		
-23008		
-23126		
-231551		
-232599		
-233027		
-234677		
-235007		
-236698		
-237486		
-237650		
-237758		
-238413		
-238545		
-239191		
-239322		
-239330		
-23964		
-240574		
-240905		
-241047		
-241234		
-241806		
-242323		
-242851		
-243391		
-244062		
-244911		
-244957		
-24507		
-24547		
-246059		
-246985		
-247283		
-247440		
-247657		
-248194		
-248824		
-249221		
-249423		
-250321		
-250370		
-250439		
-251355		
-251573		
-251815		
-252042		
-252044		
-252196		
-252728		
-253036		
-253204		
-253388		
-253823		
-253830		
-253845		
-254064		
-254267		
-255725		
-25620		
-25645		
-256487		
-257334		
-258017		
-258096		
-25837		
-258534		
-258745		
-260032		
-26131		
-261327		
-261553		
-261775		
-262273		
-262692		
-262994		
-264237		
-264576		
-265117		
-265158		
-265693		
-266505		
-266560		
-267617		
-26768		
-268044		
-268154		
-26867		
-268900		
-269085		
-269518		
-271346		
-271410		
-272787		
-273135		
-273176		
-273281		
-274636		
-275381		
-276266		
-276447		
-276471		
-276849		
-277045		
-277270		
-277360		
-277849		
-278439		
-278669		
-278978		
-279226		
-279460		
-279729		
-279865		
-27988		
-280456		
-280986		
-281060		
-281244		
-281846		
-282177		
-282371		
-282811		
-282944		
-283476		
-284019		
-284022		
-284222		
-28431		
-284554		
-284804		
-284962		
-285146		
-28521		
-285275		
-28579		
-286390		
-286675		
-286681		
-286717		
-287221		
-287289		
-28793		
-288567		
-289244		
-289481		
-289573		
-289861		
-290475		
-291438		
-29145		
-291793		
-292346		
-293263		
-294380		
-295098		
-295279		
-295472		
-295668		
-29597		
-296013		
-296126		
-297029		
-297539		
-297674		
-297736		
-298473		
-298532		
-299412		
-300279		
-30077		
-300804		
-300892		
-30117		
-301512		
-301515		
-301522		
-30235		
-302476		
-303842		
-30429		
-305061		
-305461		
-305776		
-306338		
-306740		
-307139		
-307188		
-307254		
-308423		
-30850		
-308649		
-308673		
-309100		
-309733		
-309738		
-309991		
-310366		
-310422		
-31069		
-310767		
-31088		
-310968		
-31109		
-31118		
-311658		
-311779		
-311968		
-312949		
-313154		
-313217		
-313479		
-313824		
-314165		
-314421		
-314772		
-314990		
-315447		
-315471		
-315599		
-315671		
-316340		
-316943		
-317106		
-317220		
-317468		
-317778		
-318048		
-318405		
-318439		
-319053		
-3193		
-319425		
-319732		
-319863		
-319885		
-320090		
-320147		
-320156		
-320383		
-320393		
-320502		
-320678		
-320798		
-320892		
-321004		
-321243		
-321381		
-321635		
-321660		
-321863		
-32204		
-322522		
-323368		
-323893		
-324425		
-324440		
-324662		
-324709		
-325245		
-325248		
-325260		
-325410		
-325881		
-326008		
-326490		
-326656		
-327889		
-327893		
-328857		
-330195		
-330553		
-330763		
-331005		
-331438		
-331571		
-331767		
-33186		
-331925		
-332270		
-332458		
-332636		
-332795		
-332867		
-333266		
-333756		
-333965		
-33398		
-334181		
-334215		
-334270		
-334563		
-334567		
-334711		
-335273		
-335296		
-335529		
-335633		
-335745		
-336404		
-336580		
-336639		
-336788		
-337087		
-337094		
-337105		
-337404		
-337891		
-338537		
-338963		
-339184		
-339591		
-339616		
-339682		
-340061		
-340576		
-340684		
-34095		
-34194		
-342020		
-343012		
-34377		
-343802		
-343817		
-343998		
-344635		
-345147		
-345483		
-345577		
-345975		
-345981		
-346296		
-346663		
-346873		
-348586		
-350174		
-350357		
-351582		
-351888		
-352494		
-352592		
-353429		
-353921		
-354007		
-354457		
-354783		
-354971		
-355390		
-355755		
-355938		
-356842		
-356938		
-356990		
-357145		
-357573		
-357743		
-35845		
-358523		
-358592		
-358593		
-358873		
-359800		
-359808		
-360369		
-360821		
-360924		
-360985		
-361020		
-361608		
-361663		
-363002		
-364109		
-364152		
-364778		
-364800		
-364801		
-365740		
-365923		
-366254		
-36659		
-367173		
-367648		
-367760		
-367761		
-368122		
-370038		
-370540		
-370641		
-370691		
-370796		
-373378		
-373674		
-373693		
-373712		
-374344		
-37451		
-374708		
-374809		
-375571		
-376059		
-376262		
-376985		
-377133		
-377745		
-377806		
-378524		
-378581		
-378604		
-379160		
-379346		
-379953		
-380498		
-380646		
-380843		
-381334		
-381470		
-381795		
-381886		
-382783		
-382823		
-383103		
-38320		
-383490		
-383726		
-384200		
-384272		
-384324		
-384459		
-385453		
-385615		
-386128		
-386232		
-386257		
-386486		
-386583		
-386837		
-386869		
-387474		
-387930		
-388375		
-38938		
-389898		
-390358		
-390367		
-390438		
-390969		
-391074		
-391573		
-39173		
-392040		
-392339		
-392658		
-392945		
-393803		
-394175		
-394228		
-394390		
-394937		
-39504		
-39513		
-395660		
-396207		
-39660		
-396862		
-397116		
-397194		
-397205		
-397356		
-397899		
-397926		
-397954		
-39835		
-398568		
-399547		
-39993		
-400650		
-401109		
-401261		
-401394		
-40148		
-401552		
-401815		
-402873		
-403905		
-404082		
-404250		
-404522		
-405080		
-405615		
-405794		
-406447		
-406561		
-406930		
-406965		
-407331		
-407725		
-408063		
-40820		
-408421		
-408424		
-408621		
-408803		
-408919		
-408957		
-409043		
-40915		
-409222		
-40968		
-409972		
-410261		
-410348		
-41041		
-41075		
-410869		
-411043		
-411161		
-411172		
-411224		
-41194		
-412136		
-412140		
-412297		
-412905		
-412957		
-412969		
-413153		
-415043		
-41533		
-415353		
-415356		
-416229		
-416624		
-41693		
-417		
-417173		
-417841		
-417890		
-418637		
-418757		
-418918		
-419687		
-420051		
-420052		
-420150		
-420322		
-421705		
-42207		
-422357		
-422397		
-422894		
-423096		
-423114		
-42316		
-423232		
-424286		
-42512		
-425543		
-425602		
-42688		
-427470		
-427517		
-428066		
-428856		
-429376		
-429675		
-429755		
-430899		
-43137		
-431515		
-432624		
-432976		
-433126		
-433186		
-433414		
-433878		
-434057		
-43426		
-434559		
-434805		
-43547		
-435510		
-435585		
-435720		
-435770		
-436786		
-437331		
-437562		
-438422		
-438445		
-438739		
-439476		
-440282		
-440418		
-440483		
-440947		
-44177		
-441898		
-4431		
-44586		
-45251		
-45467		
-45667		
-45828		
-46107		
-46312		
-46327		
-46702		
-46929		
-48381		
-49433		
-49446		
-49646		
-50827		
-5247		
-52689		
-53258		
-54360		
-54388		
-54430		
-55041		
-5515		
-55548		
-55563		
-55605		
-55946		
-56970		
-59025		
-59165		
-60006		
-60059		
-60554		
-62300		
-62644		
-62959		
-6296		
-63136		
-63485		
-64523		
-64734		
-65353		
-65995		
-66354		
-66670		
-66778		
-67012		
-67679		
-67983		
-68611		
-68618		
-69317		
-69595		
-69781		
-69879		
-70312		
-70535		
-71111		
-71887		
-72701		
-76019		
-76093		
-77922		
-7802		
-78129		
-79110		
-79334		
-79449		
-79768		
-80721		
-81608		
-81695		
-81938		
-82000		
-82015		
-82145		
-8241		
-82567		
-83085		
-83955		
-84042		
-84153		
-853		
-86524		
-88401		
-89415		
-90277		
-90534		
-91586		
-92016		
-92733		
-92870		
-9295		
-93859		
-95007		
-95333		
-95825		
-96974		
-9857		
-98663		
-98961		
-99342		
-99499		
-99543		
+10004	kumBake kevale sidDe kiM na siDyati BUtale	
+101106	mArkaRqeya uvAca	
+101371	pitAmahaS ca no vyAsaH SamaM vadati nityaSaH	
+101654	asidDO nindyate cApi karmanASaH kaTaM tviha	
+101694	bahUnAM samavAye hi BAvAnAM karma siDyati	
+101764	brahmA vizRustaTeSAno devatAH praBuravyayaH	
+102092	dvAtriMSattvevamapyuktaH parvato ganDamAdanaH	
+102506	tasmAcCatruvaDe rAjan kriyatAM niScayas tvayA	
+102670	Sakram eva prapadyasva sa te 'strARi pradAsyati	
+102887	nAdaH prasravaRAnAM ca pakziRAM cApyupAramat	
+103489	tatra marakataKaRqAni vajrARAM ca sahasraSaH	
+10439	jantujuzwaM jale magnam aBUmijam anArtavam	
+105039	dvinAmAnyeva varzARi yaTEva girayastaTA	
+105070	aBigacCanti tAScAnyA nadA nadyaH sarAMsi ca	
+105250	dArakO ca hi me nItO vasatas tatra bAlakO	
+105278	apakfzya ca lajjAM mAM svayam uktavatI nfpa	
+105314	bfhadaSva uvAca	
+106331	BIzmo DarmaBftAM SrezWo viDidfzwena karmaRA	
+106708	mAnuzasya tu pUrveRa kroSamAtre mahIpate	
+106960	pfTivyAM yAni tIrTAni antarikzacarARi ca	
+107597	praBavecca kule puRye sarvapApaM vyapohati	
+107708	niyatAtmA naraH pUto gacCeta paramAM gatim	
+107907	fzaya UcuH	
+108388	aBiGAtAtkzayAtkopAcCokAdDyAnAcCramAtkzuDaH	
+108914	tad yadA manyase brahman gamanaM tIrTadarSane	
+109645	evaM caturzu pArSvezu dakziRAntezu sarpati	
+109986	asmAkaM BayaBItAnAM tvaM gatir maDusUdana	
+109994	idaM ca samanuprAptaM lokAnAM Bayam uttamam	
+111424	ASramasTaM vinA rAmaM jamadagnim upAdravan	
+111522	te hi sarve mahAtmAnaH sarvaSAstraviSAradAH	
+111726	kOtUhalAt kaRwakena budDimohabalAtkftA	
+112070	tena somakulotpanno gAnDArADipatir mahAn	
+11236	samprAptaH sADakaH sAkzAt sarvalokAntarAtmanA	
+112634	hutASanasyeva samidDatejasaH sTiro Bavasveha mamAdya bandin	
+11268	yat taj jYAnaM tad evAsya dAnaM yatnena dIyate	
+112992	arvAvasus tadA sattram AjagAma punar muniH	
+113017	kAlena mahatA kleSAd brahmADigatam uttamam	
+113752	kadalIvanamaDyasTam aTa pIne SilAtale	
+113801	BIma uvAca	
+114456	mahABrEr iva SElendrO yuyuDAte mahAbalO	
+114481	samAS catasro 'BigatAH Sivena caratAM vane	
+114483	prApya parvatarAjAnaM SvetaM SiKariRAM varam	
+114575	kokilEH kalaviNkES ca hArItEr jIvajIvakEH	
+115115	deSaM virajasaM paSya meroH SiKaram uttamam	
+115215	gadA BUtvA SaktayaSca tadA devaraTe'ByayuH	
+116252	rudradattaM tadA dIptaM dIptAnalasamapraBam	
+116513	nityapuzpaPalEr vfkzEr himasaMsparSakomalEH	
+117057	etad aDyAtmaviduzAM paraM kAryaM viDIyate	
+117394	tatrAsya svakftaM karma CAyevAnugataM sadA	
+117487	viDinAnena SAmyanti sadanakzavaTujvarAH	
+117540	atiTIn annapAnena BftyAn atyaSanena ca	
+117985	sAkzAllakzmyA ivAvAsaH sa tadA pratiBAti me	
+118044	mahAtmano muKAt tasya vivftAt puruzottama	
+118415	sa cApi niDanaM prApto vidyunmAlI mahAyaSAH	
+118586	brAhmaRo ruzito hanyAd api lokAn pratijYayA	
+118717	rakzitavyAH prajA rAjYA tAs tvaM rakzitum arhasi	
+119085	apaSyat tatra gatvA taM sUnAmaDye vyavasTitam	
+119119	brahmacaryaM tapo mantrAH satyaM ca brAhmaRe sadA	
+119541	mArkaRqeya uvAca	
+119717	BUmiH paYcaguRA brahmann udakaM ca caturguRam	
+120183	mAtApitroS ca SuSrUzA vyADe DarmaS ca kIrtitaH	
+120620	Bavati cAtra	
+120899	tena haMsAS ca gfDrAS ca meruM gacCanti parvatam	
+120948	sarvAs tvadyABigacCantu skandaM lokasya mAtaraH	
+121193	skanda uvAca	
+121204	mArkaRqeya uvAca	
+121241	evam ete kumArARAM mayA proktA mahAgrahAH	
+121309	jajYire ftavastasmAdftuByo hyArtavA aBavan	
+12181	iyaM tu paramA mudrA jarAmftyuvinASinI	
+122008	catvAri niyutAni syurvarzARi tu kaliryugam	
+122024	manvantarasya kAlastu yugEH saha prakIrtitaH	
+122101	lakzaREScEva jAyante SarIrasTEramAnuzEH	
+122408	adrohaScApyaloBaSca damo BUtadayA SamaH	
+122692	manasA karmaRA vAcA vArttAH siDyanti vA na vA	
+123091	uktavAMSca naravyAGro nEtad evaM Bavizyati	
+123650	ahaM tu prezito rAjan kOraveRa mahAtmanA	
+123955	uparyupari Sakrasya lokA divyaguRAnvitAH	
+124018	vESampAyana uvAca	
+124509	arDacandreRa bARena vivyADorasi DarmarAw	
+124549	prARaprepsur upADAvad vanaM yena narADamaH	
+124560	anAmizam idaM karma kaTaM vA manyate BavAn	
+124602	anuyAya mahAbAhuH Palguno vAkyam abravIt	
+124708	kimarTaM putraM BUyastvaM niyamaM krUramicCasi	
+125433	aBigacCAva sugrIvaM SElasTaM haripuMgavam	
+126705	putrA me bahavo devi BaveyuH kulaBAvanAH	
+126742	rAjovAca	
+127682	nAtmAnam anuSocAmi yaTAhaM pitaraM SuBe	
+128183	mantragrAmo balaM tasya jYAsye nAticirAd iva	
+128802	SrAdDaM mftaM kaTaM ca syAt kaTaM yajYo mfto Bavet	
+128876	vESampAyana uvAca	
+129721	anyaTA GorasaMsArabanDahetU janasya tO	
+13014	yugAnurUpaM SrIvizRoH sevayA mokzasADanam	
+13019	Otpattikena yogena SAntAH SamadfSo matAH	
+131446	asfjaH SlezmaRaS cApi yaH prasAdaH paro mataH	
+132459	yasya vaMSo nalo vApi tAlo vorasi jAyate	
+132814	ukte samAhite garBAvetO DArayatastadA	
+133989	dvijihvASca kftAH sarpA garuqena mahAtmanA	
+134054	suvarRe galite nAgaM prakzipet zoqaSAMSakam	
+134366	yajYe vA BujagAstasmiYSataSo 'Ta sahasraSaH	
+134429	brahmovAca	
+134650	yasya vaDyaH sa nAdyApi jAtastriBuvane pumAn	
+135673	SaMkara uvAca	
+135775	brUhi tvaM kfSa tattvena paSya me tapaso balam	
+135845	kftAtmanastvayA tAta vipreReva pratigrahAt	
+13600	vizayAharaRaM vipra caturTaH parikIrtitaH	
+136012	sUta uvAca	
+136018	amAtyAn suhfdaScEva provAca sa narADipaH	
+137000	kiM sUta tezAM viprARAM mantragrAmo manIziRAm	
+137411	triBir varzEr labDakAmaH kfzRadvEpAyano muniH	
+137699	nAmnA vasur iti KyAtaM manuputraM mahISvaram	
+137839	iha puRyakfto yAnti svargalokaM na saMSayaH	
+138036	rahasyaM KalvidaM rAjan devAnAm iti naH Srutam	
+138147	taM BuvaH SoDanAyendra uvAca puruzottamam	
+138173	marIcir atryaNgirasO pulastyaH pulahaH kratuH	
+138499	pOravo nAma rAjarziH sa baBUva narezviha	
+138708	prativinDyaH sutasomaH SrutakIrtistaTAparaH	
+139125	rakzAM tu me cintaya devarAja yaTA tvadarTaM rakzitAhaM careyam	
+139412	SakuntalA ca tacCrutvA paraM harzam avApa sA	
+140290	vESaMpAyana uvAca	
+140383	yaTA bahumataH putrastaTA manyatu mAM BavAn	
+141392	SreyAn putraguRopetaH sa putro netaro vfTA	
+14165	biqAlasya varAhasya kAkaBekasya ca tvacaH	
+141808	yayAtir uvAca	
+14181	pizwvA tena liptagAtro yogaSaktyA balizWayA	
+141923	tezAM praTitavfttAnAM rAjYAM vijYAnaSAlinAm	
+142134	na Sakyam anyaTA kartuM yad uktaM brahmavAdinA	
+142238	pInaskanDo mahAbAhur mattavAraRavikramaH	
+142579	vESaMpAyana uvAca	
+142738	na cApyahaM vfTA BUyo dArAn kartum ihotsahe	
+146276	arDakalkena lepyo'Ta pAdakalkena vE punaH	
+147212	prAhuH kzatraM balajyezWaM balajyezWaM sutaM vfRu	
+148016	DarmaM cEva puraskftya SrezWAM matim akurvata	
+148079	yasya kIrtir mahezvAsAn sarvAn aBiBavizyati	
+148178	kroSantaH pARqavAH sarve BIzmo vidura eva ca	
+148576	yAvat pibati bAlo 'yaM tAvad asmE pradIyatAm	
+148696	sa BIzmeRa mahABAgastuzwo 'straviduzAM varaH	
+148911	evaM vAradvaye kzipte varDate varRakadvayam	
+14895	kapAlakuhare jihvA pravizwA viparItagA	
+150272	vESaMpAyana uvAca	
+150541	aTa tvam api rAjendra rAjavaMSo Bavizyasi	
+150670	tasya putro yaTA pARqustaTA DarmaparAyaRaH	
+152690	hate'Smavarze tumule jalavarze ca Sozite	
+153220	ko hi me BoktukAmasya viGnaM carati durmatiH	
+153532	vESaMpAyana uvAca	
+153849	tadA tava vaSaM BUya AgantAsmyASu BArata	
+153959	arDaM te BuYjate vIrAH saha mAtrA paraMtapAH	
+154069	kANkzamARAM ratiM cEva suKAni ca bahUnyapi	
+154596	praBAvAtpadmanABasya svapataH sAgarAmBasi	
+154765	kowiBAgena tenEva tAmraM Bavati kAMcanam	
+155476	dUrasTA vA samIpasTAH svargasTA vApi pARqavAH	
+155515	prapedire BayatrastA BImasADvasakAtarAH	
+156416	vESaMpAyana uvAca	
+156825	arjuna uvAca	
+156861	ityuktvA pARqavaH krudDo ganDarvAya mumoca ha	
+156953	na kAraRasya sadfSaM kAryam ityupapadyate	
+157618	SabdaM prati tadodBUto mArutaSCidrasaMBavaH	
+157930	sadBUtasya kriyA nAsti kartA ca syAd akarmakaH	
+158107	vAmadeva namastuByaM jyezWAya varadAya ca	
+158241	AjagAma mahAtejA yogAcAryo mahAyaSAH	
+158642	vinADipatyaM samatAM gate 'nte brahmaRo mama	
+158703	tadApraBfti mAmAhurhaMsaM haMso virAqiti	
+159147	smaratA nihatAn banDUn AdattAni na saMSayaH	
+159297	te ca sarve mudA yuktA modante sahitAH surEH	
+160055	alpasOKyaM bahukleSaM jarASokasamanvitam	
+160885	dAmodaro BrAtaram ugravIryaM halAyuDaM vAkyam idaM baBAze	
+162056	kAyamAtraM ca meDAvI marmARi ca mahAkapiH	
+162397	vyAsaH	
+162541	SvetaBAnur himatanur jyotizAm aDipaH SaSI	
+162573	sa nagAgre ca tAM laNkAM dadarSa pavanAtmajaH	
+163140	parArDyAstaraRopetAM rakzo'DipanizevitAm	
+163389	yAvat tvacalatAM sarve prApnuvanti narADipAH	
+163786	viBUzayantIm iva ca svaSriyA Bavanottamam	
+163994	na ca te vyasanEr yoktuM SakyA dizwakftA hi te	
+164022	vikrameRa mahI prAptA Baratena mahAtmanA	
+165028	etO hi puruzavyAGrAvezAM priyahite ratO	
+165482	dUzaRaSca mahAtejA rAmeRa viditAtmanA	
+165688	AstAm avaDyAvanyezAM trizu lokezu viSrutO	
+165854	dIptAm iva diSaM kAle pUjAm apahftAm iva	
+166089	parivArya daSagrIvaM viviSustad gfhottamam	
+166361	acireRa tu laNkeyaM SmaSAnasadfSI Bavet	
+166496	tatra devo mahAdevastatrAgnir vAyunA saha	
+166771	evaM tO sahitO BUtvA sarvArTezvekaniScayO	
+166866	vESaMpAyana uvAca	
+167030	lakzmaRaSca mahAtejAH sumitrAnandavarDanaH	
+167907	AnukUlyena DarmAtmA tyaktvA suKam anuttamam	
+168459	cintayAnaM tu kOnteyaM jYAtvA SacyA SacIpatiH	
+168630	sAgare mArutodDUtA velAm iva mahormayaH	
+169298	caturyujAm upetAnAM sUtEH kuSalasaMmatEH	
+169330	BUzaRAnAM tu muKyAnAM SataBAraM dadO Danam	
+16949	tadvisfzwaH sa puruzo loke brahmeti kIrtyate	
+169957	ye 'SfRvan kUjitaM tatra tezAM vE vyaTitaM manaH	
+170869	gacCanti saha patnIBiH sutEr api ca SASvatIm	
+17162	deSaDarmAYjAtiDarmAn kulaDarmAMS ca SASvatAn	
+171803	etacCrutvA mayA tasya mEnAkasya mahAtmanaH	
+173177	eko'Diko nyUnataro dvitIya evaM yame'pyaByaDiko viSezaH	
+174561	tatra SlokAH	
+175294	sasyaM BUte dayA dAnaM balayo devatArcanam	
+175773	apaSyaMste giriSrezWaM sahyaM drumalatAyutam	
+175949	reKA syAdDemavarRA ca tatpiRqI ca viDIyate	
+176293	ramBorvaSyaTa menakA	
+176531	mayena dAnavendreRa tvadBayAt saKyam icCatA	
+17689	te ca svA cEva rAjYaS ca tAS ca svA cAgrajanmanaH	
+177020	sa tvaM BrAtAsi me rAjan brUhi mAM yad yad icCasi	
+177071	pUrvasyAM pAradaH Sveto nAnAvarRErgadApahaH	
+177590	sakfd eva prapannAya tavAsmIti ca yAcate	
+177899	pragfhItAH prakASante sUryasyeva marIcayaH	
+179125	ruDirodA mahAvegA nadyastatra prasusruvuH	
+180360	muKArDam anyaTA varRo muKArDe'rizwamucyate	
+180556	SoRitOGamahAtoyAM yamasAgaragAminIm	
+180743	rAvaRasya vacaH SrutvA vAyusUnur vaco 'bravIt	
+181776	ekena bahavo BagnA yaSo nASaM gamizyati	
+182059	sTityutpattivinASezu BUtAnAmeza kAraRam	
+182403	tasmin pravftte tumule vimarde prahfzyamARezu valImuKezu	
+182765	sirANgavyApake rakte SfNgAlAbU tvaci sTite	
+183373	evaM kAlaprakarzeRa mukto nAqInibanDanAt	
+183507	sarvEr duzwEH sarvaliNgamaBiGAtAcca duzyati	
+184797	bAROGavitatAH sarvA diSaSca vidiSastaTA	
+185231	rAvaRistu diSaH sarvA raTenAtiraTaH patan	
+18555	AvAso DarmatfptAnAM sidDikzetraM hi tat param	
+18636	kzIripattrabilvapattrahomena SAntir Bavati	
+187001	dalanti dantavalkAni yadA SarkarayA saha	
+187627	anena viDinA droRam upayujyAnnamIritam	
+187872	anenEva viDAnena vfdDI vAtakaPAtmike	
+188685	pORqrakekzurasEr ArdraM marditaM sEnDavAnvitam	
+189070	asADyatA vikArARAM syAdezAmanuvAsanAt	
+189645	maDutEle same syAtAM kvATaScEraRqamUlajaH	
+189729	kruDyataH kupitaM pittaM kuryAttAMstAnupadravAn	
+190151	nAmnA dUzIvizAristu na cAnyatrApi vAryate	
+190864	kupitasya munestasya lalAwAt svedabindavaH	
+191159	SAlyAdeH sarzapAntasya viviDasyAsya BAgaSaH	
+19162	saptame divase strI vA puruzo vA vaSIBavati svaM ca dadAti	
+194563	upacArezu sarvezu dadyAdAcamanaM priye	
+195950	yuvA rasAyane dakzo vfdDaH syAddehalohayoH	
+19607	asapiRqezu sarvezu pretaSudDiM niboData	
+196347	praSAnte kurutas tasmin SItam ante ca tAvapi	
+197138	caturTo golakAkAraH paYcame dahanapraBaH	
+198260	vAksidDirdivyadfzwiSca tripalena Bavetpriye	
+198404	SatADiko Bavet kAntastvOzaDAnAM rasAyanam	
+19870	dehAd utkramaRaM cAsmAt punar garBe ca samBavam	
+199970	lohaM kramavivfdDAni kuryAdetAni mAtrayA	
+200535	palASabIjakaM tElaM GftaM maDu SivAmbu ca	
+201734	evaM tElopayogena mAsAjjYAnI BavennaraH	
+201809	BUgfhe vA nivAte vA pradeSe ca vasansuKI	
+201997	PalaM tyaktvA pibetkzIraM dIpte'gnO kzIraBojanam	
+203922	rakzAM baDnIta tAM spfzwvA japedazwottaraM Satam	
+2041	vAsaScaryA japaDyAnaM sadArudrasmftistaTA	
+204423	saktukawvamlalavaRarUkzAyAsAtapAMstyajet	
+204752	etezAM paYcaBUtAnAmakzaraM kAraRaM param	
+205186	vyAlAricorakzudrApasmAraBUtagrahApaham	
+205470	pibedguqena miSraM vA lihyAllehAn pfTak pfTak	
+205907	mfto BavedrasaH so'yaM sarvarogaharo Bavet	
+206275	pAtAlayantre tattElaM gfhRIyAttAmraBAjane	
+207180	milate tatkzaRAd vajraM hemnA tu salilaM yaTA	
+207665	pittezu sidDaM tElaM ca pAnAByaNgezu pUjitam	
+208057	vyaktA noktAstu ye hyarTA lInA ye cApyanirmalAH	
+208567	tannAgaM palamekaM tu SulbacUrRapalAzwakam	
+209222	kurute dantadArQyaM ca dfSO gfDradfSAviva	
+209338	uktadravye taddravatAqanametadDi so'Bizekastu	
+20995	samBUya svAni karmARi kurvadBir iha mAnavEH	
+209969	vaMSAnucaritaM cEva purARaM paYcalakzaRam	
+210020	vistaraM narmadAyAstu tIrTAnAM munisattama	
+211047	evaM jYAtvA tu viDinA vartitavyaM dvijAtiBiH	
+211769	yattanmuhUrtAdiha nAmarUpaM tAvat prapaSyAmi jagattaTEva	
+212113	ezA vE vastrasamBUtA narmadAtoyasamBavA	
+212240	tatkaTaM tu BavetpuRyam fzisidDanizevitam	
+212333	nArada uvAca	
+212431	nArada uvAca	
+212543	pOze tu kuNkumaM deyaM mAGe pAtraM tilEr Bftam	
+212636	raTaM mahImayaM kftvA Duri tAvaSvinAvuBO	
+212743	SumBo qimBaSca rOdraSca prahlAdaScAsurottamaH	
+213014	narmadottarakUle tu dArutIrTamanuttamam	
+213049	sidDastenEva tannAmnA KyAtaM loke mahacca tat	
+213472	tatra loke virudDaM vE kupyante yena vE dvijAH	
+213485	kftvA haste kapAlaM tu brahmaRaSca mahAtmanaH	
+213542	na tacCreyo 'gnihotreRa nAgnizwomena laByate	
+214176	varaM dattvA sa tasyEvaM tatrEvAntaraDIyata	
+214345	namaH paNkajanABAya namaH paNkajamAline	
+21459	tadDetutvena sarvatra hetUnAm anavasTitiH	
+216101	mAsamAnamatra vizamatIvrajvaranimittam anyatrAlpamiti	
+217329	agnivfdDaye tu maDvArdrakarasam anupibet	
+218631	sa dattvA tumulaM yudDaM pitfvyasyendrajid yuDi	
+219925	dIno dInasvarAn sarvAMstAn uvAca niSAcarAn	
+220100	nABijagmur mahAGoraM nirdahantaM SarAgninA	
+220102	raRe rAmasya dadfSuH karmARyasukarARi ca	
+220306	rUkzakfzRAruRasirAtantujAlagavAkzitaH	
+220426	pitAmahena prItena devadAnavarAkzasEH	
+220718	lavaRakzAratIkzRozRaSAkAmbu svapnajAgaram	
+222630	divasayugmamaDaH kftavahninA sa ca BavedaruRaH kamalacCaviH	
+224547	na hi me jIvitenArTaH sItayA ca jayena vA	
+224676	vezwitAM pUrvakalkena raviGarmeRa Sozayet	
+22478	hrasvaM netrOzaDaM yojyaM viSadaM nIlamfttikA	
+22646	yA na tyajati nijaruciM nikaze GfzwApi sA smftA jAtyA	
+227716	samBavanti na te rogA medo'nilakaPodBavAH	
+227844	tezAm asaMBramaM dfzwvA vAjinAM rAvaRastadA	
+229158	karaYjapallavAn KAded vAtavarco'nulomanAn	
+229514	sakalasuramunIndrEr vanditaM SamBubIjaM sa jayati BavasinDuH pAradaH pArado'yam	
+22989	sattvaM rajastama iti prakfterguRAstEr yuktaH paramapuruza eka ihAsya Datte	
+229892	rasendrajAraRe proktA viqadravyezu Sasyate	
+229996	rAGavasya vacaH SrutvA tvaramARo viBIzaRaH	
+23008	nAneva BAti viSvAtmA BUtezu ca taTA pumAn	
+23126	ucyate dfzwaH	
+231551	muYcet pawvOzaDayutaM sa pibed alpaSo Gftam	
+232599	iti	
+233027	akzIyamARo milati ca bIjEr badDo Bavatyeva	
+234677	svaM svaM kuryAt kramaM miSraM miSradoze ca kAlavit	
+235007	tasya vinaSyatyagnirna Kalu krAmati raso Baved vyADiH	
+236698	brAhmaRArTe niyuktasya rakzataH sarvatApasAn	
+237486	ete maRqUravawakAH prARadAH pARqurogiRAm	
+237650	dAhe SvetAsitaM SvetaM nikaze laGu ca vrajet	
+237758	catvAriMSatpuwErevaM pacettAraM mftaM Bavet	
+238413	punaScApahfte rakte vAtaSlezmajid OzaDam	
+238545	himaM kazAyalavaRaM pARqudAhaharaM saram	
+239191	muktaH suraripor vIra prAptaSca vijayastvayA	
+239322	nErftAnAM sahasrEstu hfzwEH pramuditEH sadA	
+239330	SrIBEravaH	
+23964	atra paratvAj jyezWaH	
+240574	mArjAreRa yaTA sarpAH sarpeRa ca yaTAKavaH	
+240905	daSagrIva taTA yatnaM kuruzvAmitavikrama	
+241047	pratyuvAca prahastaM taM vAkyaM vAkyaviSAradaH	
+241234	saMyogajapraBAveRa tasyApyanye guRAH smftAH	
+241806	nidrABiBUte tu tadA kumBakarRe daSAnanaH	
+242323	yAvat tvAM na vaDizyanti narAstAvad Bavizyasi	
+242851	namucir virocanaScEva tAvuBO maDukEwaBO	
+243391	vAksvarasmftimeDAkfdDanyaM brAhmIGftaM smftam	
+244062	nAjYAyata tadA yudDe saha kenApyayuDyata	
+244911	tattIrTasya praBAveRa sa sadyaH puruzo 'Bavat	
+244957	ISvara uvAca	
+24507	tuzyanti ca pfTak sarve te manuzyAstaTA taTA	
+24547	kAni vA tAni DarmasADanAni yEr harzotpattir mAhAtmyalABaSca Bavati	
+246059	svargadaM durvinItAnAM vinItAnAM ca mokzadam	
+246985	brahmovAca	
+247283	gatA devA brahmalokaM tatra dfzwvA pitAmaham	
+247440	SrAdDaM ca brAhmaREstatra yogyEH pARqava mAnavAH	
+247657	saMsAre sarvasOKyAnAM nilayAste Bavanti ca	
+248194	SrImArkaRqeya uvAca	
+248824	evamuktastu deveSaH SaNKacakragadADaraH	
+249221	varaM vfRIzva BadraM te yatte manasi rocate	
+249423	tasyotpannasya BUtasya tejo rUpasya BArata	
+250321	mArkaRqeya uvAca	
+250370	agnizwomASvameDAByAM vAjapeyasya yatPalam	
+250439	namo namaste deveSa padmagarBa sanAtana	
+251355	grAmaBawwo divAkIrtir dEvajYo gardaBo Bavet	
+251573	SrImArkaRqeya uvAca	
+251815	prajA rarakza yatnena pitA putrAn ivOrasAn	
+252042	BaraRaM pAnaM vastraM ca dadAmyetasya rogiRaH	
+252044	svaBartfDarmiRIM kopaM mA kuruzvAtiTiM kuru	
+252196	devaKAte trayo devA brahmavizRumaheSvarAH	
+252728	hastyaSvaraTasampanno mahABogI paraMtapaH	
+253036	SrImArkaRqeya uvAca	
+253204	sOmyAsOmyEH sadA rUpEH sfjatyavati yA jagat	
+253388	yatra sidDiM parAM prAptaH somo rAjA surottamaH	
+253823	nArAyaRa uvAca	
+253830	tamajaM sarvaBUteSaM jAnIta paramaM padam	
+253845	sarvaBUtAni govindAd yadA nAnyAni BUpate	
+254064	devatIrTe tu yaddAnaM SradDAyuktena dIyate	
+254267	kilEvaM SrUyate gATA purARezu surottama	
+255725	proktA dakziRagaNgeti BAratasya yuDizWira	
+25620	so 'jyezWaH syAd aBAgaS ca niyantavyaS ca rAjaBiH	
+25645	ete rAzwre vartamAnA rAjYaH pracCannataskarAH	
+256487	aham apyatra puline SaradindusamapraBe	
+257334	rasaratnAkare'pi	
+258017	mallaM SarAvapAtram	
+258096	viBIzaRam aTovAca rAmo maDurayA girA	
+25837	nAbrahma kzatram fDnoti nAkzatraM brahma varDate	
+258534	agnimanTasya puzpARi pIluSigruPalAni ca	
+258745	pUtiganDiH sTirIBUtaH SarkarA sApyupekzitA	
+260032	sarvam etad dvijArTaM me satyam etad bravImi vaH	
+26131	taj jIyate'nyena SuBena kena samboDicittaM yadi nAma na syAt	
+261327	yaH punaretEH kurute karmASudDEr Baved rasastasya	
+261553	na SUdro laBate Darmam ugraM taptaM nararzaBa	
+261775	iti	
+262273	SrutvA tu BAzitaM vAkyaM mama rAma SuBAkzaram	
+262692	sa muhUrtAd upaSrutya devarzir amitapraBaH	
+262994	yAvallokA Darizyanti tAvad asya vaSAnugAH	
+264237	tacCrutvA rAGavaH prIto maharzermAtulasya ca	
+264576	tad vAkyaM lakzmaRenoktaM SrutvA rAma uvAca ha	
+265117	yavAmalakacUrRaM ca prayogaH SrezWa ucyate	
+265158	grIzmavarjyezu kAlezu divAsvapnAt prakupyataH	
+265693	devEr apyApadaH prAptASCannESca bahuBistadA	
+266505	divyaM sOganDikaM puzpaM yenAjEzIt sa pARqavaH	
+266560	nedaM BIme pradAtavyam ayaM krudDo vfkodaraH	
+267617	sa cEvopalaBedaSca nagaBid dfzad aSmajit	
+26768	yad vA tapasi te nizWA sa eza madanugrahaH	
+268044	vikarRaM SukabarhaM ca haritaM SIrRaromakam	
+268154	kaPapittAsrajAn hanti grahaGnaH SIrzaroganut	
+26867	hataH sugataSabdo'pi kalpakowiSatErapi	
+268900	ayaM padArTo vyAvahArikanAmnAsmin deSe loke na prasidDaH	
+269085	hutvA ca pradakziRamagnimanuparikrAmet	
+269518	evaM vizaviDiH KyAtaH prayogaM ca vadAmyaham	
+271346	kzamADanA vayaM krUrEr balAt tvaM nIyase SuBe	
+271410	hiraRyakaSiporvaMSe jAto 'haM lokaviSrutaH	
+272787	vikftyA yasya vA nIlO na sa rogAdvimucyate	
+273135	sattvalakzaRasaMyogo BaktirvEdyadvijAtizu	
+273176	yajYasidDipradAstABirhInaM cEva sa izwavAn	
+273281	kaPapittAttrikagrAhI pfzWAdvAtakaPAtmakaH	
+274636	te hi rAjYo DarmakarAH	
+275381	iti SrIliNgamahApurARe uttaraBAge vizRumAhAtmyaM nAma dvitIyo 'DyAyaH	
+276266	ye samarTA jagatyasmin sfzwisaMhArakAraRe	
+276447	mayA cEzA na saMdehaH SradDAM jYAtumihAgataH	
+276471	pakzadvAdaSakaM vApi dinadvAdaSakaM tu vA	
+276849	BasmavratAS ca muRqAS ca vratino viSvarUpiRaH	
+277045	mahatI devatA yA sA mahataScApi suvrata	
+277270	tAsAM savarRAvedane pARir grAhyaH	
+277360	BavantamavahadvizRurdevadevaM jagadgurum	
+277849	kzitirvAyuH pumAnaMBaH suziraM sarvagaM taTA	
+278439	na vijAnanti saMmUQA mAyayA tasya mohitAH	
+278669	harivarzastftIyastu caturTo vE tvilAvftaH	
+278978	vimalasvAdupAnIye nEkaprasravaREryute	
+279226	nAnAjYAnArTasampannA durbalAScAlpaBoginaH	
+279460	kulAlacakranABistu yaTA tatrEva vartate	
+279729	ekarAtriM surAH sarve pitfBistvfziBiH saha	
+279865	etacCrutvA tu munayaH punastaM saMSayAnvitAH	
+27988	kfzRAjinopavItAkzAn biBrad daRqakamaRqalU	
+280456	vasizWamAha viSvAtmA GfRayA sa GfRAniDiH	
+280986	sahasrabAhuH sarvANgaH SaraRyaH sarvalokakft	
+281060	agfhRAd vaMSakartAraM praBAgfhRAtsutAnbahUn	
+281244	yacca kAmasuKaM loke yacca divyaM mahatsuKam	
+281846	te sattvasya ca yogena sfzwAH sattvodBavAH smftAH	
+282177	srazwavyA nAtmanastulyAH prajA deva namo'stu te	
+282371	vizRuruvAca	
+282811	aTa devo mahAdevaH sarvajYastadavEkzata	
+282944	sAmarTyaM ca sadA mahyaM BavantaM voQumISvaram	
+283476	praRavAdinamo'ntAni sarvavarRAni suvratAH	
+284019	ete hiraRyavarRABA garuqA vizRuvAhanAH	
+284022	kASyapo nAradaScEva daDIcaScyavanas taTA	
+284222	brAhmaRAn BojayitvA ca SivaBaktAn sadA SucIn	
+28431	vAse bahUnAM kalaho Baved vArttA dvayor api	
+284554	sarvasidDikaraM puRyaM sarvarakzAkaraM Sivam	
+284804	vyADyAgame SucirBUtvA juhuyAtsamiDAhutim	
+284962	jyotizaM cAparA vidyA parAkzaramiti sTitam	
+285146	jYAnavErAgyayuktasya yogasidDirdvijottamAH	
+28521	AGAtaM nIyamAnasya vaDyasyeva na tuzwidaH	
+285275	na jAyate na mriyate Cidyate na ca Bidyate	
+28579	darSanasparSanaGrARaBojanaSravaRAdizu	
+286390	tasyEvaM balinastveko hantA rudraH paraMtapaH	
+286675	brahmacArI gfhasTaSca vAnaprasTo 'Ta BikzukaH	
+286681	iti	
+286717	garBADAnam ftO puMsaH savanaM spandanAt purA	
+287221	iti	
+287289	iti	
+28793	parAyaRaM dvijaSrezWAH SriyaH kIrter damasya ca	
+288567	jyotirmayo nirAkAro jagannATo jaleSvaraH	
+289244	candrareKAvataMsAS ca nIlakaRWAs trilocanAH	
+289481	samprApya tuzwuvuH sarve pitAmahapurogamAH	
+289573	praRamyAhustu tatsarve haraye devasattamAH	
+289861	lakzmIsamanvito vizRuraSfRodgAnamuttamam	
+290475	annavinimaye viSezamAha gOtamaH	
+291438	sUta uvAca	
+29145	ijyADyayanadAnAni sarvezAM ca dvijanmanAm	
+291793	samudrARAM ca sarvatra vyApI sarvamumApatiH	
+292346	ete SUdrezu BojyAnnA yaScAtmAnaM nivedayet	
+293263	tadvizRoH paramaM padam iti vA	
+294380	haMsAkAreRa vE gAtraM hemABAsena suvratAH	
+295098	brahmabrAhmaRavfdDAya brahmaRe viSvaveDase	
+295279	viSvedevASca sADyASca paSavaH pakziRo mfgAH	
+295472	SilodBavAnAM biMbAnAM citrABAsasya vA punaH	
+295668	anayA saMhftiH SaMBor vidyayA munipuNgavAH	
+29597	vrAtyAnAM yAjanaM kftvA parezAm antyakarma ca	
+296013	drOpadyuvAca	
+296126	janamejaya uvAca	
+297029	asya varzasya SezaM ced vyatIyur iha pARqavAH	
+297539	prahasann abravId rAjan kutrAgamanam ityuta	
+297674	iti sma kuravaH sarve vimfSantaH pfTak pfTak	
+297736	BIzmo droRaH kfpo drORiH pOruzaM tad apUjayan	
+298473	tAnyanIkAnyadfSyanta kurURAm ugraDanvinAm	
+298532	sa tu labDvA punaH sTAnaM gOtamaH savyasAcinam	
+299412	nakulaH sahadevo vA drOpadI vA yaSasvinI	
+300279	upatizWatu mAM devI etad asyA hitaM param	
+30077	anizyamARo'pi balAtkroDa utpadyate taTA	
+300804	dizwyA na yudDamanasaH saha dAmodareRa te	
+300892	astamBanIyaM yuDi manyamAnaM jyAkarzatAM SrezWatamaM pfTivyAm	
+30117	tena SastraM mayA kAyo gfhItaH kutra kupyate	
+301512	na hi te darSane 'kAlyo jAtu rAjA bravIti mAm	
+301515	abravIt prAYjalir vAkyaM cintayAnaM narADipam	
+301522	tanme dahati gAtrARi tad akArzIt prajAgaram	
+30235	kzAntyA samaM tapo nAsti nanvetattadupasTitam	
+302476	brahmeSAnAdayo devAH sarvaSaktiriyaM mama	
+303842	vItarAgAMSca sarvajYAn kowikowiSatAn praBuH	
+30429	utsfzwadIrGormiBujEr ivArtaS cukroSa yajYeSvara pAhi meti	
+305061	ISvaro hi jagatsrazwA praBurnArAyaRaH svarAw	
+305461	baBUvuste taTA SApAjjAyamAnAH punaH punaH	
+305776	namo DarmavijYAnanizWAya tuByaM namaste varAhAya BUyo namaste	
+306338	tamUcurBrAtaro rudraH sevitaH sAttvikErjanEH	
+306740	mAdryAM vfzReH suto jajYe pfSnirvE yadunandanaH	
+307139	na ca liNgArcanAt puRyaM loke'smin BItinASanam	
+307188	namaH SivAya SAntAya brahmaRe liNgamUrtaye	
+307254	SrutvA sakfdapi hyetat tapaScaraRamuttamam	
+308423	sUta uvAca	
+30850	pratyakzaM cAnumAnaM ca SAstraM ca viviDAgamam	
+308649	yatra devo mahAdevo devyA saha maheSvaraH	
+308673	idAnIM SrotumicCAmastrilokasyAsya maRqalam	
+309100	muKyAvalokane ca tadanukaraRapratiBAsaH	
+309733	suzumno harikeSaSca viSvakarmA taTEva ca	
+309738	harikeSastu yaH prokto raSmirnakzatrapozakaH	
+309991	tezAM tat paramaM sTAnaM devAnAmapi durlaBam	
+310366	upAdAnam kAraRam tasya grahaRAt	
+310422	samudro niDanam	
+31069	aTa me kuru kalyARaM kAmaM kamalalocana	
+310767	triguRaM vyaktam avyaktaM cAguRaH puruzaH	
+31088	parIto BUtaparzadBir vfzeRAwati BUtarAw	
+310968	tasmAcca viparyAsAt	
+31109	na me garBam imaM brahman BUtAnAm fzaBo 'vaDIt	
+31118	kaSyapa uvAca	
+311658	ucyate	
+311779	atrAntaraM brahmavido viditvA lInA brahmaRi tatparA yonimuktAH	
+311968	svaBAvam eke kavayo vadanti kAlaM taTAnye parimuhyamAnAH	
+312949	araRye PalamUlASI carizyAmi mfgEH saha	
+313154	aniketaH paripatan vfkzamUlASrayo muniH	
+313217	SArIraM dravyam utsfjya pfTivIm anuSAsataH	
+313479	AtmanEkena yodDavyaM tat te yudDam upasTitam	
+313824	steyaM tvayA kftam idaM PalAnyAdadatA svayam	
+314165	saMsArezvanuBUtAni kasya te kasya vA vayam	
+314421	yaH sa varzaSataM rAjA hutaSizwASano 'Bavat	
+314772	mA vizAdaM kfTA rAjan kzatraDarmam anusmara	
+314990	jAnatA tu kftaM pApaM guru sarvaM Bavatyuta	
+315447	SatruBir viviDEH SastrEH kfttadehA mahAraRe	
+315471	saha sAtyakinA SOrir arjunasya niveSanam	
+315599	SiSye paramayA lakzmyA vfto brAhmaRasattamEH	
+315671	puzkaraM puzkarAkzasya tasmE padmAtmane namaH	
+316340	Gawate vinayastAta rAjYAm eza nayaH paraH	
+316943	na hi svam asti SUdrasya BartfhAryaDano hyasO	
+317106	sarve yogA rAjaDarmezu coktAH sarve lokA rAjaDarmAn pravizwAH	
+317220	sarvalokasya karmARi kartavyAnIha pArTiva	
+317468	vivftya hi yaTAkAmaM gfhadvArARi Serate	
+317778	BIzma uvAca	
+318048	brahmasve rakzyamARe hi sarvaM Bavati rakzitam	
+318405	yo na kAmAd BayAl loBAt kroDAd vA Darmam utsfjet	
+318439	atrApyudAharantImam itihAsaM purAtanam	
+319053	aNgam etanmahad rAjYAM Danino nAma BArata	
+3193	nAnAnibanDEH suratopacArEH krIqAsuKaM janmaPalaM narARAm	
+319425	jaGanyam Ahur vijayaM yo yudDena narADipa	
+319732	narakasyApratizWasya mA BUta vaSavartinaH	
+319863	AcArAd eva puruzastaTA karmasu vartate	
+319885	nakulAkzAstaTA cEva sarve SUrAstanutyajaH	
+320090	iti duzwasya vijYAnam uktaM te surasattama	
+320147	yAdfcCikaM mamAsIt tad rAjyam ityeva cintaye	
+320156	yaTA labDopapannArTastaTA kOsalya raMsyase	
+320383	jAtyA ca sadfSAH sarve kulena sadfSAstaTA	
+320393	mAtApitror gurURAM ca pUjA bahumatA mama	
+320502	taTAgataM ca yo hanyAnnAsO pApena lipyate	
+320678	mAMsApanayanaM jYAtvA vyAGrastezAM tu tad vacaH	
+320798	papracCa saritaH sarvAH saMSayaM jAtam AtmanaH	
+320892	labDuM labDvA cApi sadA rakzituM BaratarzaBa	
+321004	fziRA SaraBaH SaptaH svaM rUpaM punar AptavAn	
+321243	prajA rakzati yaH samyag Darma eva sa kevalaH	
+321381	nEva kAryaM na cAkAryaM BojyABojyaM na vidyate	
+321635	SrIr uvAca	
+321660	BIzma uvAca	
+321863	upayAto naravyAGra lokapAlo yamastadA	
+32204	jAtyaBimAno gfhasTABimAnaSca	
+322522	SatrurUpASca suhfdo mitrarUpASca SatravaH	
+323368	kaTaM kapotena purA SatruH SaraRam AgataH	
+323893	BIzma uvAca	
+324425	ete pramattaM puruzam apramattA nudanti hi	
+324440	dayayA sarvaBUtAnAM nirvedAt sA nivartate	
+324662	Saratalpagato BIzmo nakulAya mahAtmane	
+324709	tasmin girivare putra puzpitadrumakAnane	
+325245	hantavyo 'yaM mama matir BavadBir iti rAkzasAH	
+325248	dasyUnAM dIyatAm eza sADvadya puruzADamaH	
+325260	mitradrohI nfSaMsaSca kftaGnaSca narADamaH	
+325410	yadA na kurute DIraH sarvaBUtezu pApakam	
+325881	utsavAd utsavaM yAnti svargAt svargaM suKAt suKam	
+326008	kaTaM salilam utpannaM kaTaM cEvAgnimArutO	
+326490	Srotum icCAmi DarmajYa sarvajYo hyasi me mataH	
+326656	itImaM hfdayagranTiM budDiBedamayaM dfQam	
+327889	sparSarUparasAdyezu saNgaM gacCanti bAliSAH	
+327893	maDu tElaM payaH sarpir mAMsAni lavaRaM guqaH	
+328857	badDaSca vAruREH pASEr vajreRa ca samAhataH	
+330195	grIzme ca paYcatapasaH SaSvacca mitaBojanAH	
+330553	karmaRA manasA vAcA brahma sampadyate tadA	
+330763	tad etad BasmasAd BUtaM jagat sarvam upaplutam	
+331005	atIva tapasA yukto GoreRa sa baBUva ha	
+331438	mAtA jAnAti yad gotraM mAtA jAnAti yasya saH	
+331571	nEva dasyur manuzyARAM na devAnAm iti SrutiH	
+331767	kapila uvAca	
+33186	yadi pratyakzamapyetadameDyaM nADimucyase	
+331925	sarvaM suKaM yacCivam uttamaM ca brahmAvyaktaM praBavaScAvyayaSca	
+332270	BIzma uvAca	
+332458	Bruvor anantarAstasya grahA dAnavasattama	
+332636	viSvAtmA sarvagaScEva bahumAyaSca viSrutaH	
+332795	ime hi BUtale devAH praTitAH kurunandana	
+332867	BIzma uvAca	
+333266	paryakrAmad dahyamAna itaScetaSca tejasA	
+333756	daMzwriByaSca paSuByaSca prAkfto vaDa ucyate	
+333965	sADyA UcuH	
+33398	kva yAsyasi mayA dfzwaH sarvadarpAnnihanmi te	
+334181	SlezmamUtrapurIze ca tIvraganDasamanvite	
+334215	varRAnAM ca kzayaM dfzwvA kzayAntaM ca punaH punaH	
+334270	rajo vahati rAjendra sattvasya paramAM gatim	
+334563	DAma tasyopayuYjanti BUya eva tu jAyate	
+334567	sA hyasya prakftir dfzwA tatkzayAnmokza ucyate	
+334711	tasmAnmahat samutpannaM dvitIyaM rAjasattama	
+335273	etezAM saha saMvAsaM vivAsaM cEva nityaSaH	
+335296	dviguRaM yogakftyaM tu yogAnAM prAhur uttamam	
+335529	yaTEva buDyate matsyastaTEzo 'pyanubuDyate	
+335633	jarAmftyU hi BUtAnAM KAditArO vfkAviva	
+335745	rAjyESvaryamayaH pASaH snehAyatanabanDanaH	
+336404	smitapUrvABiBAziRyo rUpeRApsarasAM samAH	
+336580	divyaM varzasahasraM hi pAdenEkena tizWataH	
+336639	BIzma uvAca	
+336788	AtmaBUtEr atadBUtaH saha cEva vinEva ca	
+337087	kElAsapfzWAd utpatya sa papAta divaM tadA	
+337094	dadfSuH sarvaBUtAni jaNgamAnItarARi ca	
+337105	saMBrAntamanaso rAjann Asan paramavismitAH	
+337404	sa hi madBAvito rAjA madBaktaSca Bavizyati	
+337891	prApya SvetaM mahAdvIpaM BUtvA candrapraBo naraH	
+338537	tasmAnna cyutapUrvo 'ham acyutastena karmaRA	
+338963	jyotirBUte jale cApi lIne jyotizi cAnile	
+339184	Sreyastava viDAsyAmi balaM tejaSca suvrata	
+339591	BIzma uvAca	
+339616	kartuM kANkzAmi necCAmi badDaH sADAraREr guREH	
+339682	BIzma uvAca	
+340061	sataH sajjAyata iti vfdDAH	
+340576	bAhye lakzyaM na laByeta taTEvAByantare'pi ca	
+340684	uBAByAM ca SramaM kuryAnnArAcESca SarEstaTA	
+34095	pAhi mAM paramAtmaMs te prezaRenAsfjaM prajAH	
+34194	dIpaH prakASata iti jYAtvA jYAnena kaTyate	
+342020	tyajyatAM tadgataH snehaH SrUyatAM cAsya niScayaH	
+343012	kAryaviSezeRa nAnAtvam	
+34377	aTAnyonyavaSAtsattvamaBAvaH syAd dvayorapi	
+343802	karmaBiH karmARi guRErguRAH	
+343817	karmaBiH karmARi guRErguRAH	
+343998	strItvapuMstvADipatyAttu kAyAt strIpuruzendriye	
+344635	sa tAm Aha	
+345147	etAH sarvA vfttayo nirodDavyAH	
+345483	BIzmam evABirakzantu BavantaH sarva eva hi	
+345577	na yotsya iti govindam uktvA tUzRIM baBUva ha	
+345975	sarvaBUtAtmaBUtAtmA kurvann api na lipyate	
+345981	lipyate na sa pApena padmapatram ivAmBasA	
+346296	virudDaM varjayet karma pretaDUmaM nadItaram	
+346663	tatra durgARi kurvIta janakoSAtmaguptaye	
+346873	gopaSORqikaSElUzarajakavyADayozitAm	
+348586	ayomayyaH SalAkAS ca varmARi viviDAni ca	
+350174	katamA katamark katamat katamat sAma katamaH katama udgITa iti vimfzwaM Bavati	
+350357	tasya nAtidUre parivrAjakAvasaTaH	
+351582	tasya vA etasyAnasaH	
+351888	iti SrIdaRqinaH kftO daSakumAracarite somadattacaritaM nAma tftIya ucCvAsaH	
+352494	karoti tfRamftkAzWEr gfhaM vA gfhakArakaH	
+352592	DUmaM niSAM kfzRapakzaM dakziRAyanam eva ca	
+353429	aTa PAlgunavfzwijYAnam	
+353921	eraRqahastikarRe prAcInAmalakavAribadare dve	
+354007	mitrARi mEtre	
+354457	brahmaRA na mayA vApi na sa vaDyaH Sivena vA	
+354783	SrISuka uvAca	
+354971	sarvAn kAmAnmahAtejAH pradadAvambikAsute	
+355390	svara	
+355755	sa putrapaSuBir vfdDiM yaSaScAvyayam aSnute	
+355938	tvam eva vidura brUhi prajYASezo 'sti cet tava	
+356842	yasya yantA hfzIkeSaH SIlavfttasamo yuDi	
+356938	duryoDana uvAca	
+356990	apyagniM praviSeyuste samudraM vA paraMtapa	
+357145	aSvatTAmA vikarRaSca sEnDavaSca jayadraTaH	
+357573	yo 'sO vanyo gajaH so 'nyo rAjA rAjann upAgataH	
+357743	itIdaM nfpatiH SrutvA tAm uvAca kftasmitaH	
+35845	ucyate jAlasya	
+358523	asmAkaM tu na yAtAni gocaraM cakzuzAm iti	
+358592	SvaSureRAByanujYAtaH prItena ca mahIBujA	
+358593	dUtEH sa pratidUtES ca saha vArARasIM gataH	
+358873	latAyAH sahakArasya PalAni mukulEr iva	
+359800	SarIraM rAjaputrasya dvitIyam iva gomuKaH	
+359808	tisfRAM ca prayuktAnAm aBavad BavataH priyA	
+360369	grahItavyAni nAmAni gurudevadvijanmanAm	
+360821	evaM mAnasavegAnAM vfndEr ambaram Avftam	
+360924	yuzmatsmaraRapUto 'yaM janaH kiM kurutAm iti	
+360985	yo hi deSAntaraM yAti mugDo 'pi DaraRIcaraH	
+361020	kva ca kasyApi pAnTasya rajjuBAge vyavasTitaH	
+361608	anenEva tvadIyena SarIreRAham arTinI	
+361663	aTa gacCati sma ravir astaBUDaraM vasitadrumAn aDi SakuntapaNktayaH	
+363002	tayoktam ayam AramBo yuzmAkaM dfSyate yaTA	
+364109	sADuBir varjyamAnasya nazwam etac catuzwayam	
+364152	etasminn Akule kAle SAlaskanDAvftaH paraH	
+364778	tvadIyena tu putreRa tyaktasarvAnyakarmaRA	
+364800	yac ca sAgaradattena mayA ca pariBAzitam	
+364801	budDaM tad BavataH sarvaM sahadUtasamAgamam	
+365740	svaH prapadye 'munAmunAmunA	
+365923	vanditvA punar abrUtAM brUta kiM kriyatAm iti	
+366254	kriyatAM vatsakOSAmbIsaMbanDEva punaH kaTA	
+36659	lokasya tamasAnDasya cakzuH sUrya ivoditaH	
+367173	dakziRA dik kalA	
+367648	praviSa rADe mADavasamIpam iha	
+367760	tasmE hovAca	
+367761	prARaH kalA	
+368122	muniBiH pfzwavAn devaM pUjitaM jYAnakarmaBiH	
+370038	prasahya dApayed deyaM tasmin sTAne na cAnyaTA	
+370540	tvamakzaraM paramaM veditavyaM tvamasya viSvasya paraM niDAnam	
+370641	so 'pISvaraniyogena kubero vartate sadA	
+370691	sApi vidyA maheSasya niyogavaSavartinI	
+370796	brahmA yogI paramAtmA mahIyAn vyomavyApI vedavedyaH purARaH	
+373378	prayAgAdizu tIrTezu puRyezvAyatanezu ca	
+373674	tasyAditya eva samit	
+373693	diSo 'NgArAH	
+373712	tasyA Ahuter garBaH samBavati	
+374344	vyAsa uvAca	
+37451	devyaBAvaH sa vijYeyo yatra BAvAH kzayaM gatAH	
+374708	tatretaraH svajaGanam utkzipet	
+374809	yatra maNkaRako rudraM prapannaH parameSvaram	
+375571	prayuYjAno varastrIzu sidDiM gacCati nAyakaH	
+376059	tanmitrezu viSvasiti	
+376262	yatra devAdidevena cakrArTaM pUjito BavaH	
+376985	nArada uvAca	
+377133	rAtrO BartA gatastatra rakzito vidyayA tvayA	
+377745	balaBadraH pralambaGno yamunAkarzaRo 'Bavat	
+377806	nigfhItArizaqvargastaTA vijayate mahIm	
+378524	BUyaH kaTaya tfptir hi SfRvato nAsti me 'mftam	
+378581	manyase yadi tacCakyaM mayA drazwum iti praBo	
+378604	praRamya SirasA devaM kftAYjalir aBAzata	
+379160	saMjaya uvAca	
+379346	tuzwo 'smi pUjitaScAsmi yat kANkzasi tad astu te	
+379953	ahaM ca tvAnuyAsyAmi BImaH kfzRaSca mAriza	
+380498	BImasenaM taTA dfzwvA prAkroSaMstAvakA nfpa	
+380646	arDacandreRa vyUhena vyUhaM tam atidAruRam	
+380843	sarvaDarmaviSezajYaH pitA devavratastava	
+381334	vigAhya tad gajAnIkaM BImaseno 'pi pARqavaH	
+381470	taM dfzwvA vyaTitaM BImam aBimanyupurogamAH	
+381795	avajAnanmahAtmAnaM Gore tamasi majjati	
+381886	brahmarziBiSca devESca yaH purA kaTito Buvi	
+382783	sa hatASve raTe tizWaY SrutakarmA mahAraTaH	
+382823	varacApaDarA vIrA vicitrakavacaDvajAH	
+383103	darSayAnAH paraM SaktyA pOruzaM puruzarzaBa	
+38320	sarvaM mAyeti tarkeRa svasTas tyaktvA na tat smaret	
+383490	Goram AyoDanaM jajYe BUtasaMGasamAkulam	
+383726	taTEva kOrave rAjann avaDyanta pare raRe	
+384200	samaByaDAvan kroSanto rAjAnaM jAtasaMBramAH	
+384272	droRaM duryoDanaM Salyam aSvatTAmAnam eva ca	
+384324	samAgamaSca bahuBiH purABUd asurEH saha	
+384459	saMjaya uvAca	
+385453	mahAraTAH samAKyAtAH kulaputrAstanutyajaH	
+385615	Sakyo jetuM yamaH krudDo vajrapARiSca devarAw	
+386128	nEmittikastu sarvezAM parvaRAM pUjanaM japaH	
+386232	anyonyAtiSayEr yuktaM yaTA vftramahendrayoH	
+386257	vimuKIkftya putraM te tava senAM mamarda ha	
+386486	uzRIzEr apavidDESca cAmaravyajanEr api	
+386583	ayaM cApi mahezvAsaH pArzato vAhinIpatiH	
+386837	na ca te 'sya rujaM cakruH pitustava janeSvara	
+386869	nAByavartanta rAjAnaH sahitA vAnaraDvajam	
+387474	vidustvAM niDanaM pArTa sarvakzatrasya tadvidaH	
+387930	vedaM zaqaNgaM vedAham arTavidyAM ca mAnavIm	
+388375	jitavAn puRqarIkAkzo yavanAMSca sahAnugAn	
+38938	navanAgabalaM Datte kAntyA sUrya ivAparaH	
+389898	catvAri tu sahasrARi vAsudevasya ye 'nugAH	
+390358	AdAya karRaM vivyADa trisaptatyA nadan raRe	
+390367	evam eza mahArOdraH kzayArTaM sarvaDanvinAm	
+390438	yanmAM pfcCasi rAjendra sOBadrasya nipAtanam	
+390969	tad asya brUhi me vIryaM karma cAgryaM mahAtmanaH	
+391074	DanuzaSca SarARAM ca tad apaSyAma kevalam	
+391573	sa nUnaM bahuBir yattEr yuDyamAno nararzaBEH	
+39173	anena kurute divyaM rUpametanna saMSayaH	
+392040	sAmnA ye sarvaBUtAni gacCanti gatamatsarAH	
+392339	hariRA candanenANgam anulipya mahABujaH	
+392658	SrUyante sma giraScitrAH parasparavaDEziRAm	
+392945	tEH samyag astEr balinA kftinA citrayoDinA	
+393803	raTamArgapramARaM tu kOnteyo niSitEH SarEH	
+394175	asya prADAnyAt	
+394228	eza duryoDanaH kfzRa droRena vihitAm imAm	
+394390	kaTAsvanuvfttir anyatra sapatnyAH	
+394937	saMjaya uvAca	
+39504	gOryASca nilayo vinDye vinDyasUryasamAgamaH	
+39513	sutasya ca taTotpattirdevyAScAnDakadarSanam	
+395660	amarzI kftavarmA tu sAtyakiM paryavArayat	
+396207	yaTA purA vajraDaraH prasahya balasya saMKye 'tibalasya rAjan	
+39660	prajAsu ca vivfdDAsu prayAge yajataSca ha	
+396862	kva te mAnaSca darpaSca kva ca tad vIra garjitam	
+397116	saMjaya uvAca	
+397194	tam api prahasan droRaH SarEr ninye yamakzayam	
+397205	Adatta sarvaBUtAni prApte kAle yaTAntakaH	
+397356	sAtyakiSca mahAvIryaH kartavyaM yadi manyase	
+397899	AScaryaBUtaM loke 'smin samudrasyeva SozaRam	
+397926	sEnDave hi mahAdyUtaM samAsaktaM parEH saha	
+397954	hatASvasUtAt sa raTAd avaplutya mahAraTaH	
+39835	maRqalasTaM mahAdevam astOzId dInayA girA	
+398568	na pareRa samuddizwam upeyAt sAkziRaM rahaH	
+399547	nfSaMsaM bata kOnteya karmedaM kftavAn asi	
+39993	yaSca prARAnpriyAMstatra parityakzyati mAnavaH	
+400650	tvaM ca duryoDana balaM yadi Saknozi DAraya	
+401109	duryoDana uvAca	
+401261	etena sarvapAlAnAM vivAdaH samudAhftaH	
+401394	izavas tasya naSyanti yo vidDam anuviDyati	
+40148	pitAmaha uvAca	
+401552	tvayA nATena rADeya vacasA yadi siDyati	
+401815	mAtulenEvam uktastu drORiH SastraBftAM varaH	
+402873	ezo 'rjuno raRe yatto yuDyate kuruBiH saha	
+403905	tasyApyakzasamA bARA rukmapuNKAH SilASitAH	
+404082	atIva sA niSA tezAM baBUva vijayAvahA	
+404250	SaktihastaM punaH karRaM ko loke 'sti pumAn iha	
+404522	BaktaSca me mahAbAhuH priyo 'syAhaM priyaSca me	
+405080	vavO ca vizamo vAyuH sAgarAScApi cukzuBuH	
+405615	kasmin idaM hate rAjan raTasiMhe balaM tava	
+405794	yaTA yaTAham icCeyaM taTA BUtvA SarA mama	
+406447	apare pradrutAstatra dahyamAnA mahAgajAH	
+406561	vyAsa uvAca	
+406930	aNke kuruzva rAjAnaM DftarAzwra yuDizWiram	
+406965	vESaMpAyana uvAca	
+407331	na jAtu gamanaM tatra Bavet pArTa nirarTakam	
+407725	sAtyakir uvAca	
+408063	yaTA prItir mahAbAho tvayi jAyeta tasya vE	
+40820	sa cApi taruBistatra bahuBiH kusumotkarEH	
+408421	mAdrIputrO ca vaktavyO kzatraDarmaratO sadA	
+408424	mano manuzyasya sadA prIRanti puruzottama	
+408621	DarmArTayuktaM taTyaM ca yaTA tvayyupapadyate	
+408803	sahaBUtAstu BaratAstavEva syur janeSvara	
+408919	tapasvino mahAtmAno vedavratasamanvitAH	
+408957	yadyetad astram asmAsu yuktaM tApasa manyase	
+409043	kaRva uvAca	
+40915	madyamAMsaratAprajYA mohitAH SivamAyayA	
+409222	ugre tapasi vartante yezAM biByati devatAH	
+40968	sampradAyaM prayacCanti gurO tuzwe marIcayaH	
+409972	taTA tu ramamARasya divodAsasya BUpateH	
+410261	eza dozo 'BimAnena purA prApto yayAtinA	
+410348	yaH samyag vartamAnezu miTyA rAjan pravartate	
+41041	yastu harotsavamadButametaM gAyati dEvataviprasamakzam	
+41075	rasadIkzAvihInA ye proktalakzaRavarjitAH	
+410869	baBUvuScEva rUpARi yakzaganDarvarakzasAm	
+411043	rASivarDanamAtraM sa nEva strI na punaH pumAn	
+411161	na tvaM parasyAnuDuraM tAta jIvitum arhasi	
+411172	putra uvAca	
+411224	mAtovAca	
+41194	pUjayedrasasidDyarTaM vidyayA paYcabIjayA	
+412136	evaM jyezWo 'pyaTotsikto na rAjyam aBijAyate	
+412140	tasya pArTivasiMhasya rAjyaM DarmeRa SAsataH	
+412297	yam Aha kfzRo dASArhaH so 'stu no vAhinIpatiH	
+412905	aSaktena ca yacCaptaM BImasenena pARqava	
+412957	vAsudevasahasraM vA PalgunAnAM SatAni vA	
+412969	saMjaya uvAca	
+413153	sudakziRastu kAmbojo raTa ekaguRo mataH	
+415043	nihanyA iti taM droRaH pratyuvAca hasann iva	
+41533	sa badDvA mahatIM kaRWe SilAM brahmasutaH praBuH	
+415353	ahaM hi devo devAnAM sarvalokeSvareSvaraH	
+415356	niyamESca vratEstuzwa AcAreRa ca mAnavEH	
+416229	gacCa gacCa paraM sTAnaM yatra devo niraYjanaH	
+416624	na sragupAnahO	
+41693	rudreRa samatAM labDvA mahAgaRapatirbaBO	
+417	tadudBavaM kuRqapuzpaM sarvakAryArTasADakam	
+417173	stamBanAdicakrAya namaH	
+417841	oM padmAya namaH	
+417890	tES cAbdaM samAcaran	
+418637	iti Darmo DarmaH	
+418757	mudrAyA darSanaM rudra mUlamantreRa vA hara	
+418918	mUlamantreRa vE kuryAjjapapUjAsamarpaRam	
+419687	kadambakusumAkAro lakzmInArAyaRo'vatu	
+420051	apare aparAH	
+420052	aDare aDarAH	
+420150	tAneva devatAnAM ca pUrvamAnena kArayet	
+420322	AsanetAni sarvARi praRavAKyaM japedguruH	
+421705	pratyakze'pi kfte doze mUrKaH sAntvena tuzyati	
+42207	uktvA nadI Bavasveti visasarja mahAtapAH	
+422357	catvAriMSacca varzARi hInareKastu jIvati	
+422397	akarmakAc ca	
+422894	aparADaH sa dEvasya na punar mantriRAm ayam	
+423096	suhfdbalaM taTA rAjyam AtmAnaM kIrtim eva ca	
+423114	DanaDAnyADiko vESyaH SUdras tu dvijasevayA	
+42316	nadyaH sarvAH samAjagmuH paSavaScEva sarvaSaH	
+423232	sa kaTayati	
+424286	anyatra jAtaM ca na tatpraDAnaM mUlyaM BavecCilpiviSezayogAt	
+42512	SuBeByaSca namo vo 'stu aSuBeByastaTEva ca	
+425543	nadyAH Sezasya anyatarasyAm	
+425602	tfRe ca jAtO	
+42688	daSavarzasahasrARi daSavarzaSatAni ca	
+427470	sarpaH kUpe gajaH skanDe bila AKuSca DAvati	
+427517	yaTA pUrvakftaM karma SuBaM vA yadi vASuBam	
+428066	kzamasva jagatAM nATa trElokyADipate hara	
+428856	hariruvAca	
+429376	SukrapravfttO mftyustu jAyate SukrasaMSraye	
+429675	Adye made dvitIye 'pi pramadAyatane sTitaH	
+429755	antarmuKAni pARqUni dAruRopadravARi ca	
+430899	DanvantariruvAca	
+43137	taM sa rAjA daSaraTo gamizyati mahAyaSAH	
+431515	yAjanaM hi mamApyevaM vartate tvayi pArTiva	
+432624	trElokyam asfjad brahmA kftsnaM sTAvarajaNgamam	
+432976	prARApAnAvudAnaSca samAnaSca tam abruvan	
+433126	brAhmaRa uvAca	
+433186	tam aDvaryuH pratyuvAca nAyaM CAgo vinaSyati	
+433414	pitfpEtAmahe rAjye vaSye janapade sati	
+433878	aDiBUtaM tu karmARi SakrastatrADidEvatam	
+434057	izwaM dattaM tapo 'DItaM vratAni niyamASca ye	
+43426	etasminn antare vizRur upayAto mahAdyutiH	
+434559	SabdaH sparSastaTA rUpaM raso ganDaSca paYcamaH	
+434805	tejomayI vAg iti	
+43547	vizRor arDaM mahABAgaM putram ikzvAkunandanam	
+435510	janaka uvAca	
+435585	sa tasya damaSOcAByAM vikrAntena ca karmaRA	
+435720	uttaNka uvAca	
+435770	svargadvArasya gamane sTAne ceha dvijottama	
+436786	vESaMpAyana uvAca	
+437331	vavarza DanuzA pArTo varzARIva sureSvaraH	
+437562	taM ha prajApatir uvAca	
+438422	rAjAnaM BojarAjanyavarDano vizRur abravIt	
+438445	dizwyAsi pArTa kuSalI Danyo rAjA yuDizWiraH	
+438739	kalyARavftte kalyARi nEvaM tvaM vaktum arhasi	
+439476	kfzRanetro mahAbAhur devEr api durAsadaH	
+440282	snAnaM pAdodakaM vizRoH piban Sirasi DArayan	
+440418	amBasA kevalenATa karizye vratapAraRam	
+440483	SrutvA DarmaM vijAnAti SrutvA tyajati durmatim	
+440947	eza eva paro mokza eza svarga udAhftaH	
+44177	anujagmur mahAtmAnaM viSvAmitraM mahAmunim	
+441898	itTamBUtalakzaRe	
+4431	taTEvoccAraRenEva Baktiyuktena cetasA	
+44586	ayaM yajYahano 'smAkam anenASvo 'panIyate	
+45251	ihAgato mahAtejAH pUjAM prApya mahAtmanaH	
+45467	tava prasAdAd Bavatu devadeva mamepsitam	
+45667	yAvajjIvaM na saMdehaH keSAH syur BramaropamAH	
+45828	gacCed ikzvAkudAyAdo viSvAmitrasya tejasA	
+46107	puzkaraM SrezWam Agamya viSvAmitraM dadarSa ha	
+46312	putrO daSaraTasyemO kzatriyO lokaviSrutO	
+46327	tad etad devadevasya DanUratnaM mahAtmanaH	
+46702	sadfSAByAM naraSrezWa sadfSe dAtum arhasi	
+46929	vamanaM recanaM kftvA praviSettatra sADakaH	
+48381	aparADaM kam uddiSya tyakzyAmIzwam ahaM sutam	
+49433	bahuBiS cEkam atyasyann ekena ca bahUY janAn	
+49446	devadeva mahAdeva SaktInAM lakzaRaM kaTam	
+49646	anena sidDakalkena vezwitaM bfhatIPale	
+50827	BogASca santi SarIre tadanityamato vfTA sakalam	
+5247	hrasvoccAre vyADiyukto dIrGajApe vasukzayaH	
+52689	jale nivAsAjjalajA jalecaryAj jalecarAH	
+53258	DaraRyAM nipapAtASu bAzpaviplutaBAziRI	
+54360	iti	
+54388	tvaM cEva hi naraSrezWa devAS cAgnipurogamAH	
+54430	muzRantI praBayA rAjYAM cakzUMzi ca manAMsi ca	
+55041	eraRqasnehagavyAjEr mAtuluNgarasena vA	
+5515	tvagdozAriH kuzWahantA girivAsI nagASrayaH	
+55548	uBayAtmakaM leKanam	
+55563	evaM ca tadazwaDA saMmatam	
+55605	rAjAnaM pretaBAvasTaM kftvA rAmaM ca tApasam	
+55946	yujyatAM mahatI senA caturaNgamahAbalA	
+56970	pAdyam arGyaM taTAtiTyaM vane yad upapadyate	
+59025	Baratasya vacaH kurvan yAcamAnasya rAGava	
+59165	yAnES ca SakawES cEva hayEr nAgES ca sA camUH	
+60006	sTitA iti dIrGakAlajIvinaH	
+60059	idaM provAca DarmAtmA sarvAn eva tapasvinaH	
+60554	taM taTA BAzamARaM tu BrAtaraM vipraGAtinam	
+62300	puzparAgaM guru svacCaM snigDaM sTUlaM samaM mfdu	
+62644	catvAriMSatpuwErevaM kAntaM tIkzRaM ca muRqakam	
+62959	yaToktena viDAnena guruRA muditAtmanA	
+6296	nAlo naqo nalaS cEva kukziranDro 'Ta kIcakaH	
+63136	tAmraM tIkzRasamAyuktaM drutaM nikzipya BUriSaH	
+63485	sA tu SUrpaRaKA nAma daSagrIvasya rakzasaH	
+64523	nacirAt prApyate loke pApAnAM karmaRAM Palam	
+64734	rAmam uddiSya cikzepa hatas tvam iti cAbravIt	
+65353	balaM nAgasahasrasya DArayan parvatopamaH	
+65995	tejasA kzamayA dIptyA yaTAyaM mfgasattamaH	
+66354	evaM bruvatyAM sItAyAM rAmapatnyAM mahAbalaH	
+66670	jawAyus tam atikramya tuRqenAsya KarADipaH	
+66778	prahfzwA vyaTitAS cAsan sarve te paramarzayaH	
+67012	puzpakaM nAma suSroRi BrAtur vESravaRasya me	
+67679	vartIraH kapiYjalaBedaH	
+67983	budDyA yuktA mahAprAjYA vijAnanti SuBASuBe	
+68611	SvetakriyAsu SvetaM deyaM SvetaM tAram ityarTaH	
+68618	iti	
+69317	Bavanti parahantAras te jYeyAH prAkftEr narEH	
+69595	vAlinA nikfto BrAtrA kftavEraS ca rAGava	
+69781	SrUyatAm aBiDAsyAmi yas te yudDaM pradAsyati	
+69879	ata eva BogAnAm ASrayAH SarIram	
+70312	yavIyAn AtmanaH putraH SizyaS cApi guRoditaH	
+70535	avyagras tad avApnoti sarvaM pretya SuBASuBam	
+71111	upakAraM ca sugrIvo vetsyate nAtra saMSayaH	
+71887	tvaM pramatta iti vyaktaM lakzmaRo 'yam ihAgataH	
+72701	AjagAma mahAvIryas tisfBiH kowiBir vftaH	
+76019	ko 'rTaH mfta iva mftaH	
+76093	mayA vitatya noktAste granTagOravaBIruRA	
+77922	udAno 'NkuSakoRe ca mAtrAyAM vyAna eva ca	
+7802	rozaRaM raktamAlyastrIraktamadyAmizapriyam	
+78129	etA dehe viSezeRa tava nityA hi devatAH	
+79110	anusarataH anugacCataH	
+79334	narmadA ca nadI puRyA mArkaRqeyo mahAnfziH	
+79449	brahmovAca	
+79768	putraM SakravaDArTAya samarTam amitOjasam	
+80721	sUta uvAca	
+81608	ko nu Darmo'tra BavitA mattyAgAdgatireva vA	
+81695	yajeta vASvameDena nIlaM vA vfzamutsfjet	
+81938	anekasaMSayocCedi parokzArTasya darSakam	
+82000	dEvaM nihatya kuru pOruzam AtmaSaktyA yatne kfte yadi na siDyati ko 'tra dozaH	
+82015	etac cintayitvA rAjA paRqitasaBAM kAritavAn	
+82145	taTA coktam	
+8241	karkawaH kArkawaH karkaH kzudraDAtrI ca sa smftaH	
+82567	uttamasyApi varRasya nIco 'pi gfham AgataH	
+83085	stUyamAnasya tasyABUdaDiko DAmasamBavaH	
+83955	yasya prasAde padmAste vijayaS ca parAkrame	
+84042	rAjAha damanakakarawakO jAnItaH	
+84153	muKam eva vArtAM kaTayati	
+853	strIsnehanityamandAgnisuKitakleSaBIruzu	
+86524	na bAhuyugmezu vilAsinInAM prayAnti saNgaM valayANgadAni	
+88401	liptvA tatra muKaM rudDvA garBayantramidaM Bavet	
+89415	samyak toyamfdA rudDvA samyaggartoccamAnayA	
+90277	na nUnaM kArtavIryasya gatiM yAsyanti kzatriyAH	
+90534	pAdam etat surAsekEr jAyate naKapARquram	
+91586	arTaduzwaM punarjYeyaM yatrokte jAyate matiH	
+92016	AsIdbfhadraTAccEva viSvajijjanamejayaH	
+92733	kaliyugapramARaM ca yugadozaM yugakzayam	
+92870	manvantarezu sarvezu nAnArUpaprayojanEH	
+9295	SfNgArAdinavanAwyarasAH iti hAsyAdiBAvAH SfNgArAdInAm	
+93859	kA punariyaM rItirityata Aha	
+95007	matimapi ca narARAM yo dadAti priyArTaM vibuDapativimAne nAyakaH syAdamoGaH	
+95333	namo nIlAya vE jaNGe pAdO viSvasfje namaH	
+95825	BAnurarko ravirbrahmA sUryaH Sakro hariH SivaH	
+96974	ihEva PaladaM puMsAmetannAmutra SoBanam	
+9857	kuSAsane mfgAjine vyAGrAjine ca kambale	
+98663	ciYcAbIjaM mezaSfMgI strIpuzpaM cAmlavetasam	
+98961	sa tEH parivfto rAjA SuSuBe brahmavAdiBiH	
+99342	na jahyAjjIvitaM prAjYas taM gacCAnaya saMjaya	
+99499	cirAya tava putrARAM Satam ekaS ca pArTiva	
+99543	vESampAyana uvAca	
