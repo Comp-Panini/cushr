@@ -66,3 +66,14 @@ cushr_train/byt5_infer.e*
 # the .ncu-rep files match the ncu_batched_*/ncu_kbest_* reports already in git.
 cushr_gpu/*.npz
 cushr_gpu/cushr_score_tests
+
+# Compiled GPU binaries. Every slurm job rebuilds these into $SLURM_SUBMIT_DIR,
+# so tracking them means a dirty tree after every run and a 1.1 MB binary
+# re-committed on every `git add -A`. cushr_score_tests was already ignored
+# just above; these are its siblings. They were tracked until 2026-08-27 and
+# need `git rm --cached` once for these rules to take effect.
+cushr_gpu/cushr_batched
+cushr_gpu/cushr_kbest
+cushr_gpu/cushr_viterbi_k1
+cushr_gpu/cushr_kbest_tests
+cushr_gpu/cushr_viterbi_tests

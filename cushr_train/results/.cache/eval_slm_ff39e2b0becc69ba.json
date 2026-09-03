@@ -1,0 +1,33 @@
+{
+ "n": 1000,
+ "n_oracle": 1000,
+ "levels": {
+  "L": {
+   "cushr": 57.6,
+   "oracle": 61.9,
+   "pred": null
+  },
+  "L(tol)": {
+   "cushr": 62.3,
+   "oracle": 67.3,
+   "pred": null
+  },
+  "L+M": {
+   "cushr": 39.5,
+   "oracle": 60.7,
+   "pred": null
+  },
+  "L+M(tol)": {
+   "cushr": 41.4,
+   "oracle": 63.8,
+   "pred": null
+  }
+ },
+ "pred_name": null,
+ "n_pred": null,
+ "tsv": "heldout_1000.tsv",
+ "cache": "./cache95_ctx_ex4200",
+ "model": "model95_ctx_ex4200.npz",
+ "cands": null,
+ "rerank": null
+}

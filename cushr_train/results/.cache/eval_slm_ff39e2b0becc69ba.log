@@ -1,0 +1,23 @@
+heldout_1000.tsv: 1,000 rows, 1,000 with a complete external reference (0 unusable)
+reading cng from graphml for the test sentences ...
+  layout verified against node_form_id on all test sentences
+
+sentence-level perfect match over 1,000 sentences (all scored, gold path or not)
+level          cuSHR   ORACLE      ByT5-Sanskrit (Sen, DCS 2024)
+  L           57.60   61.90       79.88
+  L(tol)      62.30   67.30         --
+  L+M         39.50   60.70       62.00
+  L+M(tol)    41.40   63.80         --
+
+  ORACLE = our own gold path scored against the same external reference, over the 1,000 sentences that have one.
+  It is a CEILING, and it is not 100: DCS lemmatises participles to the verbal
+  root where SHR gives the participial stem, so L / L+M / S+L+M measure
+  convention agreement as much as model quality. Read every cuSHR number
+  against its oracle, not against ByT5.
+  (tol) = lemma matched through ingest.lemma_candidates; upper bound.
+  'ByT5 paper' is a DIFFERENT CORPUS (DCS April-2024, 8,398 test), shown for
+  category alignment only. It is NOT the --pred-jsonl column, which is measured
+  here on these 1,000 sentences.
+
+  ingest resolved a gold path for 1,000 / 1,000 of these sentences
+wrote results/.cache\eval_slm_ff39e2b0becc69ba.json

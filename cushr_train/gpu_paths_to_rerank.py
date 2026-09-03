@@ -107,14 +107,26 @@ def main():
     np.savez_compressed(args.out, **data)
 
     n = len(sent_ids)
+    # cushr_batched reports recall over sentences that HAVE a gold path
+    # (`n_gold` in its csv), not over every sentence in the corpus. 4,056 of the
+    # 119,503 sentences in g95 have an empty gold_nodes span -- no annotation --
+    # and no decoder can ever hit them. Dividing by n instead of n_gold scores
+    # those as misses and understates recall by ~3.3 points, which previously
+    # looked like a candidate-conversion bug when it was only a denominator.
+    has_gold = np.array([len(gold[si]) > 0 for si in range(n)])
+    n_gold = int(has_gold.sum())
     print(f"{args.gpu} -> {args.out}")
     print(f"  {n:,} sentences, {len(out_sent):,} candidates, K={K}")
-    print(f"  recall@1  = {100 * hit1.sum() / n:.2f}%")
-    print(f"  recall@{K if K else 'K'} = {100 * hitK.sum() / n:.2f}%")
+    print(f"  {n_gold:,} with a gold path ({n - n_gold:,} unannotated, excluded "
+          f"from recall)")
+    print(f"  recall@1  = {100 * (hit1 & has_gold).sum() / n_gold:.4f}%")
+    print(f"  recall@{K if K else 'K'} = "
+          f"{100 * (hitK & has_gold).sum() / n_gold:.4f}%")
     print("  cross-check: recall@K must equal the number cushr_batched printed "
-          "for this run; if it does not, the form filter or the span-start sort "
-          "differs between the two sides and the candidate lists are not "
-          "comparable to make_rerank_data.py's.")
+          "for this run (its csv `recall_at_K`, over its `n_gold`); if it does "
+          "not, the form filter or the span-start sort differs between the two "
+          "sides and the candidate lists are not comparable to "
+          "make_rerank_data.py's.")
 
 
 if __name__ == "__main__":

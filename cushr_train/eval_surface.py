@@ -51,6 +51,10 @@ def main():
     ap.add_argument("--raw", default="../data/cushr_data_repaired.npz")
     ap.add_argument("--vocab", default="../data/form_vocabulary.txt")
     ap.add_argument("--dump", default="", help="write per-sentence predictions")
+    ap.add_argument("--json-out", default="",
+                    help="also write the printed numbers as a JSON dict, for "
+                         "make_results_matrix.py; does not change what is "
+                         "computed or printed")
     args = ap.parse_args()
 
     rows = list(csv.DictReader(open(args.tsv, encoding="utf-8-sig"),
@@ -146,6 +150,26 @@ def main():
     for k, (h, tot) in by_group.items():
         if tot:
             print(f"    {k:<16} PM {100 * h / tot:6.2f}   n={tot:,}")
+
+    if args.json_out:
+        # Exactly the values printed above -- recomputing nothing, so the file
+        # and the table can never disagree.
+        json.dump({
+            "n": n,
+            "pm": 100 * pm / n,
+            "p_macro": 100 * float(np.mean(mp)),
+            "r_macro": 100 * float(np.mean(mr)),
+            "f1_macro": 100 * float(np.mean(mf)),
+            "p_micro": 100 * prec,
+            "r_micro": 100 * rec,
+            "f1_micro": 100 * f1,
+            "by_group": {k: {"pm": 100 * h / tot, "n": tot}
+                         for k, (h, tot) in by_group.items() if tot},
+            "tsv": args.tsv,
+            "cache": args.cache,
+            "model": args.model,
+        }, open(args.json_out, "w"), indent=1)
+        print(f"wrote {args.json_out}")
 
     if args.dump:
         json.dump(dump, open(args.dump, "w"), ensure_ascii=False)

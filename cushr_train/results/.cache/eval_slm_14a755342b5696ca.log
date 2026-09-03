@@ -1,0 +1,43 @@
+sighum_test_4200.tsv: 4,200 rows, 4,200 with a complete external reference (0 unusable)
+reading cng from graphml for the test sentences ...
+  layout verified against node_form_id on all test sentences
+
+sentence-level perfect match over 4,200 sentences (all scored, gold path or not)
+level          cuSHR   ORACLE      ByT5      ByT5 paper (Sen, DCS 2024)
+  S           91.52   98.00     81.38       84.61
+  L           65.62   70.07     90.55       79.88
+  L(tol)      66.05   70.64     90.74         --
+  S+M         45.69   68.23       n/a       63.86
+  L+M         45.45   68.18       n/a       62.00
+  L+M(tol)    45.83   68.76       n/a         --
+  S+L+M       45.29   67.97       n/a       61.27
+  S+L+M(tol)  45.48   68.23       n/a         --
+
+  ByT5: 4,200 sentences from byt5_preds_segmentation-lemma-morphosyntax_sighum_test.jsonl, scored against the SAME external reference
+  and the same score() as cuSHR -- this column IS a head-to-head.
+  M levels are n/a: ByT5 emits full UD feature bundles
+  (Case=Nom|Gender=Masc|Number=Sing) while the reference is DCS cng integers
+  (29, -153). Scoring them directly would read as total tagging failure rather
+  than an unmapped vocabulary. NOTE the observed output is NOT the compressed
+  SNM codes of the paper's figures, so sanskrit_tags.tsv is not needed to bridge it.
+
+  ORACLE = our own gold path scored against the same external reference, over the 4,196 sentences that have one.
+  It is a CEILING, and it is not 100: DCS lemmatises participles to the verbal
+  root where SHR gives the participial stem, so L / L+M / S+L+M measure
+  convention agreement as much as model quality. Read every cuSHR number
+  against its oracle, not against ByT5.
+  (tol) = lemma matched through ingest.lemma_candidates; upper bound.
+  'ByT5 paper' is a DIFFERENT CORPUS (DCS April-2024, 8,398 test), shown for
+  category alignment only. It is NOT the --pred-jsonl column, which is measured
+  here on these 4,200 sentences.
+
+  CAVEAT on the ByT5 S column: the released chronbmm/sanskrit5-multitask
+  is trained on DCS compound conventions, while this reference uses SIGHUM's.
+  Most of its segmentation errors are compound-boundary disagreements
+  (droRaputraH vs droRa putraH, alOlyena vs a lOlyena), not failures to
+  segment. Their published 93.83 on SIGHUM comes from a model fine-tuned ON
+  SIGHUM; this is the off-the-shelf multitask checkpoint, so the S column
+  understates it. L is unaffected -- both sides use DCS lemma conventions.
+
+  ingest resolved a gold path for 4,196 / 4,200 of these sentences
+wrote results/.cache\eval_slm_14a755342b5696ca.json

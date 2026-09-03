@@ -1,0 +1,10 @@
+sighum_test_4200.tsv: 4,200 rows, 4,200 located in our corpus
+
+surface-string metric over 4,200 sentences (every reference sentence scored, gold path or not)
+  perfect match     : 91.52   (3,844/4,200)
+  word P/R/F MACRO  : 98.36 / 98.33 / 98.32   <- matches TransLIST's protocol
+  word P/R/F micro  : 98.60 / 98.58 / 98.59
+  by ingest gold-path status:
+    gold-resolved    PM  91.61   n=4,196
+    no-gold-path     PM   0.00   n=4
+wrote results/.cache\eval_surface_ea48cc94386231e8.json

@@ -14,6 +14,7 @@
 //                  [--golden golden_outputs.json]
 //                  [--golden-n 500]
 //                  [--keep-report keep_report.csv]
+//                  [--csv cpu_bench.csv]      one machine-readable timing row
 
 #include "cushr/decoder.hpp"
 #include "cushr/json_io.hpp"
@@ -49,7 +50,7 @@ void usage(const char* prog) {
         "Usage: %s <lattice.npz> [--scorer uniform|length|log_linear|biaffine]\n"
         "           [--weights w0,w1,...] [--bias b] [--model model.bin]\n"
         "           [--K 10] [--golden out.json] [--golden-n 500]\n"
-        "           [--keep-report keep_report.csv]\n", prog);
+        "           [--keep-report keep_report.csv] [--csv cpu_bench.csv]\n", prog);
 }
 
 }  // namespace
@@ -66,6 +67,7 @@ int main(int argc, char** argv) {
     std::string golden_path;
     int   golden_n = 500;
     std::string keep_report_path;
+    std::string csv_path;
 
     for (int i = 2; i < argc; ++i) {
         std::string a = argv[i];
@@ -84,6 +86,7 @@ int main(int argc, char** argv) {
         else if (a == "--golden")   golden_path = need("--golden");
         else if (a == "--golden-n") golden_n = std::stoi(need("--golden-n"));
         else if (a == "--keep-report") keep_report_path = need("--keep-report");
+        else if (a == "--csv")      csv_path = need("--csv");
         else { std::fprintf(stderr, "unknown arg: %s\n", a.c_str()); return 1; }
     }
 
@@ -197,6 +200,36 @@ int main(int argc, char** argv) {
               << " / " << m.num_sentences
               << "  (" << (m.num_sentences ? 100.0 * m.perfect_match / m.num_sentences : 0.0)
               << "%)\n";
+
+    // One machine-readable row, so the CPU baseline can appear in the results
+    // matrix. Until this existed the only CPU throughput figure anywhere was
+    // the "~100 sentences/sec" design target in README.md -- prose, never a
+    // measurement. Column names are deliberately NOT the GPU CSV's
+    // `sent_per_sec_kernel`: there is no kernel here, and reusing the name
+    // would invite a reader to compare a wall-clock number against a
+    // kernel-only one.
+    if (!csv_path.empty()) {
+        std::ofstream out(csv_path);
+        if (!out) {
+            std::fprintf(stderr, "could not open csv file: %s\n",
+                         csv_path.c_str());
+            return 1;
+        }
+        out << "K,n_sentences,n_gold,wall_sec,us_per_sent,sent_per_sec,"
+               "precision,recall,f1,perfect_match,scorer\n";
+        out << K << ","
+            << lat.num_sentences() << ","
+            << m.num_sentences << ","
+            << wall_sec << ","
+            << (lat.num_sentences() ? 1e6 * wall_sec / lat.num_sentences() : 0.0) << ","
+            << per_sec << ","
+            << m.precision << ","
+            << m.recall << ","
+            << m.f1 << ","
+            << m.perfect_match << ","
+            << scorer_kind << "\n";
+        std::cout << "Wrote csv to " << csv_path << "\n";
+    }
 
     // Dump golden outputs
     if (!golden_path.empty()) {

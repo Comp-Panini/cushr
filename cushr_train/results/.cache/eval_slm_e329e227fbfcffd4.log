@@ -1,0 +1,38 @@
+heldout_1000.tsv: 1,000 rows, 1,000 with a complete external reference (0 unusable)
+reading cng from graphml for the test sentences ...
+  layout verified against node_form_id on all test sentences
+
+sentence-level perfect match over 1,000 sentences (all scored, gold path or not)
+level          cuSHR   ORACLE      ByT5-Sanskrit (Sen, DCS 2024)
+  L           57.60   61.90       79.88
+  L(tol)      62.30   67.30         --
+  L+M         39.50   60.70       62.00
+  L+M(tol)    41.40   63.80         --
+
+recall@k over 1,000 sentences -- is the correct analysis ANYWHERE in the top-k paths?
+  A hard upper bound on any reranker: it can only pick from these candidates.
+
+level             @1      @2      @4      @5      @8     @16     @32   ORACLE
+  L            57.60   59.30   61.00   61.50   62.30   62.80   63.20    61.90
+  L(tol)       62.30   64.10   66.00   66.40   67.20   67.80   68.50    67.30
+  L+M          39.50   46.20   51.40   52.50   54.40   57.10   58.60    60.70
+  L+M(tol)     41.40   48.30   53.60   54.60   56.60   59.30   60.90    63.80
+
+  recall@1 must equal the cuSHR column above -- kbest(K=1) is asserted
+  identical to viterbi() in test_kbest.py, so any disagreement is a bug.
+  NOTE this is the TRAINED contextual model. The recall@64 = 0.3679 in
+  cushr_gpu/BATCHED_BENCHMARK.md is the hand-tuned LogLinearScorer (recall@1
+  8.31%) and the two must never be quoted together.
+
+  ORACLE = our own gold path scored against the same external reference, over the 1,000 sentences that have one.
+  It is a CEILING, and it is not 100: DCS lemmatises participles to the verbal
+  root where SHR gives the participial stem, so L / L+M / S+L+M measure
+  convention agreement as much as model quality. Read every cuSHR number
+  against its oracle, not against ByT5.
+  (tol) = lemma matched through ingest.lemma_candidates; upper bound.
+  'ByT5 paper' is a DIFFERENT CORPUS (DCS April-2024, 8,398 test), shown for
+  category alignment only. It is NOT the --pred-jsonl column, which is measured
+  here on these 1,000 sentences.
+
+  ingest resolved a gold path for 1,000 / 1,000 of these sentences
+wrote results/.cache\eval_slm_e329e227fbfcffd4.json

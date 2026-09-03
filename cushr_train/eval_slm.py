@@ -92,6 +92,11 @@ def load_vocab(path):
     return out
 
 
+# Impossible as an SLP1 surface form, so an S level that ever slipped past
+# the --no-surface LEVELS filter would read 0, not a plausible number.
+_NO_SURFACE = "<no-surface>"
+
+
 def dcs_reference(p_dir, stem):
     """(lemmas, cngs) flattened in reading order, or None."""
     path = os.path.join(p_dir, f"{stem}.p")
@@ -138,6 +143,17 @@ def main():
     ap.add_argument("--graphml-dir", default="../../SIGHUM_database/After_graphml")
     ap.add_argument("--p-dir", default="../../SIGHUM_database_gold_path/DCS_pick")
     ap.add_argument("--dump", default="")
+    ap.add_argument("--no-surface", action="store_true",
+                    help="the TSV has no usable `output` column, so score "
+                         "only the levels that do not involve S. Needed "
+                         "for any set outside the published 4,200: the "
+                         "DCS pickles carry lemma+cng but no inflected "
+                         "surface forms, and npz `surface_text` is a lossy "
+                         "reconstruction of the gold path, not a reference.")
+    ap.add_argument("--json-out", default="",
+                    help="also write the printed numbers as a JSON dict, "
+                         "for make_results_matrix.py; does not change "
+                         "what is computed or printed")
     ap.add_argument("--kbest", type=int, default=0,
                     help="also report recall@k -- is the correct analysis "
                          "anywhere in the top-k paths? This is a hard upper "
@@ -150,6 +166,15 @@ def main():
                          "candidate has the same role-feature vector as an "
                          "incorrect one, no such reranker can separate them.")
     ap.add_argument("--morph-vocab", default="../data/morph_vocabulary.txt")
+    ap.add_argument("--cands", default="",
+                    help="gpu_paths_to_rerank.py output. Score THESE candidate "
+                         "paths instead of decoding here -- the GPU pipeline's "
+                         "K4/K3/K5 output, run through the identical reference, "
+                         "analysis() and score(). Implies --kbest (K is read "
+                         "from the file). The torch decode is skipped entirely; "
+                         "everything downstream is untouched, so the cuSHR and "
+                         "GPU columns differ only in where the paths came from. "
+                         "Without this flag nothing about this script changes.")
     ap.add_argument("--rerank", default="",
                     help="rerank.py checkpoint. With --kbest K, the top-1 path "
                          "becomes the candidate the reranker scores highest "
@@ -213,13 +238,23 @@ def main():
             missing += 1
             continue
         lem, cng = got
-        words = r["output"].split()
-        if not (len(words) == len(lem) == len(cng)):
-            raise SystemExit(
-                f"reference length mismatch for {stem}: "
-                f"{len(words)} tsv words / {len(lem)} lemmas / {len(cng)} cngs. "
-                "The TSV and the DCS pickle no longer align; this script's "
-                "whole premise is that they do.")
+        if args.no_surface:
+            # A sentinel no prediction can equal, so any S level that slipped
+            # through would read 0 rather than a plausible-looking number.
+            # LEVELS drops them below, so it is never reported either way.
+            words = [_NO_SURFACE] * len(lem)
+            if len(lem) != len(cng):
+                raise SystemExit(
+                    f"reference length mismatch for {stem}: "
+                    f"{len(lem)} lemmas / {len(cng)} cngs.")
+        else:
+            words = r["output"].split()
+            if not (len(words) == len(lem) == len(cng)):
+                raise SystemExit(
+                    f"reference length mismatch for {stem}: "
+                    f"{len(words)} tsv words / {len(lem)} lemmas / "
+                    f"{len(cng)} cngs. The TSV and the DCS pickle no longer "
+                    "align; this script's whole premise is that they do.")
         ref[pos[stem]] = (words, lem, cng)
     print(f"{args.tsv}: {len(rows):,} rows, {len(ref):,} with a complete "
           f"external reference ({missing:,} unusable)")
@@ -243,6 +278,10 @@ def main():
     if args.restrict_agreeing_seg:
         if not args.pred_jsonl:
             raise SystemExit("--restrict-agreeing-seg needs --pred-jsonl")
+        if args.no_surface:
+            raise SystemExit("--restrict-agreeing-seg compares surface "
+                             "segmentations, which --no-surface does not "
+                             "have")
         _p = {}
         with open(args.pred_jsonl, encoding="utf-8") as f:
             for line in f:
@@ -286,6 +325,8 @@ def main():
 
     has_gold = (store.gold_off[1:] - store.gold_off[:-1]) > 0
     LEVELS = ["S", "L", "L(tol)", "S+M", "L+M", "L+M(tol)", "S+L+M", "S+L+M(tol)"]
+    if args.no_surface:
+        LEVELS = [lv for lv in LEVELS if "S" not in lv.split("(")[0].split("+")]
     hit = Counter()
     n = 0
     dump = []
@@ -398,8 +439,9 @@ def main():
     mt = None
     ceil = Counter()
     if args.rerank_ceiling:
-        if not args.kbest:
-            raise SystemExit("--rerank-ceiling requires --kbest")
+        if not args.kbest and not args.cands:
+            raise SystemExit("--rerank-ceiling requires --kbest (or --cands, "
+                             "which supplies K from the file)")
         from morph_table import MorphTable
         mt = MorphTable(z, args.morph_vocab)
 
@@ -409,8 +451,9 @@ def main():
 
     ranker = None
     if args.rerank:
-        if not args.kbest:
-            raise SystemExit("--rerank requires --kbest")
+        if not args.kbest and not args.cands:
+            raise SystemExit("--rerank requires --kbest (or --cands, which "
+                             "supplies K from the file)")
         from rerank import PathRanker
         ck = torch.load(args.rerank, weights_only=False)
         ranker = PathRanker(ck["n_morph"], ck["n_lemma"], hidden=ck["hidden"],
@@ -419,7 +462,8 @@ def main():
         ranker.eval()
         r_morph = np.asarray(z["node_features"]).ravel().astype(np.int64)
         r_lemma = np.asarray(z["node_lemma_id"]).ravel().astype(np.int64)
-        print(f"reranker: {args.rerank}, rescoring the top {args.kbest} paths")
+        print(f"reranker: {args.rerank}, rescoring the top "
+              f"{args.kbest or 'K (from --cands)'} paths")
 
     def rerank_pick(cand_seqs, cand_scores):
         """Index of the candidate the reranker scores highest."""
@@ -438,7 +482,95 @@ def main():
                         torch.as_tensor(np.asarray(cand_scores, np.float32)))
         return int(sc.argmax())
 
+    def emit(s, nodes, cseqs):
+        """Tally one sentence. Identical for locally decoded and
+        --cands paths -- that sameness is the point: the two columns
+        differ only in where `nodes` and `cseqs` came from."""
+        nonlocal n, n_kb
+        p_form, p_lem, p_cng = analysis(nodes)
+        g_form, g_lem, g_cng = ref[int(s)]
+        s_ok, l_strict, m_ok = score(p_form, p_lem, p_cng,
+                                     g_form, g_lem, g_cng, hit)
+        n += 1
+        if kb_first is not None:
+            # First rank at which each level becomes correct. One K=64
+            # decode yields the whole recall curve, since recall@k is just
+            # "did the first hit land before k".
+            first = dict.fromkeys(LEVELS, None)
+            keys_ok, keys_bad = set(), set()
+            for k_i, kn in enumerate(cseqs):
+                one = Counter()
+                score(*analysis(kn), g_form, g_lem, g_cng, one)
+                for lv in LEVELS:
+                    if first[lv] is None and one[lv]:
+                        first[lv] = k_i
+                if mt is not None:
+                    (keys_ok if one["S+M"] else keys_bad).add(role_key(kn))
+                elif all(v is not None for v in first.values()):
+                    break     # F3 needs every candidate, not just the hits
+            if mt is not None and first["S+M"] is not None:
+                ceil["winnable"] += 1
+                if first["S+M"] > 0:
+                    ceil["needs_rerank"] += 1
+                    # separable iff some correct candidate has a role
+                    # signature no incorrect candidate shares
+                    if keys_ok - keys_bad:
+                        ceil["separable"] += 1
+            for lv, r in first.items():
+                if r is not None:
+                    kb_first[lv].append(r)
+            n_kb += 1
+        if args.dump:
+            dump.append({"id": index[int(s)], "S": s_ok, "L": l_strict,
+                         "M": m_ok, "pred_form": p_form, "gold_form": g_form,
+                         "pred_lemma": p_lem, "gold_lemma": g_lem,
+                         "pred_cng": p_cng, "gold_cng": g_cng})
+
+    # ---- GPU candidate paths (--cands) --------------------------------------
+    # gpu_paths_to_rerank.py has already applied the two conventions this loop
+    # would otherwise apply below -- the span-start sort and the form filter --
+    # so the sequences are used verbatim. Re-applying them would be idempotent
+    # but would hide a disagreement instead of surfacing it.
+    gpu_cands = None
+    if args.cands:
+        gz = np.load(args.cands)
+        g_nodes = np.asarray(gz["cand_nodes"], dtype=np.int64)
+        g_off = np.asarray(gz["cand_off"], dtype=np.int64)
+        g_sent = np.asarray(gz["cand_sent"], dtype=np.int64)
+        g_score = np.asarray(gz["cand_score"], dtype=np.float32)
+        g_sids = np.asarray(gz["sent_ids"], dtype=np.int64)
+        gpu_cands = {}
+        for j in range(len(g_sent)):
+            sid = int(g_sids[int(g_sent[j])])   # cand_sent indexes sent_ids
+            seq = [int(x) for x in g_nodes[g_off[j]:g_off[j + 1]]]
+            e = gpu_cands.setdefault(sid, ([], []))
+            e[0].append(seq)
+            e[1].append(float(g_score[j]))
+        kmax = max(len(v[0]) for v in gpu_cands.values())
+        if not args.kbest:
+            args.kbest = kmax
+            kb_first = {lv: [] for lv in LEVELS}
+        print(f"candidates: {args.cands} -- {len(gpu_cands):,} sentences, "
+              f"max {kmax} per sentence; the local decode is SKIPPED")
+        missing = [int(x) for x in sids if int(x) not in gpu_cands]
+        if missing:
+            raise SystemExit(
+                f"--cands covers {len(gpu_cands):,} sentences but {len(missing)} "
+                f"of the {len(sids)} test sentences are absent (e.g. "
+                f"{missing[:5]}). Scoring the remainder would silently report "
+                f"a different test set than the cuSHR column.")
+
     for chunk in batches(sids, 128, shuffle=False):
+        if gpu_cands is not None:
+            for i, s in enumerate(chunk):
+                cseqs, cscores = gpu_cands[int(s)]
+                nodes = list(cseqs[0])
+                if ranker is not None:
+                    pick = rerank_pick(cseqs, cscores)
+                    nodes = cseqs[pick]
+                    n_moved += pick != 0
+                emit(s, nodes, cseqs)
+            continue
         b = collate(store, chunk)
         t = to_torch(b, dev)
         w = net(t["feats"], t["src"], t["dst"], t.get("ids"), t)
@@ -471,44 +603,7 @@ def main():
                                            for j in range(len(cseqs))])
                 nodes = cseqs[pick]
                 n_moved += pick != 0
-            p_form, p_lem, p_cng = analysis(nodes)
-            g_form, g_lem, g_cng = ref[int(s)]
-            s_ok, l_strict, m_ok = score(p_form, p_lem, p_cng,
-                                         g_form, g_lem, g_cng, hit)
-            n += 1
-            if kb_first is not None:
-                # First rank at which each level becomes correct. One K=64
-                # decode yields the whole recall curve, since recall@k is just
-                # "did the first hit land before k".
-                first = dict.fromkeys(LEVELS, None)
-                keys_ok, keys_bad = set(), set()
-                for k_i, kn in enumerate(cseqs):
-                    one = Counter()
-                    score(*analysis(kn), g_form, g_lem, g_cng, one)
-                    for lv in LEVELS:
-                        if first[lv] is None and one[lv]:
-                            first[lv] = k_i
-                    if mt is not None:
-                        (keys_ok if one["S+M"] else keys_bad).add(role_key(kn))
-                    elif all(v is not None for v in first.values()):
-                        break     # F3 needs every candidate, not just the hits
-                if mt is not None and first["S+M"] is not None:
-                    ceil["winnable"] += 1
-                    if first["S+M"] > 0:
-                        ceil["needs_rerank"] += 1
-                        # separable iff some correct candidate has a role
-                        # signature no incorrect candidate shares
-                        if keys_ok - keys_bad:
-                            ceil["separable"] += 1
-                for lv, r in first.items():
-                    if r is not None:
-                        kb_first[lv].append(r)
-                n_kb += 1
-            if args.dump:
-                dump.append({"id": index[int(s)], "S": s_ok, "L": l_strict,
-                             "M": m_ok, "pred_form": p_form, "gold_form": g_form,
-                             "pred_lemma": p_lem, "gold_lemma": g_lem,
-                             "pred_cng": p_cng, "gold_cng": g_cng})
+            emit(s, nodes, cseqs)
 
     # ---- external system, scored through the identical reference + score() ---
     ext = Counter()
@@ -580,7 +675,7 @@ def main():
         line += (f"      {b_:>6.2f}" if b_ is not None else "         --")
         print(line)
     if kb_first is not None:
-        ks = [k for k in (1, 2, 4, 8, 16, 32, 64) if k <= args.kbest]
+        ks = [k for k in (1, 2, 4, 5, 8, 16, 32, 64) if k <= args.kbest]
         if ks and ks[-1] != args.kbest:
             ks.append(args.kbest)
         print(f"\nrecall@k over {n_kb:,} sentences -- is the correct analysis "
@@ -655,7 +750,7 @@ def main():
     print("  (tol) = lemma matched through ingest.lemma_candidates; upper bound.")
     print("  'ByT5 paper' is a DIFFERENT CORPUS (DCS April-2024, 8,398 test), "
           "shown for\n  category alignment only. It is NOT the --pred-jsonl "
-          "column, which is measured\n  here on these 4,200 sentences.")
+          f"column, which is measured\n  here on these {n:,} sentences.")
     if n_ext:
         print(f"\n  CAVEAT on the {args.pred_name} S column: the released "
               f"chronbmm/sanskrit5-multitask\n  is trained on DCS compound "
@@ -674,6 +769,44 @@ def main():
     if args.dump:
         json.dump(dump, open(args.dump, "w"), ensure_ascii=False)
         print(f"wrote {args.dump}")
+
+
+    if args.json_out:
+        # Mirrors the tables printed above and recomputes nothing, so the file
+        # and the console can never disagree. Levels not applicable to the
+        # external system are null, never 0 -- same rule as the "n/a" cells.
+        out = {
+            "n": n,
+            "n_oracle": n_oracle,
+            "levels": {k: {
+                "cushr": 100 * hit[k] / n,
+                "oracle": (100 * oracle[k] / n_oracle) if n_oracle else None,
+                "pred": ((100 * ext[k] / n_ext)
+                         if (n_ext and not (k in M_LEVELS
+                                            and not ext_tags_usable))
+                         else None),
+            } for k in LEVELS},
+            "pred_name": args.pred_name if n_ext else None,
+            "n_pred": n_ext or None,
+            "tsv": args.tsv,
+            "cache": args.cache,
+            "model": args.model,
+            "cands": args.cands or None,
+            "rerank": args.rerank or None,
+        }
+        if kb_first is not None:
+            out["n_kbest"] = n_kb
+            out["kbest"] = args.kbest
+            out["recall"] = {
+                lv: {str(k): 100 * sum(1 for x in kb_first[lv] if x < k) / n_kb
+                     for k in ks}
+                for lv in LEVELS
+            }
+        if ranker is not None:
+            out["rerank_moved"] = n_moved
+            out["rerank_moved_pct"] = 100 * n_moved / n
+        json.dump(out, open(args.json_out, "w"), indent=1)
+        print(f"wrote {args.json_out}")
 
 
 if __name__ == "__main__":

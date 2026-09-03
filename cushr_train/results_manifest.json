@@ -1,0 +1,76 @@
+{
+  "_readme": [
+    "Every cell names a cached artifact or is null. null renders as an em-dash",
+    "in RESULTS_MATRIX.md with a footnote -- make_results_matrix.py never",
+    "interpolates, infers, or back-fills a missing number.",
+    "Paths are relative to cushr_train/."
+  ],
+
+  "common": {
+    "cache": "./cache95_ctx_ex4200",
+    "model": "model95_ctx_ex4200.npz",
+    "index": "../data/sentence_index_g95.json",
+    "raw": "../data/cushr_data_g95.npz"
+  },
+
+  "datasets": {
+    "sighum_test": {
+      "label": "SIGHUM-test (in-domain, published)",
+      "tsv": "sighum_test_4200.tsv",
+      "n": 4200,
+      "no_surface": false
+    },
+    "g95_heldout": {
+      "label": "g95 held-out (no surface reference)",
+      "tsv": "heldout_1000.tsv",
+      "n": 1000,
+      "no_surface": true,
+      "note": "Out-of-domain by text, not by lattice source: every sentence still comes from an SHR graphml. No surface segmentation gold exists outside the published 4,200, so S / P / R / F1 / PM are unmeasurable here by construction, not merely unmeasured."
+    }
+  },
+
+  "systems": {
+    "cushr_gpu_top1":   {"label": "cuSHR K4 top-1 (GPU)",  "kind": "cushr"},
+    "cushr_gpu_rerank": {"label": "cuSHR K4 + reranker",   "kind": "cushr"},
+    "cushr_cpu":        {"label": "cushr_cpu (week 3)",    "kind": "cpu"},
+    "byt5":             {"label": "ByT5-Sanskrit",         "kind": "external"},
+    "translist":        {"label": "TransLIST",             "kind": "published"}
+  },
+
+  "cells": {
+    "sighum_test/cushr_gpu_top1": {
+      "slm":     {"cands": null},
+      "surface": {}
+    },
+    "sighum_test/cushr_gpu_rerank": {
+      "slm": {"cands": "gpu_rerank_k32.npz", "kbest": 32,
+              "rerank": "reranker_full.pt"}
+    },
+    "sighum_test/byt5": {
+      "slm": {"pred_jsonl": "byt5_preds_segmentation-lemma-morphosyntax_sighum_test.jsonl",
+              "pred_name": "ByT5"}
+    },
+    "sighum_test/cushr_cpu": null,
+    "sighum_test/translist": {
+      "published": {
+        "p_macro": 98.80, "r_macro": 98.93, "f1_macro": 98.86, "pm": 93.97,
+        "source": "papers/2210.11753v1.pdf, via PAPER_COMPARISON.md",
+        "reproduced": false
+      }
+    },
+
+    "g95_heldout/cushr_gpu_top1":   {"slm": {"cands": null, "kbest": 32}},
+    "g95_heldout/cushr_gpu_rerank": null,
+    "g95_heldout/byt5":             null,
+    "g95_heldout/cushr_cpu":        null,
+    "g95_heldout/translist":        null
+  },
+
+  "bench": {
+    "k_sweep":     "../cushr_gpu/k4_bench_C_biaffine_twopass.csv",
+    "k_sweep_label": "cuSHR GPU, biaffine, k4=twopass, batch -1",
+    "checked_k32": "../cushr_gpu/k4_bench_E_k32_checked.csv",
+    "batch_sweep": "../cushr_gpu/batched_bench_b*.csv",
+    "cpu_csv":     null
+  }
+}
