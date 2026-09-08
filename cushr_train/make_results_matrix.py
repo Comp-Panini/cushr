@@ -154,6 +154,31 @@ def collect(man, force=False):
             rec["slm"] = run_eval("eval_slm.py", a, inputs, force)
             src.append("eval_slm.py")
 
+            # The +maps variant: a SECOND run with the convention tables, kept
+            # beside the raw one rather than replacing it. run_eval keys its
+            # cache on the argv, so the two runs cache independently.
+            #
+            # The maps rewrite lemma and cng only, never form, so S must come
+            # back identical; render_ladder asserts that rather than trusting
+            # it. They are applied by eval_slm.py to cuSHR and its ORACLE and
+            # never to --pred-jsonl, which is why only cuSHR cells declare the
+            # variant -- ByT5 emits DCS conventions natively.
+            maps = common.get("maps") or {}
+            if "maps" in (s.get("variants") or []) and maps:
+                # A COPY of inputs: `inputs` is reused by the eval_surface.py
+                # call below, and appending the map files to it would change
+                # that cache key over files eval_surface.py never reads.
+                am, im = list(a), list(inputs)
+                # NOT `key` -- that is the enclosing loop's cell name, and
+                # rebinding it here filed every cell under "convention_map".
+                for flag, mk in (("--lemma-map", "lemma_map"),
+                                 ("--convention-map", "convention_map")):
+                    if maps.get(mk):
+                        am += [flag, maps[mk]]
+                        im.append(maps[mk])
+                rec["slm_maps"] = run_eval("eval_slm.py", am, im, force)
+                src.append("eval_slm.py +maps")
+
         if "surface" in spec:
             rec["surface"] = run_eval("eval_surface.py", base, inputs, force)
             src.append("eval_surface.py")
@@ -183,12 +208,20 @@ def collect(man, force=False):
     return out, prov
 
 
-def cell_levels(rec, sys_id):
-    """The S/L/M ladder for one cell as {level: value or None}."""
-    if not rec or "slm" not in rec:
+def cell_levels(rec, sys_id, variant="raw", field=None):
+    """The S/L/M ladder for one cell as {level: value or None}.
+
+    variant "maps" reads the second eval_slm.py run (convention tables applied);
+    it returns {} when that run was not requested, so a system without the
+    variant renders as em-dashes rather than silently reusing its raw numbers.
+    field defaults to the system's own column, or "oracle" for the ceiling row.
+    """
+    key = "slm_maps" if variant == "maps" else "slm"
+    if not rec or key not in rec:
         return {}
-    lv = rec["slm"]["levels"]
-    field = "pred" if sys_id in EXTERNAL else "cushr"
+    lv = rec[key]["levels"]
+    if field is None:
+        field = "pred" if sys_id in EXTERNAL else "cushr"
     return {k: (lv[k][field] if k in lv else None) for k in SLM_LEVELS}
 
 
@@ -202,6 +235,20 @@ def render(man, res, prov, bench, path):
       "not produced &mdash; no value in this file is inferred, interpolated, "
       "or carried over from another cell.\n")
 
+    # The baseline policy, stated once at the top rather than inferred from
+    # daggers scattered through the tables. The second sentence is the one the
+    # paper should lift verbatim: it is the only place the ByT5 corpus
+    # distinction is made in prose.
+    A("**Baseline policy.** Numbers marked &dagger; are *reported by their "
+      "authors* and were not reproduced here; everything unmarked we measured "
+      "ourselves. We compare against numbers reported by Sandhan et al. "
+      "(2022) for TransLIST. **ByT5-Sanskrit we ran ourselves on our own test "
+      "set**, rather than citing it, because its published results are "
+      "measured on a different corpus (a DCS April-2024 split, 8,398 test "
+      "sentences) and are therefore not comparable to a SIGHUM-test row. "
+      "Throughput is only ever reported for systems we ran, and the "
+      "accuracy-vs-throughput plot excludes cited systems by construction.\n")
+
     for ds_id, ds in man["datasets"].items():
         A(f"\n## {ds['label']}  (n = {ds['n']:,})\n")
         if ds.get("note"):
@@ -210,9 +257,11 @@ def render(man, res, prov, bench, path):
         A("\n### Word-level segmentation\n")
         A("| System | P | R | F1 | Perfect match |")
         A("|---|---:|---:|---:|---:|")
+        cited = []
         for sys_id, sy in man["systems"].items():
             rec = res.get(f"{ds_id}/{sys_id}")
             p = r = f = pm = None
+            dag = ""
             if rec and "surface" in rec:
                 d = rec["surface"]
                 p, r, f, pm = (d["p_macro"], d["r_macro"], d["f1_macro"],
@@ -221,30 +270,75 @@ def render(man, res, prov, bench, path):
                 d = rec["published"]
                 p, r, f, pm = (d.get("p_macro"), d.get("r_macro"),
                                d.get("f1_macro"), d.get("pm"))
+                # Marked at the point of rendering, so a cited number can never
+                # reach the page looking like one of ours.
+                dag = "&dagger;"
+                cited.append((sy["label"], d))
             elif rec and "slm" in rec:
                 # The S level IS surface perfect match -- eval_surface.py and
                 # eval_slm.py agree to the digit on SIGHUM-test. Report PM
                 # alone; never a P/R/F1 that was not measured.
                 pm = cell_levels(rec, sys_id).get("S")
-            A(f"| {sy['label']} | {fmt(p)} | {fmt(r)} | {fmt(f)} | "
-              f"{fmt(pm)} |")
+            A(f"| {sy['label']} | {fmt(p)}{dag} | {fmt(r)}{dag} | "
+              f"{fmt(f)}{dag} | {fmt(pm)}{dag} |")
+        for label, d in cited:
+            A(f"\n&dagger; **{label}** numbers are *reported*, not reproduced "
+              f"here: {d.get('citation', d.get('source', 'see source'))} "
+              + (d.get("split_note", "") or ""))
 
         A("\n### Sentence-level perfect match by annotation level\n")
-        A("| System | " + " | ".join(SLM_LEVELS) + " |")
-        A("|---" * (len(SLM_LEVELS) + 1) + "|")
+
+        # Paired raw / +maps columns. Both are shown because they answer
+        # different questions: raw is what the decoder emits, +maps is what it
+        # emits once SHR's analytical vocabulary is translated into DCS's. A
+        # table carrying only one of them invites the wrong comparison against
+        # ByT5, which needs no such translation.
+        any_maps = any("slm_maps" in (res.get(f"{ds_id}/{s}") or {})
+                       for s in man["systems"])
+        cols = ([f"{k} raw" for k in SLM_LEVELS] + [f"{k} +maps" for k in SLM_LEVELS]
+                if any_maps else list(SLM_LEVELS))
+        A("| System | " + " | ".join(cols) + " |")
+        A("|---" * (len(cols) + 1) + "|")
+
+        def ladder_row(label, rec, sys_id, field=None):
+            raw = cell_levels(rec, sys_id, "raw", field)
+            cells = [fmt(raw.get(k)) for k in SLM_LEVELS]
+            if any_maps:
+                mp = cell_levels(rec, sys_id, "maps", field)
+                cells += [fmt(mp.get(k)) for k in SLM_LEVELS]
+                # S is form-only; the maps rewrite lemma and cng and never
+                # touch form, so a moved S means the wrong run was read.
+                if raw.get("S") is not None and mp.get("S") is not None \
+                        and abs(raw["S"] - mp["S"]) > 1e-9:
+                    raise SystemExit(
+                        f"{ds_id}/{sys_id}: S is {raw['S']:.4f} raw but "
+                        f"{mp['S']:.4f} with maps. The convention tables "
+                        "rewrite lemma and cng only, never form, so S cannot "
+                        "move. Something is reading the wrong run.")
+            A(f"| {label} | " + " | ".join(cells) + " |")
+
         for sys_id, sy in man["systems"].items():
-            rec = res.get(f"{ds_id}/{sys_id}")
-            lv = cell_levels(rec, sys_id)
-            A(f"| {sy['label']} | "
-              + " | ".join(fmt(lv.get(k)) for k in SLM_LEVELS) + " |")
+            ladder_row(sy["label"], res.get(f"{ds_id}/{sys_id}"), sys_id)
         for sys_id in ("cushr_gpu_rerank", "cushr_gpu_top1"):
             rec = res.get(f"{ds_id}/{sys_id}")
             if rec and "slm" in rec:
-                lv = rec["slm"]["levels"]
-                A("| *ORACLE (ceiling)* | "
-                  + " | ".join(fmt(lv[k]["oracle"]) if k in lv else "&mdash;"
-                               for k in SLM_LEVELS) + " |")
+                ladder_row("*ORACLE (ceiling)*", rec, sys_id, field="oracle")
                 break
+
+        if any_maps:
+            A("\n**+maps** are the convention tables "
+              "(`lemma_map.json`, `convention_map.json`) that translate SHR's "
+              "analytical vocabulary into DCS's. Both are built from **train "
+              "ids only**, with dev/test membership asserted absent rather "
+              "than assumed (`build_lemma_map.py:70-75` raises on leakage). "
+              "They rewrite lemma and cng, never form &mdash; which is why S "
+              "is identical in both halves of the table.")
+            A("\nThey are applied to cuSHR **and to its ORACLE**, and never to "
+              "ByT5, which emits DCS conventions natively and needs no "
+              "translation. Applying them to the ORACLE renormalises the "
+              "ceiling: the +maps ladder is a **change of measurement target, "
+              "not a model gain**. Read each cuSHR number against the ORACLE "
+              "in the same half of the table, never across halves.")
 
         # Only the beam, deliberately. recall@K is a property of the candidate
         # list, so the reranker cell reports numbers identical to the top-1
@@ -347,6 +441,18 @@ def render(man, res, prov, bench, path):
     for k in man["cells"]:
         A(f"| `{k}` | {', '.join(prov.get(k, [])) or '&mdash; not produced'} |")
 
+    A("\n### Relationship to `PAPER_COMPARISON.md`\n")
+    A("This file is **generated from the artifacts** and is the reference for "
+      "any number that appears in both. `PAPER_COMPARISON.md` is a hand-written "
+      "analysis; where the two differ, the difference is the convention "
+      "variant, and this file now reports both halves side by side.")
+    A("\nOne difference is *not* a convention variant and should not be "
+      "reconciled by picking either number: `PAPER_COMPARISON.md`'s "
+      "`+maps +rerank` column comes from a run logged in "
+      "`eval_rerank_full.log` whose **top-1 S is 92.00**, where this file's "
+      "reranker row reads **91.98**. They are different runs of the reranker, "
+      "not the same run reported twice.")
+
     open(path, "w", encoding="utf-8", newline="\n").write("\n".join(L) + "\n")
     print(f"wrote {path}")
 
@@ -362,18 +468,25 @@ def plots(man, res, bench, outdir):
         return
 
     # 1. accuracy vs throughput
-    pts = []
+    pts, excluded = [], []
     for ds_id in man["datasets"]:
         for sys_id, sy in man["systems"].items():
             rec = res.get(f"{ds_id}/{sys_id}")
             if not rec:
                 continue
-            f1 = None
-            if "surface" in rec:
-                f1 = rec["surface"]["f1_macro"]
-            elif "published" in rec:
-                f1 = rec["published"].get("f1_macro")
+            # A point may be plotted ONLY if its accuracy and its throughput
+            # are both ours. Plotting a cited accuracy against our wall clock
+            # would read as a head-to-head on identical hardware, which it is
+            # not -- their number comes from their machine and their split.
+            # This used to fall through to rec["published"], and only avoided
+            # the mistake because no published system happened to carry a
+            # throughput. Excluded systems are named in the caption instead.
             tp = bench["throughput"].get(sys_id)
+            if "published" in rec:
+                if tp:
+                    excluded.append(sy["label"])
+                continue
+            f1 = rec["surface"]["f1_macro"] if "surface" in rec else None
             if f1 is not None and tp:
                 pts.append((tp, f1, sy["label"]))
     if pts:
@@ -392,7 +505,13 @@ def plots(man, res, bench, outdir):
         plt.xlim(min(xs) / 4, max(xs) * 4)
         plt.xlabel("Sentences / sec (log scale)")
         plt.ylabel("Word-level F1 (macro)")
-        plt.title("Accuracy vs throughput")
+        # The exclusion is part of the figure, not a footnote elsewhere: a
+        # reader must see that a system is absent by policy, not by oversight.
+        title = "Accuracy vs throughput (measured on our hardware)"
+        if excluded:
+            title += ("\nexcluded, accuracy is cited not measured: "
+                      + ", ".join(excluded))
+        plt.title(title, fontsize=9 if excluded else 10)
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         plt.savefig(f"{outdir}/pareto_accuracy_throughput.png", dpi=140)

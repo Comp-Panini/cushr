@@ -23,21 +23,24 @@ cells.** Section 2 gives step-by-step instructions for each gap.
 
 ## 0. Status against the Week 11 specification
 
+The spec predates the decision to cite rather than re-run baselines (§2). Rows are
+marked against that policy, not against the original wording.
+
 | Spec item | State |
 |---|---|
 | **Dataset 1** — SIGHUM-test, 4,200 | ✅ complete |
-| **Dataset 2** — SIGHUM-hackathon-test | ❌ not attempted — see §2.5 |
-| **Dataset 3** — DCS held-out 1,000, disjoint from SIGHUM train | ⚠️ built with two documented deviations — see §1.2, §2.6 |
-| **Dataset 4** — GRETIL śāstra ~500 | ❌ not done — see §2.7 |
+| **Dataset 2** — SIGHUM-hackathon-test | 🔨 reachable, spike defined — see §2.3 |
+| **Dataset 3** — DCS held-out 1,000, disjoint from SIGHUM train | ⚠️ built with two documented deviations — see §1.2 |
+| **Dataset 4** — GRETIL śāstra ~500 | ⏸ deferred for annotation cost — see §2.4 |
 | **Baseline 1** — cushr_cpu | ✅ measured on a Lonestar6 compute node |
-| **Baseline 2** — TransLIST on A100 | ❌ published figures only, not reproduced — see §2.2 |
-| **Baseline 3** — ByT5-Sanskrit on A100 | ⚠️ run on dataset 1 only — see §2.1 |
-| **Baseline 4** — SHR's own beam (optional) | ❌ not installed — see §2.8 |
+| **Baseline 2** — TransLIST on A100 | ✅ **cited by policy**, daggered — see §2 |
+| **Baseline 3** — ByT5-Sanskrit on A100 | ✅ **measured by us** on dataset 1; deliberately not cited — see §2 |
+| **Baseline 4** — SHR's own beam (optional) | ❌ not installed; optional in the spec |
 | **Metric** — Word-level P / R / F1 | ✅ dataset 1; structurally impossible on dataset 3 (§3.2) |
 | **Metric** — Sentence-level Perfect Match | ✅ same |
 | **Metric** — Top-K recall @ 1, 5, 16, 32, 64 | ✅ complete |
-| **Metric** — Wallclock throughput | ⚠️ CPU is true wallclock; GPU is kernel-only — see §2.3 |
-| **Metric** — GPU memory | ⚠️ cuSHR complete; ByT5 never recorded — see §2.4 |
+| **Metric** — Wallclock throughput | ⚠️ CPU is true wallclock; GPU is kernel-only — see §2.2 |
+| **Metric** — GPU memory | ✅ cuSHR complete; not reported for cited systems, by policy (§2.1) |
 | **Deliverable** — one script, three plots | ✅ complete |
 
 ---
@@ -53,8 +56,14 @@ cells.** Section 2 gives step-by-step instructions for each gap.
 | cuSHR K4 top-1 (GPU) | 98.36 | 98.33 | 98.32 | 91.52 |
 | cuSHR K4 + reranker | | | | 91.98 |
 | cushr_cpu (week 3) | 98.36 | 98.33 | 98.32 | 91.52 |
-| ByT5-Sanskrit | | | | 81.38 |
-| TransLIST *(published, not reproduced)* | 98.80 | 98.93 | 98.86 | 93.97 |
+| ByT5-Sanskrit *(measured by us)* | | | | 81.38 |
+| TransLIST † | 98.80 | 98.93 | 98.86 | 93.97 |
+
+† Reported by Sandhan et al., *TransLIST*, Findings of EMNLP 2022, arXiv:2210.11753,
+Table 1 (SIGHUM column); **not reproduced here** — see §2. Their split overlaps ours by
+97.02% (4,075/4,200), so this is a comparison across near-identical rather than
+identical data. Their Hackathon column is 97.78 / 97.44 / 97.61 / 85.47 and is a
+different dataset; do not mix the two.
 
 The `cushr_cpu` accuracy row is an **asserted identity, not a second
 measurement**: same biaffine weights, same lattice, same top-1 Viterbi. Week 10
@@ -69,19 +78,35 @@ sentences. Only throughput differs between the two rows.
 
 #### Sentence-level perfect match by annotation level
 
-| System | S | L | S+M | L+M | S+L+M |
-|---|---:|---:|---:|---:|---:|
-| cuSHR K4 top-1 (GPU) | 91.52 | 65.62 | 45.69 | 45.45 | 45.29 |
-| cuSHR K4 + reranker | 91.98 | 65.98 | 50.29 | 50.02 | 49.86 |
-| cushr_cpu (week 3) | 91.52 | 65.62 | 45.69 | 45.45 | 45.29 |
-| ByT5-Sanskrit | 81.38 | 90.55 | | | |
-| *ORACLE (ceiling)* | *98.00* | *70.07* | *68.23* | *68.18* | *67.97* |
+Reported in two conventions. **raw** is what the decoder emits; **+maps** is the same
+output after SHR's analytical vocabulary is translated into DCS's by two tables
+(`lemma_map.json`, `convention_map.json`) built from **train ids only**, with dev/test
+membership asserted absent rather than assumed (`build_lemma_map.py:70-75` raises on
+leakage).
 
-**Read every cuSHR number against its ORACLE, not against ByT5.** ByT5's L =
-90.55 exceeds our own ceiling of 70.07. A system cannot beat our ceiling by
-decoding better, so that gap is a *convention* artifact: DCS lemmatises
-participles to the verbal root where SHR gives the participial stem. The L / L+M
-/ S+L+M columns measure convention agreement as much as model quality. See §4.
+| System | S | L raw | L +maps | S+M raw | S+M +maps | L+M raw | L+M +maps |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| cuSHR K4 top-1 (GPU) | 91.52 | 65.62 | **85.40** | 45.69 | 52.26 | 45.45 | 52.38 |
+| cuSHR K4 + reranker | 91.98 | 65.98 | **86.10** | 50.29 | 57.40 | 50.02 | 57.57 |
+| cushr_cpu (week 3) | 91.52 | 65.62 | 85.40 | 45.69 | 52.26 | 45.45 | 52.38 |
+| ByT5-Sanskrit | 81.38 | 90.55 | *n/a* | | *n/a* | | *n/a* |
+| *ORACLE (ceiling)* | *98.00* | *70.07* | *91.75* | *68.23* | *77.65* | *68.18* | *78.05* |
+
+S is identical in both conventions because the maps rewrite lemma and cng and never
+touch form. The generator asserts this rather than trusting it.
+
+**Read every cuSHR number against the ORACLE in the same convention, never across
+them.** The maps are applied to cuSHR *and to its ORACLE*, so the +maps ladder is a
+**change of measurement target, not a model gain**. They are never applied to ByT5,
+which emits DCS conventions natively and needs no translation — so its column is
+identical under both and is marked *n/a* rather than repeated.
+
+This is what the raw ladder was hiding: ByT5's L = 90.55 exceeds our *raw* ceiling of
+70.07, which is impossible as a quality claim — a system cannot beat our ceiling by
+decoding better. Once the convention gap is removed the comparison is 85.40 against
+90.55 with a ceiling of 91.75, which is a real and much smaller gap. DCS lemmatises
+participles to the verbal root where SHR gives the participial stem; that is the whole
+of the difference. See §4.
 
 #### Top-K recall — beam width K = 64
 
@@ -112,20 +137,24 @@ Pool: 5,456 eligible of 5,681 test rows. Built by `make_heldout_set.py`.
 2. There is no surface-segmentation reference, so S / P / R / F1 / PM are
    unmeasurable here **by construction, not merely unmeasured** (§3.2).
 
-| System | S | L | S+M | L+M | S+L+M |
+| System | S | L raw | L +maps | L+M raw | L+M +maps |
 |---|---:|---:|---:|---:|---:|
-| cuSHR K4 top-1 (GPU) | *n/a* | 57.60 | *n/a* | 39.50 | *n/a* |
+| cuSHR K4 top-1 (GPU) | *n/a* | 57.60 | **83.80** | 39.50 | 48.00 |
 | ByT5-Sanskrit | *n/a* | | *n/a* | | *n/a* |
-| *ORACLE (ceiling)* | *n/a* | *61.90* | *n/a* | *60.70* | *n/a* |
+| *ORACLE (ceiling)* | *n/a* | *61.90* | *90.80* | *60.70* | *73.40* |
 
 | Level | @1 | @5 | @16 | @32 | @64 |
 |---|---:|---:|---:|---:|---:|
 | L | 57.60 | 61.50 | 62.80 | 63.20 | |
 
-**The headline out-of-domain finding.** L drops 65.62 → 57.60, but ORACLE drops
-70.07 → 61.90 alongside it. cuSHR holds 93.7% of its ceiling in-domain and 93.1%
-out-of-domain. **The loss is the convention ceiling moving, not the model
-degrading** — a distinction the raw L number alone would hide.
+**The headline out-of-domain finding, and it survives both conventions.** Raw L drops
+65.62 → 57.60, but the ORACLE drops 70.07 → 61.90 alongside it: cuSHR holds **93.7%**
+of its ceiling in-domain and **93.1%** out-of-domain. Under +maps the same holds —
+85.40/91.75 = 93.1% in-domain against 83.80/90.80 = **92.3%** out-of-domain.
+
+**The loss is mostly the convention ceiling moving, not the model degrading.** That the
+ratio is stable under two independent normalisations is a stronger claim than either
+number alone, and it is the form the result should take in the paper.
 
 ### 1.3 Throughput and memory (Lonestar6 A100)
 
@@ -191,101 +220,65 @@ how to close that gap.
 > and scaling result only; do not attach an accuracy claim to it.
 
 ---
+## 2. Baseline policy — what we measure, what we cite
 
-## 2. What is missing, and exactly how to get it
+Advisor guidance, adopted: **do not re-run other people's models.** Cite their
+published numbers, mark them, and never mix a cited accuracy with our throughput.
+Re-running a baseline is only warranted when the split differs, when a head-to-head
+speed claim on identical hardware is being made, or when the paper does not report the
+metric needed. For accuracy, none of those applies.
 
-Ordered by value per unit effort.
+| System | Policy | Why |
+|---|---|---|
+| cuSHR (GPU top-1, reranker, ORACLE) | measured | ours |
+| `cushr_cpu` | measured | the only same-hardware speed claim in the paper |
+| **ByT5-Sanskrit** | **measured — ours, not cited** | see below |
+| **TransLIST** | **cited, daggered** | same task, 97% overlapping split |
+| SHR's own beam | not run | optional in the spec; not installed |
 
-### 2.1 ByT5 on the held-out set — *one job, fills an entire empty row*
+**ByT5 is the exception, and deliberately so.** Its published results are measured on a
+DCS April-2024 split (601,403 sentences, 8,398 test), *not* SIGHUM — see
+`PAPER_COMPARISON.md:448`. Citing those figures in a SIGHUM-test row would silently
+swap corpora mid-table. We already ran the released `chronbmm/sanskrit5-multitask` on
+our exact 4,200 through the identical reference and `score()`, so the honest column is
+the one we measured. The published ByT5 ladder may still be shown *as literature
+context*, clearly labelled as a different corpus, never as a table row.
 
-The inputs already exist locally but `byt5_in/` is git-ignored, so regenerate
-them on Lonestar6 rather than copying.
+**TransLIST's split is not identical to ours either.** `PAPER_COMPARISON.md:51`:
+`sighum_test_4200.tsv` and the published SIGHUM test split share 4,075 of 4,200
+sentences (97.02%) after transliterating to a common scheme. The generated footnote
+says "97% overlapping", not "the same split", and it should stay that way.
 
-```bash
-cd /home1/11503/njhavar/cushr/cushr_train
+**Numbers verified at source.** TransLIST's row was read directly from Table 1 of
+`papers/2210.11753v1.pdf`: SIGHUM 98.80 / 98.93 / 98.86 / 93.97, Hackathon
+97.78 / 97.44 / 97.61 / 85.47. A secondary summary claimed 93.97 was the Hackathon
+figure; it is not. Do not re-derive these from anything but the PDF.
 
-# 1. Build the inputs from the tracked TSV.
-python make_byt5_input.py --tsv heldout_1000.tsv \
-    --out-dir byt5_in --stem heldout_1000
+**Contamination runs the other way, and is worth one sentence in the paper.**
+`PAPER_COMPARISON.md` records 0 of 4,200 benchmark sentences in cuSHR's training data
+against 100 of 4,200 (2.38%) in ByT5's SIGHUM fine-tuning split, plus unavoidable
+pretraining exposure to all 4,200. The comparison is not tilted our way.
 
-# 2. Teach the job about the new stem. Line 81-83 hardcodes STEM, and line 242
-#    calls make_byt5_input.py without --tsv, so both need a branch.
-sed -i '83a [ "$HELDOUT" = "1" ] \&\& STEM="heldout_1000"' byt5_infer.slurm
-sed -i 's|--out-dir byt5_in --stem "$STEM" --limit "$LIMIT"|--out-dir byt5_in --stem "$STEM" --limit "$LIMIT" --tsv "${TSV:-sighum_test_4200.tsv}"|' byt5_infer.slurm
+### 2.1 Throughput and memory are the one place re-running would matter
 
-# 3. Run it.
-sbatch --export=ALL,HELDOUT=1,TSV=heldout_1000.tsv byt5_infer.slurm
-```
+The spec asked for baselines "on the same hardware", which is a *throughput* claim, not
+an accuracy one. Since we are not re-running anyone, the honest consequence is:
 
-Copy back `byt5_preds_segmentation-lemma-morphosyntax_heldout_1000.jsonl`, then
-set the manifest cell:
+- Throughput and GPU memory are reported **only** for cuSHR and `cushr_cpu`.
+- The accuracy-vs-throughput plot **excludes cited systems by construction** — this is
+  enforced in `make_results_matrix.py`, not left to reviewer discipline, and the
+  excluded system is named in the figure caption.
+- ByT5's throughput was never recorded even though we ran it. If it is ever re-run,
+  capture wall clock from the job log and `torch.cuda.max_memory_allocated()`; that
+  would put a third point on the Pareto plot.
 
-```json
-"g95_heldout/byt5": {
-  "slm": {"pred_jsonl": "byt5_preds_segmentation-lemma-morphosyntax_heldout_1000.jsonl",
-          "pred_name": "ByT5"}
-}
-```
+### 2.2 GPU wallclock throughput — deferred, not descoped
 
-and rebuild. **While you are there, capture §2.4's numbers from the same job.**
+Our GPU column is kernel-only; the spec asked for wallclock. I checked whether the CSVs
+already answer this: **they do not.** `us_per_sent_loop` and `us_per_sent_kernel` are
+identical in every row of every sweep, so that column excludes host time too.
 
-Expect only the L and L+M columns to populate — the `--no-surface` rule applies
-to every system on this dataset, ByT5 included.
-
-### 2.2 TransLIST measured rather than transcribed — *~4 hours, timeboxed*
-
-The table currently carries published figures with `"reproduced": false`. To
-measure them on our data:
-
-```bash
-# On a Lonestar6 login node.
-cd $WORK
-git clone https://github.com/rsingha108/TransLIST
-cd TransLIST
-# Fetch saved_models/ from the Google Drive link in the repo README.
-```
-
-**The documented stack is Python 3.7.3 / PyTorch 1.5.0 / CUDA 9.2. An A100 is
-sm_80 and requires CUDA 11+, so "run on A100" does not work as written.** Run it
-on CPU instead — 4,200 sentences is tractable, and the accuracy column becomes a
-measurement on our data rather than a transcription.
-
-```bash
-conda create -n translist python=3.7 -y && conda activate translist
-pip install torch==1.5.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
-pip install -r requirements.txt
-
-# Input is SLP1, one sentence per line -- the same format as byt5_in/.
-python interactive_module.py < sighum_test_4200.slp1.txt > translist_preds.txt
-```
-
-**Timebox it.** If the checkpoint will not load inside four hours, stop and keep
-the published row with its `reproduced: false` footnote. Do not attempt a
-PyTorch port. The throughput cell stays empty either way, with the CUDA-version
-reason stated.
-
-Then replace the manifest's `published` block with a `pred_jsonl` cell in the
-same shape as ByT5's.
-
-### 2.3 GPU wallclock throughput — *no new job needed*
-
-The spec asks for wallclock; the GPU column is kernel-only. I checked whether
-the CSVs already answer this: **they do not.** `us_per_sent_loop` and
-`us_per_sent_kernel` are identical in every row of every sweep, so that column
-excludes host time too.
-
-The number does exist — both SLURM scripts wrap their run in `time`, and the
-job logs are still on Lonestar6:
-
-```bash
-grep -A3 "^real" /home1/11503/njhavar/cushr/cushr_gpu/k64_bench.o*
-grep -A3 "^real" /home1/11503/njhavar/cushr/cushr_cpu/cpu_bench.o*
-```
-
-Divide 119,503 by the GPU job's `real` seconds for an end-to-end figure — but
-note that number **includes** the npz load, the CPU cross-check, and the 325 MB
-dump, so it understates streaming throughput badly. For a clean measurement,
-re-run one row without `--check` or `--dump-paths` and time it:
+One job fixes it, and it is *our* system, so the cite-don't-rerun policy does not apply:
 
 ```bash
 cd /home1/11503/njhavar/cushr/cushr_gpu
@@ -293,75 +286,59 @@ time ./cushr_batched "$DATA" --scorer biaffine --model "$MODEL" \
     --k4 twopass --K 32 --batch -1 --check 0 --csv k4_bench_G_k32_wall.csv
 ```
 
-Report both, labelled distinctly. Do **not** rename either to the other.
+Report both figures, labelled distinctly. Never rename one to the other. The job logs on
+Lonestar6 also carry a `real` time for the runs already done, but that number includes
+the npz load, the CPU cross-check and the 325 MB dump, so it understates streaming
+throughput badly.
 
-### 2.4 ByT5 throughput and GPU memory — *free if you run §2.1*
+### 2.3 SIGHUM-hackathon-test — reachable, and previously descoped in error
 
-Never recorded. The preds jsonl carries only `id, mode, words, lemmas, tags,
-raw` — no timing. From the job that runs §2.1:
+I had descoped this on the grounds that cuSHR cannot decode sentences SHR has not
+parsed. **That reasoning does not apply to this dataset.** From
+`papers/2210.11753v1.pdf` §3, read directly:
 
-```bash
-# Wallclock: the job log already has it.
-grep -E "^real|elapsed" byt5_infer.o<jobid>
+> "Both datasets are made of DCS. These datasets also come with candidate solution
+> space generated by SHR for SWS."
 
-# Peak GPU memory: add this to byt5_infer.slurm after inference, inside the
-# same python process that ran the model.
-#   import torch; print("peak_gpu_MB", torch.cuda.max_memory_allocated()/1e6)
-```
+The SHR candidate space already exists for the Hackathon set — 90,000 train / 10,332 dev
+/ **9,963 test** — and Sandhan et al. state *"We release our codebase and datasets
+publicly under the Apache license 2.0."* Because it ships gold segmentation, this
+dataset could carry **full word-level P/R/F1 and surface PM**, unlike `g95_heldout`.
+TransLIST also publishes a Hackathon column (97.78 / 97.44 / 97.61 / 85.47), so the
+cited comparison comes free.
 
-That fills ByT5's throughput and memory cells and puts a third point on the
-Pareto plot — currently the plot has only two, which is thin for a "frontier".
+**Spike, with a hard go/no-go at step 3:**
 
-### 2.5 SIGHUM-hackathon-test — *blocked on a source*
+1. **Download.** `Hackathon_data/` is referenced by `github.com/rsingha108/TransLIST`;
+   the SIGHUM original is `zenodo.org/record/803508` (footnote 7 of the paper).
+2. **Characterise the candidate-space format — read only, no code yet.** Our loader
+   consumes SHR `.graphml` with the `key=1` / `key=2` edge semantics documented in
+   `ingest/INGEST_METHODOLOGY.md`. Their release may be graphml in the same shape,
+   graphml in a different shape, or something else entirely. This is the unknown.
+3. **Go/no-go: can it convert without inventing edges?** Validate by converting a
+   SIGHUM sentence we *already* have graphml for and diffing node and edge sets against
+   `../../SIGHUM_database/After_graphml`. If it does not round-trip, stop and descope
+   with that as the stated reason.
+4. If it converts: ingest, add `hackathon_test` to `results_manifest.json`, decode, and
+   fill a complete row.
 
-Not present in this repo or either external tree, and no distribution URL has
-been identified. Before spending time here, establish that the split is publicly
-available at all:
+Do **not** hand-write a converter against a guessed schema.
 
-1. Check the SIGHUM / Sanskrit hackathon shared-task page for a test release.
-2. If it exists, confirm it ships **gold surface segmentations** — without them
-   it lands in the same `--no-surface` bucket as the held-out set (§3.2).
-3. Confirm the sentences have SHR graphml, or can be run through SHR (§3.1).
+### 2.4 GRETIL śāstra subset — deferred for annotation cost, not capability
 
-If any of the three fails, descope it explicitly in the paper rather than
-leaving the row blank without explanation.
+Also not blocked on SHR the way I first claimed.
+`github.com/SriramKrishnan8/sandhi_vicchedika` is a local, batch-capable wrapper around
+the Heritage Engine's `interface2` binary (prereqs: ocaml, ocamlbuild, camlp4, python3,
+devtrans; accepts SLP as the `SL` encoding; `-i input_file -o output_file`). Producing
+SHR analyses for new sentences is roughly a day of work.
 
-### 2.6 A true DCS held-out set — *blocked on SHR*
+**The real blocker is gold.** A GRETIL śāstra text has no DCS annotation, so ~500
+sentences need hand-correction by someone competent in śāstric Sanskrit. That is not an
+engineering cost. Secondary risk: that tool's documented output is a segmentation and
+morphology list, **not** graphml, so the same step-3 schema gate as above would apply.
 
-§1.2 is the closest reachable approximation. To build the set as specified —
-1,000 DCS sentences with no SHR restriction — you must first give cuSHR the
-ability to parse new sentences:
-
-1. Install the Sanskrit Heritage Reader (`gitlab.inria.fr/huet/Heritage_Platform`).
-2. Run the 322,232 DCS sentences that currently have no graphml through it.
-3. Point `ingest.py` at the new graphml directory and re-ingest.
-4. Re-run `make_heldout_set.py` with the enlarged corpus.
-
-This is a multi-week capability, not a Week 11 task. **It also unblocks §2.7 and
-§2.8.** Until then, §3.1 is a limitations paragraph, not a gap.
-
-### 2.7 GRETIL śāstra subset — *blocked on SHR, plus annotation*
-
-Same blocker as §2.6, plus: a GRETIL technical text has no DCS gold at all, so
-the ~500 sentences would need hand-correction by someone competent in śāstric
-Sanskrit. Sequence, once SHR is installed:
-
-1. Select the text (e.g. a section of the Kāśikā or the Sāṅkhyakārikā).
-2. Segment it into sentences; SLP1-transliterate.
-3. Run through SHR to obtain graphml.
-4. Obtain gold: match against DCS where possible, hand-correct the remainder.
-5. Ingest, then add as a third dataset in `results_manifest.json`.
-
-Step 4 is the expensive one and needs a human annotator.
-
-### 2.8 SHR's own beam — *optional in the spec*
-
-Requires the same Heritage Platform install as §2.6. Nothing in this repository
-invokes SHR; `ingest.py` only *consumes* pre-existing graphml. Reasonable to
-leave descoped and say so.
-
----
-
+Say in the paper that it is deferred for annotation cost. That is accurate; "we could
+not run SHR" is not.
 ## 3. Structural limits — state these in the paper
 
 ### 3.1 cuSHR's coverage is bounded by SHR's, not by annotation availability
@@ -373,9 +350,21 @@ repository invokes SHR. `ingest/INGEST_METHODOLOGY.md:150` states the corpus is
 Concretely: **119,503 sentences have graphml; 322,232 DCS pickles do not.**
 A sentence SHR has never parsed cannot be decoded at all, at any K.
 
-This single fact explains datasets 2, 3 (partially), and 4, and baseline 4. It
-is the structural finding of the week and deserves a paragraph in the paper's
-limitations section — it is a real property of the system, not an excuse.
+**State the bound precisely, because a loose version of it is wrong.** It constrains
+expansion onto *arbitrary new text* — any sentence we would have to run through SHR
+ourselves. It does **not** prevent us from using a released dataset that ships its own
+SHR candidate space, which is exactly what the Hackathon set does (§2.3). I initially
+descoped that dataset on this reasoning and was wrong to.
+
+So the bound explains dataset 3's restriction to already-parsed sentences (§1.2), and
+it explains why extending to arbitrary GRETIL text needs a generation step. It does not
+by itself explain dataset 2. Nor is running SHR a capability we lack outright:
+`sandhi_vicchedika` wraps the Heritage Engine's `interface2` locally (§2.4). The honest
+statement is that we have not needed to, not that we could not.
+
+It still deserves a paragraph in the paper's limitations section — cuSHR's coverage is
+bounded by SHR's, not by annotation availability — but as a property of the pipeline,
+scoped as above.
 
 ### 3.2 No surface-segmentation gold exists outside the published 4,200
 
@@ -400,28 +389,37 @@ it would score cuSHR against its own lattice gold and drive ORACLE toward 100.
 
 ### Headline vs appendix
 
-**Headline:** S-level F1 and Perfect Match; throughput and the CPU/GPU ratio;
-recall-vs-K; the out-of-domain ceiling-relative result from §1.2.
+**Headline:** S-level F1 and Perfect Match; the **+maps** L/M ladder with its ORACLE and
+the convention footnote; throughput and the CPU/GPU ratio; recall-vs-K; the
+out-of-domain ceiling-relative result from §1.2.
 
-**Appendix:** the full S/L/M ladder with the convention caveat; the memory
-sweeps; fused-vs-twopass; the ncu profile.
+**Appendix:** the raw ladder beside the +maps one; the memory sweeps;
+fused-vs-twopass; the ncu profile.
 
-Rationale: the L/M columns invite a direct comparison against ByT5 that the
-ORACLE row shows to be invalid. Leading with S puts the comparison on the axis
-we actually measure well; burying the ladder without its caveat would let the
-table argue against us.
+Rationale, revised: leading with S alone was the safe choice while the only L figure
+was the raw 65.62, which loses to ByT5's 90.55 by a margin that is convention, not
+quality. With both conventions computed we can headline the ladder honestly — 85.40
+against 90.55 under a 91.75 ceiling — provided the footnote travels with it. **Both
+columns must appear somewhere**; publishing only +maps would look like a chosen
+convention, and only raw understates by ~20 points on L for no substantive reason.
 
-### Three numbers to raise explicitly
+### Four numbers to raise explicitly
 
-1. **The CPU baseline is 11× faster than the README claimed.** The speedup
-   headline shrinks accordingly. Better found now than in review, and
-   `cushr_cpu/README.md:55` should be corrected.
+1. **The CPU baseline is ~11× faster than the README claimed** (1,076.75 vs "~100
+   sentences/sec"). The speedup headline shrinks accordingly: ~432× against the K=32
+   kernel figure, and that is still kernel-vs-wallclock, so an upper bound.
+   `cushr_cpu/README.md` has been corrected.
 2. **The K=32→48 throughput cliff is entirely in K3** — a concrete optimisation
-   target, and consistent with the register/occupancy trade from the branchless
-   merge rewrite. Evaluate with a batched `ncu` profile, not per-sentence.
-3. **Out-of-domain, cuSHR holds ~93% of its oracle in both domains.** The
-   apparent L drop is the ceiling moving. This is a stronger claim than the raw
-   number and should be made in these terms.
+   target, consistent with the register/occupancy trade from the branchless merge
+   rewrite. Evaluate with a batched `ncu` profile, not per-sentence.
+3. **Out-of-domain, cuSHR holds ~93% of its oracle under both conventions** (93.7/93.1
+   raw, 93.1/92.3 +maps). That the ratio is stable under two independent
+   normalisations is the claim to make, not the raw L drop.
+4. **The Hackathon dataset is reachable and I said otherwise earlier.** It ships its
+   own SHR candidate space, so it needs no SHR run from us, and it carries surface gold
+   — meaning it could add a second *full* P/R/F1 row. Decide whether to spend the spike
+   (§2.3) before the paper's dataset section is written, since it changes how the
+   limitations paragraph is worded.
 
 ---
 

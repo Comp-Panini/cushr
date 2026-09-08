@@ -56,6 +56,17 @@ Expected output (on SIGHUM-test, per the project plan):
 - `golden_outputs.json` containing top-10 paths for 500 sentences. This is
   the regression artifact for Week 4.
 
+> **The 100 sentences/sec above is a Week-3 design target, not a measurement,
+> and it is low by an order of magnitude.** Measured in Week 11 on a Lonestar6
+> compute node with the trained biaffine scorer: **1,076.75 sentences/sec**
+> wall clock, 119,503 sentences in 111.0 s at K=1 (`cpu_bench.csv`, produced by
+> `bench_cpu.slurm`; `cushr_evaluate --csv`).
+>
+> Use the measured figure in any speedup claim. Against the GPU's 464,995
+> sentences/sec at K=32 the ratio is ~432x — but that compares a kernel-only
+> GPU number against an end-to-end CPU one, so it is an upper bound on the
+> achievable end-to-end speedup rather than a measurement of one.
+
 ## The data structure (why these choices)
 
 Each node `v` stores a `std::vector<Entry>` of at most `K` entries:

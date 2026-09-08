@@ -10,7 +10,24 @@
     "cache": "./cache95_ctx_ex4200",
     "model": "model95_ctx_ex4200.npz",
     "index": "../data/sentence_index_g95.json",
-    "raw": "../data/cushr_data_g95.npz"
+    "raw": "../data/cushr_data_g95.npz",
+
+    "_maps_why": [
+      "The convention tables that translate SHR's analytical vocabulary into",
+      "DCS's. They compose by backoff in eval_slm.py analysis(): the",
+      "convention map is tried first on the (lemma, cng) pair, the lemma map",
+      "second on the lemma alone. Both are built from TRAIN ids only and",
+      "build_lemma_map.py asserts dev/test membership is absent rather than",
+      "assuming it, so applying them at eval is not leakage.",
+      "They rewrite lemma and cng, never form, so S must be identical with and",
+      "without them. Any S movement between the two variants is a bug.",
+      "eval_slm.py applies them to cuSHR AND its ORACLE, never to --pred-jsonl:",
+      "ByT5 emits DCS conventions natively and needs no translation."
+    ],
+    "maps": {
+      "lemma_map": "lemma_map.json",
+      "convention_map": "convention_map.json"
+    }
   },
 
   "datasets": {
@@ -47,12 +64,14 @@
         "reranking over 64 candidates instead of 32 is a different experiment",
         "and would move its 91.98, which is not what filling in a column means."
       ],
-      "slm":     {"cands": "gpu_rerank_k64.npz", "kbest": 64},
+      "slm":     {"cands": "gpu_rerank_k64.npz", "kbest": 64,
+                  "variants": ["raw", "maps"]},
       "surface": {}
     },
     "sighum_test/cushr_gpu_rerank": {
       "slm": {"cands": "gpu_rerank_k32.npz", "kbest": 32,
-              "rerank": "reranker_full.pt"}
+              "rerank": "reranker_full.pt",
+              "variants": ["raw", "maps"]}
     },
     "sighum_test/byt5": {
       "slm": {"pred_jsonl": "byt5_preds_segmentation-lemma-morphosyntax_sighum_test.jsonl",
@@ -77,11 +96,15 @@
       "published": {
         "p_macro": 98.80, "r_macro": 98.93, "f1_macro": 98.86, "pm": 93.97,
         "source": "papers/2210.11753v1.pdf, via PAPER_COMPARISON.md",
-        "reproduced": false
+        "citation": "Sandhan, Singha, Rao, Samanta, Behera and Goyal, *TransLIST: A Transformer-Based Linguistically Informed Sanskrit Tokenizer*, Findings of EMNLP 2022, arXiv:2210.11753, Table 1 (SIGHUM column).",
+        "split_note": "Measured on the published SIGHUM test split, which overlaps ours by 97.02% (4,075 of 4,200 sentences; see PAPER_COMPARISON.md), so this is a comparison across near-identical rather than identical data. Their Hackathon column reads 97.78 / 97.44 / 97.61 / 85.47 and is a different dataset -- do not mix the two.",
+        "reproduced": false,
+        "_verified": "Read directly from Table 1 of the PDF on 2026-09-08, not transcribed from a secondary source."
       }
     },
 
-    "g95_heldout/cushr_gpu_top1":   {"slm": {"cands": null, "kbest": 32}},
+    "g95_heldout/cushr_gpu_top1":   {"slm": {"cands": null, "kbest": 32,
+                                            "variants": ["raw", "maps"]}},
     "g95_heldout/cushr_gpu_rerank": null,
     "g95_heldout/byt5":             null,
     "g95_heldout/cushr_cpu":        null,
