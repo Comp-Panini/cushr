@@ -1,0 +1,2 @@
+K,n_sentences,n_gold,recall_at_K,us_per_sent_loop,us_per_sent_kernel,sent_per_sec_kernel,gpu_table_MB,gpu_used_MB,score_mismatch,count_mismatch,n_check,n_chunks,n_launches,us_per_sent_k4,us_per_sent_k3,k4_mode,scorer
+64,119503,115447,0.984192,6.420,6.420,155772.3,3304.344,3306.000,0,0,119503,1,363,1.766,4.653,twopass,biaffine

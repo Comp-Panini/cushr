@@ -160,6 +160,26 @@ def collect(man, force=False):
 
         out[key] = rec
         prov[key] = src
+
+    # Resolved after the loop so the referenced cell is guaranteed present.
+    # This is an asserted identity, not a measurement: see the "why" block in
+    # the manifest. It borrows accuracy only -- throughput and memory still
+    # come from the borrowing system's own bench CSV.
+    for key, spec in cells.items():
+        if not spec or "same_accuracy_as" not in spec:
+            continue
+        ds_id, _ = key.split("/")
+        ref = f"{ds_id}/{spec['same_accuracy_as']}"
+        if not out.get(ref):
+            raise SystemExit(
+                f"{key}: same_accuracy_as points at {ref}, which produced "
+                "nothing. Fix the manifest rather than let the cell silently "
+                "fall back to an em-dash.")
+        out[key] = dict(out[ref])
+        out[key]["_borrowed_from"] = ref
+        prov[key] = [f"accuracy asserted identical to `{ref}` "
+                     "(score_mismatch = 0); throughput measured separately"]
+        print(f"[{key}]\n  accuracy borrowed from {ref}")
     return out, prov
 
 
@@ -226,19 +246,29 @@ def render(man, res, prov, bench, path):
                                for k in SLM_LEVELS) + " |")
                 break
 
-        rows = []
-        for sys_id in ("cushr_gpu_rerank", "cushr_gpu_top1"):
-            rec = res.get(f"{ds_id}/{sys_id}")
-            if rec and "slm" in rec and "recall" in rec["slm"]:
-                rc = rec["slm"]["recall"]
-                for lvl in ("S", "L", "S+M"):
-                    if lvl in rc:
-                        rows.append(
-                            (f"{man['systems'][sys_id]['label']} [{lvl}]",
-                             rc[lvl]))
-                break
+        # Only the beam, deliberately. recall@K is a property of the candidate
+        # list, so the reranker cell reports numbers identical to the top-1
+        # cell -- listing both would suggest the reranker improved recall, and
+        # it cannot: it only reorders what the beam already contains. Take the
+        # widest beam available, since that is the one that reaches K=64.
+        rows, kb_used = [], None
+        cand = [(res.get(f"{ds_id}/{s}"), s)
+                for s in ("cushr_gpu_top1", "cushr_gpu_rerank")]
+        cand = [(r, s) for r, s in cand
+                if r and "slm" in r and r["slm"].get("recall")]
+        if cand:
+            rec, _ = max(cand, key=lambda t: t[0]["slm"].get("kbest") or 0)
+            rc, kb_used = rec["slm"]["recall"], rec["slm"].get("kbest")
+            for lvl in ("S", "L", "S+M"):
+                if lvl in rc:
+                    rows.append((f"beam [{lvl}]", rc[lvl]))
         if rows:
             A("\n### Top-K recall (cuSHR only &mdash; ByT5 has no beam)\n")
+            A(f"Beam width K={kb_used}. This is the beam's own recall, so it "
+              "is a hard ceiling on any reranker: the reranker reorders these "
+              "candidates and cannot add one. Compare it against the top-1 "
+              "row of the ladder above to see how much headroom reranking "
+              "has.\n")
             A("| Beam | " + " | ".join(f"@{k}" for k in REPORT_KS) + " |")
             A("|---" * (len(REPORT_KS) + 1) + "|")
             for name, rc in rows:
@@ -258,12 +288,52 @@ def render(man, res, prov, bench, path):
               f"{fmt(r.get('us_per_sent_k3'), 3)} |")
         A("\nThe recall column is empty across this sweep: it was run with "
           "`--check 0`, which skips the CPU cross-check that computes recall. "
-          "The only checked whole-corpus figure is **97.3053%** at K=32 "
-          "(`k4_bench_E_k32_checked.csv`, over its 115,447 sentences that have "
-          "a gold path). `batched_bench.csv` does carry a full recall curve, "
+          "The checked runs are tabulated separately below. "
+          "`batched_bench.csv` does carry a full recall curve, "
           "but that run used the hand-tuned `log_linear` scorer (recall@1 = "
           "8.31%) and must never be quoted alongside the trained model.")
-    if not bench["cpu"]:
+
+    if bench["checked"]:
+        A("\n### Whole-corpus recall, verified against the CPU decoder\n")
+        A("| K | recall@K | n_gold | sentences/sec | GPU MB | source |")
+        A("|---:|---:|---:|---:|---:|---|")
+        for r in bench["checked"]:
+            rc = r.get("recall_at_K")
+            A(f"| {r['K']} | {fmt(100 * rc if rc is not None else None, 4)} | "
+              f"{r['n_gold']:,} | {r['sent_per_sec_kernel']:,.0f} | "
+              f"{r['gpu_used_MB']:,.0f} | `{r['_src']}` |")
+        A("\nThese ran with `--check -1`, decoding every sentence on the CPU "
+          "as well and comparing; `score_mismatch` and `count_mismatch` are 0 "
+          "in both. The denominator is `n_gold`, not `n_sentences`: 4,056 of "
+          "the 119,503 corpus sentences have an empty gold span and can never "
+          "be hit by any decoder, so including them would understate recall.")
+        # Computed, not transcribed: a hardcoded pair would silently go stale
+        # the first time either CSV is regenerated.
+        sweep_at = {r["K"]: r["sent_per_sec_kernel"] for r in bench["k_sweep"]}
+        cmp = [(r["K"], r["sent_per_sec_kernel"], sweep_at[r["K"]])
+               for r in bench["checked"] if r["K"] in sweep_at]
+        if cmp:
+            A("\nThese throughputs are **lower** than the same K in the sweep "
+              "above ("
+              + "; ".join(f"K={k}: {c:,.0f} vs {s:,.0f}" for k, c, s in cmp)
+              + " sent/sec). Quote the sweep rows as the throughput result: "
+                "these runs also paid for the path dump and ran alongside the "
+                "full CPU cross-check.")
+
+    if bench["cpu"]:
+        c = bench["cpu"][0]
+        A(f"\n**cushr_cpu, measured on a Lonestar6 compute node:** "
+          f"{c['sent_per_sec']:,.0f} sentences/sec wall clock "
+          f"(K={c['K']:.0f}, {c['n_sentences']:,} sentences in "
+          f"{c['wall_sec']:.1f} s, `{c['scorer']}`). This supersedes the "
+          "\"~100 sentences/sec single-threaded\" figure in "
+          "`cushr_cpu/README.md:55`, which was a design target written before "
+          "the decoder existed and is low by a factor of ~11. Any speedup "
+          "claim must use this number. Note it is end-to-end wall clock while "
+          "the GPU column is kernel-only, so the ratio of the two is an upper "
+          "bound on the achievable end-to-end speedup, not a measurement of "
+          "one.")
+    else:
         A("\n**cushr_cpu throughput: not measured.** `cushr_evaluate` prints "
           "its `sent/s` line to stdout and writes it nowhere; the "
           "\"~100 sentences/sec\" in `cushr_cpu/README.md:55` is a design "
@@ -307,12 +377,19 @@ def plots(man, res, bench, outdir):
             if f1 is not None and tp:
                 pts.append((tp, f1, sy["label"]))
     if pts:
-        plt.figure(figsize=(6, 3.8))
+        plt.figure(figsize=(6.5, 3.8))
+        xs = [p[0] for p in pts]
+        # Labels sit beside their point, so the rightmost one needs room or it
+        # runs off the canvas. Flip the anchor for points in the right half.
+        mid = (min(xs) * max(xs)) ** 0.5
         for x, y, lab in pts:
             plt.scatter(x, y, s=60, zorder=3)
+            right = x > mid
             plt.annotate(lab, (x, y), textcoords="offset points",
-                         xytext=(6, 4), fontsize=8)
+                         xytext=(-8 if right else 8, 6), fontsize=8,
+                         ha="right" if right else "left")
         plt.xscale("log")
+        plt.xlim(min(xs) / 4, max(xs) * 4)
         plt.xlabel("Sentences / sec (log scale)")
         plt.ylabel("Word-level F1 (macro)")
         plt.title("Accuracy vs throughput")
@@ -332,14 +409,20 @@ def plots(man, res, bench, outdir):
     # (recall@1 = 8.31%) and plotting it here would attribute the wrong
     # decoder's numbers to the trained model. eval_slm.py --kbest is the only
     # source of a trained-model recall curve.
+    # Widest beam per dataset, not the first cell that happens to have a curve:
+    # taking the first one truncated the SIGHUM line at K=32 (the reranker
+    # cell) while a K=64 curve sat unused in the top-1 cell. recall@K is a
+    # property of the beam, so the two cells agree wherever they overlap.
     found = []
     for ds_id, ds in man["datasets"].items():
-        for sys_id in ("cushr_gpu_rerank", "cushr_gpu_top1"):
-            rec = res.get(f"{ds_id}/{sys_id}")
-            if rec and "slm" in rec and rec["slm"].get("recall"):
-                found.append((ds["label"].split("(")[0].strip(),
-                              rec["slm"]["recall"]))
-                break
+        cand = [res.get(f"{ds_id}/{s}")
+                for s in ("cushr_gpu_top1", "cushr_gpu_rerank")]
+        cand = [r for r in cand
+                if r and "slm" in r and r["slm"].get("recall")]
+        if cand:
+            rec = max(cand, key=lambda r: r["slm"].get("kbest") or 0)
+            found.append((ds["label"].split("(")[0].strip(),
+                          rec["slm"]["recall"]))
     # One level for every curve. A plot mixing S on one dataset with L on
     # another would show a gap that is mostly the level, not the domain, and a
     # reader would take it for the domain. S is preferred; L is the fallback
@@ -419,6 +502,15 @@ def load_bench(man):
         if rows and m:
             batch[int(m.group(1))] = rows
     cpu = read_bench(b.get("cpu_csv"))
+    # The checked runs are separate one-row CSVs, not part of the K sweep: the
+    # sweep ran --check 0 and so has no recall at any K. These are the only
+    # whole-corpus recall figures that were verified against the CPU decoder.
+    checked = []
+    for key in ("checked_k32", "checked_k64"):
+        for r in read_bench(b.get(key)):
+            r["_src"] = os.path.basename(b[key])
+            checked.append(r)
+    checked.sort(key=lambda r: r["K"])
     thr = {}
     # K=32 is the headline beam; quote its throughput, not the fastest row.
     for r in k_sweep:
@@ -431,7 +523,8 @@ def load_bench(man):
         # end-to-end, the other excludes host time, and silently equating them
         # would overstate the GPU speedup.
         thr["cushr_cpu"] = cpu[0].get("sent_per_sec")
-    return {"k_sweep": k_sweep, "batch": batch, "cpu": cpu, "throughput": thr}
+    return {"k_sweep": k_sweep, "batch": batch, "cpu": cpu,
+            "checked": checked, "throughput": thr}
 
 
 def main():

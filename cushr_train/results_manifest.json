@@ -39,7 +39,15 @@
 
   "cells": {
     "sighum_test/cushr_gpu_top1": {
-      "slm":     {"cands": null},
+      "_note": [
+        "cands/kbest are here only to produce the recall@K curve out to 64.",
+        "Verified they do not perturb the top-1 ladder: with and without them",
+        "the levels are 91.52 / 65.62 / 45.69 / 45.45 / 45.29, the CP-5",
+        "anchors. The reranker cell below is deliberately LEFT at kbest 32:",
+        "reranking over 64 candidates instead of 32 is a different experiment",
+        "and would move its 91.98, which is not what filling in a column means."
+      ],
+      "slm":     {"cands": "gpu_rerank_k64.npz", "kbest": 64},
       "surface": {}
     },
     "sighum_test/cushr_gpu_rerank": {
@@ -50,7 +58,21 @@
       "slm": {"pred_jsonl": "byt5_preds_segmentation-lemma-morphosyntax_sighum_test.jsonl",
               "pred_name": "ByT5"}
     },
-    "sighum_test/cushr_cpu": null,
+    "sighum_test/cushr_cpu": {
+      "same_accuracy_as": "cushr_gpu_top1",
+      "why": [
+        "The CPU decoder is not a different system: same biaffine weights,",
+        "same lattice, same top-1 Viterbi. Week 10 established the GPU top-1",
+        "is digit-identical to it, and k4_bench_F_k64_checked.csv re-confirms",
+        "it here with score_mismatch = count_mismatch = 0 over all 119,503",
+        "sentences. So its accuracy row IS the cushr_gpu_top1 row; only",
+        "throughput differs. Stated here rather than copied silently, so a",
+        "reader can see it is an asserted identity, not a second measurement.",
+        "NOTE: cpu_bench.csv's own precision/recall/f1 are node-level over the",
+        "whole 119,503-sentence corpus and are NOT the surface-level numbers",
+        "measured on the 4,200. Do not put those in this table."
+      ]
+    },
     "sighum_test/translist": {
       "published": {
         "p_macro": 98.80, "r_macro": 98.93, "f1_macro": 98.86, "pm": 93.97,
@@ -70,7 +92,8 @@
     "k_sweep":     "../cushr_gpu/k4_bench_C_biaffine_twopass.csv",
     "k_sweep_label": "cuSHR GPU, biaffine, k4=twopass, batch -1",
     "checked_k32": "../cushr_gpu/k4_bench_E_k32_checked.csv",
+    "checked_k64": "../cushr_gpu/k4_bench_F_k64_checked.csv",
     "batch_sweep": "../cushr_gpu/batched_bench_b*.csv",
-    "cpu_csv":     null
+    "cpu_csv":     "../cushr_cpu/cpu_bench.csv"
   }
 }
