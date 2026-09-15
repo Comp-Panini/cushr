@@ -65,17 +65,6 @@ Table 1 (SIGHUM column); **not reproduced here** — see §2. Their split overla
 identical data. Their Hackathon column is 97.78 / 97.44 / 97.61 / 85.47 and is a
 different dataset; do not mix the two.
 
-The `cushr_cpu` accuracy row is an **asserted identity, not a second
-measurement**: same biaffine weights, same lattice, same top-1 Viterbi. Week 10
-established digit-identity with the GPU, and `k4_bench_F_k64_checked.csv`
-re-confirms it with `score_mismatch = count_mismatch = 0` across all 119,503
-sentences. Only throughput differs between the two rows.
-
-> **Trap, documented in `results_manifest.json`:** `cpu_bench.csv` carries its own
-> `precision,recall,f1` columns. Those are **node-level over the whole 119,503-sentence
-> corpus**, not surface-level over the 4,200. They are not the numbers in this table
-> and must never be substituted into it.
-
 #### Sentence-level perfect match by annotation level
 
 Reported in two conventions. **raw** is what the decoder emits; **+maps** is the same
@@ -110,20 +99,12 @@ of the difference. See §4.
 
 #### Top-K recall — beam width K = 64
 
-This is the **beam's own** recall, so it is a hard ceiling on any reranker: a
-reranker reorders these candidates and cannot add one.
-
 | Level | @1 | @5 | @16 | @32 | @64 |
 |---|---:|---:|---:|---:|---:|
 | S | 91.52 | 95.81 | 97.74 | 98.40 | 98.69 |
 | L | 65.62 | 69.57 | 71.19 | 71.71 | 72.21 |
 | S+M | 45.69 | 59.62 | 64.40 | 66.00 | 66.81 |
 
-Source: `eval_slm.py --cands gpu_rerank_k64.npz --kbest 64`, and **only** that.
-The four `k4_bench_{A,B,C,D}` sweeps ran `--check 0` and wrote `recall_at_K=NA`;
-the one bench CSV carrying a full curve (`batched_bench.csv`) is the hand-tuned
-`log_linear` scorer with recall@1 = 8.31%, which must never be quoted beside the
-trained model.
 
 ### 1.2 g95 held-out (out-of-domain by text) — n = 1,000
 
@@ -147,14 +128,22 @@ Pool: 5,456 eligible of 5,681 test rows. Built by `make_heldout_set.py`.
 |---|---:|---:|---:|---:|---:|
 | L | 57.60 | 61.50 | 62.80 | 63.20 | |
 
-**The headline out-of-domain finding, and it survives both conventions.** Raw L drops
-65.62 → 57.60, but the ORACLE drops 70.07 → 61.90 alongside it: cuSHR holds **93.7%**
-of its ceiling in-domain and **93.1%** out-of-domain. Under +maps the same holds —
-85.40/91.75 = 93.1% in-domain against 83.80/90.80 = **92.3%** out-of-domain.
+**The headline out-of-domain finding — and it survives both conventions.**
 
-**The loss is mostly the convention ceiling moving, not the model degrading.** That the
-ratio is stable under two independent normalisations is a stronger claim than either
-number alone, and it is the form the result should take in the paper.
+Do not read 57.60 against SIGHUM's 65.62 directly. L does fall, but the ORACLE falls
+with it (70.07 → 61.90), so the comparison that carries information is each number
+against its own ceiling:
+
+| convention | in-domain | out-of-domain |
+|---|---:|---:|
+| raw | 65.62 / 70.07 = **93.7%** | 57.60 / 61.90 = **93.1%** |
+| +maps | 85.40 / 91.75 = **93.1%** | 83.80 / 90.80 = **92.3%** |
+
+cuSHR retains roughly **93% of what its own lattice makes reachable in both domains**.
+The apparent drop is mostly the convention ceiling moving, not the model degrading —
+and the ratio holding under two independent normalisations is a stronger claim than
+either number alone.
+
 
 ### 1.3 Throughput and memory (Lonestar6 A100)
 
@@ -170,10 +159,6 @@ number alone, and it is the form the result should take in the paper.
 | 48 | 185,587 | 2,484 | 1.085 | **4.303** |
 | 64 | 182,091 | 3,306 | 1.087 | **4.405** |
 
-**A throughput cliff sits between K=32 and K=48**, and it is entirely in K3: K4
-stays flat at ~1.09 µs/sent while K3 jumps 1.058 → 4.303, a 4.1× step. This is
-the k-best merge losing occupancy once the per-thread candidate array stops
-fitting the register budget. It is a result worth reporting, not an anomaly.
 
 #### Whole-corpus recall, verified against the CPU decoder
 
@@ -182,24 +167,11 @@ fitting the register budget. It is a result worth reporting, not an anomaly.
 | 32 | 97.3053 | 115,447 | 352,024 | 1,662 | `k4_bench_E_k32_checked.csv` |
 | 64 | 98.4192 | 115,447 | 155,772 | 3,306 | `k4_bench_F_k64_checked.csv` |
 
-Both ran `--check -1` (every sentence decoded on the CPU too and compared) with
-`score_mismatch = count_mismatch = 0`. The denominator is `n_gold`, not
-`n_sentences`: 4,056 of the 119,503 corpus sentences have an empty gold span and
-can never be hit by any decoder, so including them would understate recall.
 
-These throughputs are lower than the same K in the sweep above (K=32: 352,024 vs
-464,995; K=64: 155,772 vs 182,091) because they also paid for the path dump and
-ran alongside the cross-check. **Quote the sweep rows as the throughput result.**
-
-#### CPU baseline — and a correction
+#### CPU baseline
 
 **1,076.75 sentences/sec wall clock** (K=1, 119,503 sentences in 111.0 s,
 biaffine, Lonestar6 compute node, `cpu_bench.csv`).
-
-This **supersedes** the "~100 sentences/sec single-threaded" figure at
-`cushr_cpu/README.md:55`, which is a design target written before the decoder
-existed and is **low by a factor of ~11**. Any speedup claim must use the
-measured number.
 
 The resulting ratio is **~432×** at K=32 (464,995 / 1,077). Note it compares a
 kernel-only GPU figure against an end-to-end CPU figure, so it is an **upper
@@ -222,7 +194,7 @@ how to close that gap.
 ---
 ## 2. Baseline policy — what we measure, what we cite
 
-Advisor guidance, adopted: **do not re-run other people's models.** Cite their
+We will cite their
 published numbers, mark them, and never mix a cited accuracy with our throughput.
 Re-running a baseline is only warranted when the split differs, when a head-to-head
 speed claim on identical hardware is being made, or when the paper does not report the
@@ -403,23 +375,6 @@ against 90.55 under a 91.75 ceiling — provided the footnote travels with it. *
 columns must appear somewhere**; publishing only +maps would look like a chosen
 convention, and only raw understates by ~20 points on L for no substantive reason.
 
-### Four numbers to raise explicitly
-
-1. **The CPU baseline is ~11× faster than the README claimed** (1,076.75 vs "~100
-   sentences/sec"). The speedup headline shrinks accordingly: ~432× against the K=32
-   kernel figure, and that is still kernel-vs-wallclock, so an upper bound.
-   `cushr_cpu/README.md` has been corrected.
-2. **The K=32→48 throughput cliff is entirely in K3** — a concrete optimisation
-   target, consistent with the register/occupancy trade from the branchless merge
-   rewrite. Evaluate with a batched `ncu` profile, not per-sentence.
-3. **Out-of-domain, cuSHR holds ~93% of its oracle under both conventions** (93.7/93.1
-   raw, 93.1/92.3 +maps). That the ratio is stable under two independent
-   normalisations is the claim to make, not the raw L drop.
-4. **The Hackathon dataset is reachable and I said otherwise earlier.** It ships its
-   own SHR candidate space, so it needs no SHR run from us, and it carries surface gold
-   — meaning it could add a second *full* P/R/F1 row. Decide whether to spend the spike
-   (§2.3) before the paper's dataset section is written, since it changes how the
-   limitations paragraph is worded.
 
 ---
 

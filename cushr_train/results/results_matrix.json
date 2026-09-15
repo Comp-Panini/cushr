@@ -1,6 +1,7 @@
 {
  "cells": {
   "g95_heldout/byt5": null,
+  "g95_heldout/byt5_paper": null,
   "g95_heldout/cushr_cpu": null,
   "g95_heldout/cushr_gpu_rerank": null,
   "g95_heldout/cushr_gpu_top1": {
@@ -205,6 +206,24 @@
     "pred_name": "ByT5",
     "rerank": null,
     "tsv": "sighum_test_4200.tsv"
+   }
+  },
+  "sighum_test/byt5_paper": {
+   "published": {
+    "_verified": "Read directly from Tables 3 and 7 of the PDF on 2026-09-08.",
+    "citation": "Nehrdich, Hellwig et al., *One Model is All You Need: ByT5-Sanskrit, a Unified Model for Sanskrit NLP Tasks*, Findings of EMNLP 2024, arXiv:2409.13920, Table 3 (SIGHUM column).",
+    "levels": {
+     "L": 79.88,
+     "L+M": 62.0,
+     "S": 84.61,
+     "S+L+M": 61.27,
+     "S+M": 63.86
+    },
+    "levels_corpus": "DIFFERENT CORPUS -- Table 7, `Sen` column: a DCS April-2024 split (601,403 sentences, 8,398 test), not SIGHUM. Their test split also excludes reconstructed forms and is 'strongly biased towards Vedic texts' (their §5.5). Read this row for category alignment, never as a SIGHUM result. The `Par` column is excluded deliberately: it feeds pseudo-paragraphs of up to 512 characters, a different input granularity from our per-sentence decode.",
+    "pm": 93.83,
+    "reproduced": false,
+    "source": "papers/2024-FgRTq7-2024.findings-emnlp.805 (1).pdf, Table 3",
+    "split_note": "This is a SIGHUM figure and so is comparable in principle, but it is a **different configuration from the one we ran**: their model was fine-tuned on SIGHUM (99k samples) while ours is the released multitask checkpoint used off the shelf. The 12-point gap against our measured 81.38 is mostly that, not a reproduction failure. Their Hackathon figure is 94.29."
    }
   },
   "sighum_test/cushr_cpu": {
@@ -1086,6 +1105,7 @@
  },
  "provenance": {
   "g95_heldout/byt5": [],
+  "g95_heldout/byt5_paper": [],
   "g95_heldout/cushr_cpu": [],
   "g95_heldout/cushr_gpu_rerank": [],
   "g95_heldout/cushr_gpu_top1": [
@@ -1095,6 +1115,9 @@
   "g95_heldout/translist": [],
   "sighum_test/byt5": [
    "eval_slm.py"
+  ],
+  "sighum_test/byt5_paper": [
+   "papers/2024-FgRTq7-2024.findings-emnlp.805 (1).pdf, Table 3"
   ],
   "sighum_test/cushr_cpu": [
    "accuracy asserted identical to `sighum_test/cushr_gpu_top1` (score_mismatch = 0); throughput measured separately"

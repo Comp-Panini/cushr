@@ -1,0 +1,67 @@
+{
+  "args": {
+    "cache": "./cache95_ngrams80",
+    "epochs": 1,
+    "batch": 64,
+    "lr": 0.001,
+    "margin": 1.0,
+    "cost": "surface",
+    "gold_target": "surface",
+    "morph_cost": 0.0,
+    "surface_raw": "../data/cushr_data_g95.npz",
+    "select_by": "surface_pm",
+    "weight_decay": 1e-05,
+    "hidden": 128,
+    "seed": 0,
+    "limit_train": 5000,
+    "eval_every": 1,
+    "splits_override": "splits95_ex4200.json",
+    "train_subset": "",
+    "out": "seg_quick.npz",
+    "log": "seg_quick.json",
+    "learned": "hybrid_tag",
+    "node_dim": 96,
+    "word_dropout": 0.1,
+    "encoder": "char_bilstm",
+    "ctx_dim": 96,
+    "ctx_hidden": 128,
+    "ctx_layers": 2,
+    "ctx_char_dim": 32,
+    "resume": false,
+    "materialize": "",
+    "device": "cpu"
+  },
+  "featurizer": "ngrams80",
+  "feat_dim": 192,
+  "scalar_dim": 80,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 6.179060438537598,
+      "active_frac": 0.9446,
+      "sec": 28.712330102920532,
+      "dev": {
+        "precision": 0.695,
+        "recall": 0.616204489718921,
+        "f1": 0.6532346765323467,
+        "perfect_match": 0.14486552567237163,
+        "n": 1636,
+        "surface_precision": 0.9460361912968548,
+        "surface_recall": 0.8284285983776646,
+        "surface_f1": 0.8833350095544604,
+        "surface_pm": 0.44865525672371637
+      }
+    }
+  ],
+  "test": {
+    "precision": 0.7037769191601522,
+    "recall": 0.6297437821612349,
+    "f1": 0.6647052999335209,
+    "perfect_match": 0.151381798979053,
+    "n": 5681,
+    "surface_precision": 0.943204252088079,
+    "surface_recall": 0.8323282678030608,
+    "surface_f1": 0.8843043453499629,
+    "surface_pm": 0.4569618024995599
+  }
+}

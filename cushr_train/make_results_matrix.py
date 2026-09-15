@@ -63,7 +63,7 @@ def run_eval(script, args, inputs, force=False):
     log = out[:-5] + ".log"
     if os.path.exists(out) and not force:
         print(f"  cached  {os.path.basename(out)}")
-        return json.load(open(out))
+        return json.load(open(out, encoding="utf-8"))
     cmd = [sys.executable, script] + args + ["--json-out", out]
     print(f"  running {' '.join(cmd[1:])[:110]}")
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
@@ -76,7 +76,7 @@ def run_eval(script, args, inputs, force=False):
         # read as "not attempted" rather than "attempted and broken".
         tail = open(log, encoding="utf-8").read()[-800:]
         raise SystemExit(f"{script} failed (exit {r.returncode}):\n{tail}")
-    return json.load(open(out))
+    return json.load(open(out, encoding="utf-8"))
 
 
 def read_bench(path):
@@ -279,8 +279,11 @@ def render(man, res, prov, bench, path):
                 # eval_slm.py agree to the digit on SIGHUM-test. Report PM
                 # alone; never a P/R/F1 that was not measured.
                 pm = cell_levels(rec, sys_id).get("S")
-            A(f"| {sy['label']} | {fmt(p)}{dag} | {fmt(r)}{dag} | "
-              f"{fmt(f)}{dag} | {fmt(pm)}{dag} |")
+            # Mark values, not em-dashes: "&mdash;&dagger;" reads as a cited
+            # absence, which is not a thing.
+            def m(v):
+                return fmt(v) + (dag if v is not None else "")
+            A(f"| {sy['label']} | {m(p)} | {m(r)} | {m(f)} | {m(pm)} |")
         for label, d in cited:
             A(f"\n&dagger; **{label}** numbers are *reported*, not reproduced "
               f"here: {d.get('citation', d.get('source', 'see source'))} "
@@ -300,7 +303,22 @@ def render(man, res, prov, bench, path):
         A("| System | " + " | ".join(cols) + " |")
         A("|---" * (len(cols) + 1) + "|")
 
+        corpus_notes = []
+
         def ladder_row(label, rec, sys_id, field=None):
+            # A cited ladder: rendered in the raw half with a marker, never in
+            # the +maps half, because the maps are ours and were never applied
+            # to anyone else's numbers.
+            pub = (rec or {}).get("published") or {}
+            if pub.get("levels") and "slm" not in (rec or {}):
+                mark = "&Dagger;" if pub.get("levels_corpus") else "&dagger;"
+                cells = [fmt(pub["levels"].get(k)) + mark for k in SLM_LEVELS]
+                if any_maps:
+                    cells += ["*n/a*"] * len(SLM_LEVELS)
+                A(f"| {label} | " + " | ".join(cells) + " |")
+                if pub.get("levels_corpus"):
+                    corpus_notes.append((label, pub["levels_corpus"]))
+                return
             raw = cell_levels(rec, sys_id, "raw", field)
             cells = [fmt(raw.get(k)) for k in SLM_LEVELS]
             if any_maps:
@@ -324,6 +342,10 @@ def render(man, res, prov, bench, path):
             if rec and "slm" in rec:
                 ladder_row("*ORACLE (ceiling)*", rec, sys_id, field="oracle")
                 break
+
+        for label, note in corpus_notes:
+            A(f"\n&Dagger; **{label} is measured on a different corpus and is "
+              f"not a {ds['label'].split('(')[0].strip()} result.** {note}")
 
         if any_maps:
             A("\n**+maps** are the convention tables "
@@ -494,16 +516,29 @@ def plots(man, res, bench, outdir):
         xs = [p[0] for p in pts]
         # Labels sit beside their point, so the rightmost one needs room or it
         # runs off the canvas. Flip the anchor for points in the right half.
-        mid = (min(xs) * max(xs)) ** 0.5
+        mid = max(xs) / 2
         for x, y, lab in pts:
             plt.scatter(x, y, s=60, zorder=3)
             right = x > mid
+            # With the y axis pinned to 0-100 every real point sits near the
+            # top, so a label placed above it lands in the title. Drop the
+            # label below the marker whenever the point is high.
+            dy = -14 if y > 88 else 6
             plt.annotate(lab, (x, y), textcoords="offset points",
-                         xytext=(-8 if right else 8, 6), fontsize=8,
+                         xytext=(-8 if right else 8, dy), fontsize=8,
                          ha="right" if right else "left")
-        plt.xscale("log")
-        plt.xlim(min(xs) / 4, max(xs) * 4)
-        plt.xlabel("Sentences / sec (log scale)")
+        # Linear from the origin on both axes. This is the honest picture of
+        # the ratio -- the CPU point sits almost on the y axis because it IS
+        # ~432x slower -- but it costs resolution at the low end: on this scale
+        # 1,077 and 10,000 sent/sec are indistinguishable. The log version is
+        # the one to use if the question is "how do several systems compare";
+        # this one answers "how big is the gap".
+        plt.xlim(0, max(xs) * 1.15)
+        plt.ylim(0, 100)
+        plt.yticks(range(0, 101, 10))
+        plt.gca().xaxis.set_major_formatter(
+            matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+        plt.xlabel("Sentences / sec")
         plt.ylabel("Word-level F1 (macro)")
         # The exclusion is part of the figure, not a footnote elsewhere: a
         # reader must see that a system is absent by policy, not by oversight.
@@ -553,16 +588,24 @@ def plots(man, res, bench, outdir):
               for lab, rc in found] if lvl else []
     if curves:
         plt.figure(figsize=(5.4, 3.4))
-        for lab, pts in curves:
-            plt.plot([k for k, _ in pts], [v for _, v in pts], "o-", label=lab)
-        plt.xscale("log", base=2)
+        # A true linear K axis with evenly spaced ticks. Points sit at their
+        # actual K, so the low end (1,2,4,5,8) is genuinely crowded -- that
+        # crowding is real and the curve shape here IS a growth rate, which
+        # neither the log nor the ordinal version could show.
         ticks = sorted({k for _, pts in curves for k, _ in pts})
-        plt.xticks(ticks, [str(t) for t in ticks])
+        for lab, pts in curves:
+            plt.plot([k for k, _ in pts], [v for _, v in pts],
+                     "o-", label=lab)
+        plt.xticks(range(0, max(ticks) + 1, 10))
+        plt.xlim(0, max(ticks) + 2)
+        # From 0 so the reader sees the absolute level, not just the slope.
+        plt.ylim(0, 100)
+        plt.yticks(range(0, 101, 10))
         plt.xlabel("K (beam width)")
         plt.ylabel("Top-K recall, sentence-level (%)")
         plt.title("Top-K recall vs K (trained biaffine)")
         plt.grid(True, alpha=0.3)
-        plt.legend(fontsize=8)
+        plt.legend(fontsize=8, loc="lower right")
         plt.tight_layout()
         plt.savefig(f"{outdir}/recall_vs_k.png", dpi=140)
         plt.close()
@@ -573,31 +616,30 @@ def plots(man, res, bench, outdir):
     # 3. memory vs K and vs batch size -- both sweeps already exist
     if bench["k_sweep"] or bench["batch"]:
         fig, ax = plt.subplots(1, 2, figsize=(9, 3.4))
+        # Linear K on both panels, ticks every 10, points at their actual K.
         if bench["k_sweep"]:
             ks = [r["K"] for r in bench["k_sweep"]]
-            ax[0].plot(ks, [r["gpu_used_MB"] for r in bench["k_sweep"]],
-                       "s-", color="#c05621")
-            ax[0].set_xscale("log", base=2)
-            # The sweep includes K=24 and K=48, so power-of-two tick labels
-            # would name values that were never run.
-            ax[0].set_xticks(ks)
-            ax[0].set_xticklabels([str(k) for k in ks], fontsize=7)
-            ax[0].minorticks_off()
+            mb = [r["gpu_used_MB"] for r in bench["k_sweep"]]
+            ax[0].plot(ks, mb, "s-", color="#c05621")
+            ax[0].set_xticks(range(0, max(ks) + 1, 10))
+            ax[0].set_xlim(0, max(ks) + 2)
+            ax[0].set_ylim(0, max(mb) * 1.08)
             ax[0].set_xlabel("K (beam width)")
             ax[0].set_ylabel("GPU MB in use")
             ax[0].set_title("Memory vs K")
             ax[0].grid(True, alpha=0.3)
-        for b, rows in sorted(bench["batch"].items()):
-            ax[1].plot([r["K"] for r in rows],
-                       [r["gpu_used_MB"] for r in rows],
-                       "o-", ms=3, label=f"batch {b:,}")
         if bench["batch"]:
             bks = sorted({r["K"] for rows in bench["batch"].values()
                           for r in rows})
-            ax[1].set_xscale("log", base=2)
-            ax[1].set_xticks(bks)
-            ax[1].set_xticklabels([str(k) for k in bks], fontsize=7)
-            ax[1].minorticks_off()
+            top = 0.0
+            for b, rows in sorted(bench["batch"].items()):
+                ax[1].plot([r["K"] for r in rows],
+                           [r["gpu_used_MB"] for r in rows],
+                           "o-", ms=3, label=f"batch {b:,}")
+                top = max(top, max(r["gpu_used_MB"] for r in rows))
+            ax[1].set_xticks(range(0, max(bks) + 1, 10))
+            ax[1].set_xlim(0, max(bks) + 2)
+            ax[1].set_ylim(0, top * 1.15)
             ax[1].set_xlabel("K (beam width)")
             ax[1].set_ylabel("GPU MB in use")
             ax[1].set_title("Memory vs K, by batch size")
@@ -656,14 +698,18 @@ def main():
                     help="ignore the cache and re-run every eval")
     args = ap.parse_args()
 
-    man = json.load(open(args.manifest))
+    # encoding is explicit everywhere: Python on Windows defaults text I/O
+    # to cp1252, which silently mangled the manifest's non-ASCII (a section
+    # sign came back as two characters and reached the rendered table).
+    man = json.load(open(args.manifest, encoding="utf-8"))
     os.makedirs(args.plot_dir, exist_ok=True)
     res, prov = collect(man, args.force)
     bench = load_bench(man)
     render(man, res, prov, bench, args.out_md)
     json.dump({"cells": res, "provenance": prov,
                "throughput": bench["throughput"]},
-              open(args.out_json, "w"), indent=1, sort_keys=True)
+              open(args.out_json, "w", encoding="utf-8"),
+              indent=1, sort_keys=True, ensure_ascii=False)
     print(f"wrote {args.out_json}")
     plots(man, res, bench, args.plot_dir)
 

@@ -38,6 +38,7 @@ train recall@1 is close to dev recall@1 the effect is small and train is usable
 directly; a large gap means 5-fold jackknifed decoding is required.
 """
 import argparse
+import json
 
 import numpy as np
 import torch
@@ -46,6 +47,7 @@ from dataset import LatticeStore, collate
 from kbest import kbest, predicted_nodes_k
 from model import BiaffineEdgeScorer
 from train import batches, to_torch
+import surface_cands as SC
 
 
 def load_net(model_path, dev):
@@ -60,14 +62,19 @@ def load_net(model_path, dev):
 
 @torch.no_grad()
 def dump(store, net, dev, ids, K, cstart, fid, forms, batch_size=128,
-         progress_every=20000):
+         progress_every=20000, label="node", dedup_surface=False, k_decode=0):
+    """label='node' + no dedup is the original dump, unchanged. label='surface'
+    marks a candidate correct when its segmentation matches the gold path's;
+    dedup_surface keeps one candidate per distinct segmentation out of the top
+    k_decode paths."""
+    kd = max(K, k_decode or K)
     nodes_flat, off, c_sent, c_score, c_label = [], [0], [], [], []
     sent_ids, n_hit1, n_hitK = [], 0, 0
     for chunk in batches(ids, batch_size, shuffle=False):
         b = collate(store, chunk)
         t = to_torch(b, dev)
         w = net(t["feats"], t["src"], t["dst"], t.get("ids"), t)
-        ke, km, sc, va = kbest(t, w, K)
+        ke, km, sc, va = kbest(t, w, kd)
         cands = predicted_nodes_k(t, ke, km, va)
         gn = np.asarray(b["global_node"])
         for i, s in enumerate(chunk):
@@ -76,18 +83,19 @@ def dump(store, net, dev, ids, K, cstart, fid, forms, batch_size=128,
                 store.gold_nodes[store.gold_off[s]:store.gold_off[s + 1]].tolist(),
                 key=lambda g: int(cstart[g]))
             gold = tuple(g for g in gold if forms[fid[g]])
+            gold_key = SC.surface_key(gold, cstart, fid)
             si = len(sent_ids)
             sent_ids.append(s)
             hit1 = hitK = False
-            for k, loc in enumerate(cands[i]):
-                seq = sorted((int(gn[x]) for x in loc),
-                             key=lambda g: int(cstart[g]))
-                seq = [g for g in seq if forms[fid[g]]]
-                ok = tuple(seq) == gold
+            seqs, scores = SC.sentence_candidates(cands[i], sc[i], gn, cstart,
+                                                  fid, forms, K, dedup_surface)
+            for k, (seq, score) in enumerate(zip(seqs, scores)):
+                ok = (SC.surface_key(seq, cstart, fid) == gold_key
+                      if label == "surface" else tuple(seq) == gold)
                 nodes_flat.extend(seq)
                 off.append(len(nodes_flat))
                 c_sent.append(si)
-                c_score.append(float(sc[i, k]))
+                c_score.append(score)
                 c_label.append(ok)
                 hitK |= ok
                 hit1 |= ok and k == 0
@@ -121,9 +129,28 @@ def main():
                          "rather than the model.")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out-prefix", default="rerank")
+    # --- segmentation reranker options. Defaults reproduce the original dump.
+    ap.add_argument("--label", choices=("node", "surface"), default="node",
+                    help="node: correct = exact gold node path (original). "
+                         "surface: correct = same segmentation as the gold path.")
+    ap.add_argument("--dedup-surface", action="store_true",
+                    help="keep one candidate per distinct segmentation, so --k "
+                         "counts different splits, not morph variants")
+    ap.add_argument("--k-decode", type=int, default=0,
+                    help="with --dedup-surface: decode this many paths, then "
+                         "keep the best --k distinct segmentations (0 = --k)")
+    ap.add_argument("--splits-override", default="",
+                    help="JSON {train,dev,test} as in train.py. Use the same "
+                         "file the base model trained with, so benchmark "
+                         "sentences never reach reranker training.")
     args = ap.parse_args()
 
     store = LatticeStore(args.cache)
+    if args.splits_override:
+        ov = json.load(open(args.splits_override))
+        for k in ("train", "dev", "test"):
+            store.splits[k] = np.asarray(ov[k], dtype=np.int64)
+        print(f"splits override {args.splits_override}")
     dev = torch.device("cpu")
     net = load_net(args.model, dev)
     z = np.load(args.raw)
@@ -131,7 +158,11 @@ def main():
     forms = [l.split("\t", 1)[1].rstrip("\n") if "\t" in l else ""
              for l in open(args.form_vocab, encoding="utf-8")]
 
-    print(f"K={args.k}   label = candidate node sequence equals the gold path\n")
+    what = ("segmentation equals the gold path's" if args.label == "surface"
+            else "candidate node sequence equals the gold path")
+    dd = (f"   dedup: best {args.k} distinct segmentations of top "
+          f"{max(args.k, args.k_decode or args.k)}" if args.dedup_surface else "")
+    print(f"K={args.k}   label = {what}{dd}\n")
     print(f"{'split':<8}{'sentences':>11}{'recall@1':>10}{'recall@'+str(args.k):>11}")
     rows = {}
     for sp in args.splits.split(","):
@@ -139,7 +170,9 @@ def main():
         if args.limit and args.limit < len(ids):
             rng = np.random.default_rng(args.seed)
             ids = np.sort(rng.choice(ids, args.limit, replace=False))
-        data, h1, hK = dump(store, net, dev, ids, args.k, cstart, fid, forms)
+        data, h1, hK = dump(store, net, dev, ids, args.k, cstart, fid, forms,
+                            label=args.label, dedup_surface=args.dedup_surface,
+                            k_decode=args.k_decode)
         n = len(data["sent_ids"])
         rows[sp] = (100 * h1 / n, 100 * hK / n)
         print(f"{sp:<8}{n:>11,}{100*h1/n:>9.2f}%{100*hK/n:>10.2f}%")

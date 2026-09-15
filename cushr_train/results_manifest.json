@@ -50,8 +50,9 @@
     "cushr_gpu_top1":   {"label": "cuSHR K4 top-1 (GPU)",  "kind": "cushr"},
     "cushr_gpu_rerank": {"label": "cuSHR K4 + reranker",   "kind": "cushr"},
     "cushr_cpu":        {"label": "cushr_cpu (week 3)",    "kind": "cpu"},
-    "byt5":             {"label": "ByT5-Sanskrit",         "kind": "external"},
-    "translist":        {"label": "TransLIST",             "kind": "published"}
+    "byt5":             {"label": "ByT5-Sanskrit (we ran it)", "kind": "external"},
+    "byt5_paper":       {"label": "ByT5-Sanskrit (reported)",  "kind": "published"},
+    "translist":        {"label": "TransLIST (reported)",   "kind": "published"}
   },
 
   "cells": {
@@ -92,6 +93,31 @@
         "measured on the 4,200. Do not put those in this table."
       ]
     },
+    "sighum_test/byt5_paper": {
+      "_why": [
+        "ByT5's own SIGHUM figure, cited beside the run we did ourselves.",
+        "These are NOT the same system configuration and the gap is large:",
+        "93.83 reported vs 81.38 measured. Their number comes from a model",
+        "FINE-TUNED ON SIGHUM, which learned SIGHUM's compound convention;",
+        "ours is the off-the-shelf chronbmm/sanskrit5-multitask checkpoint,",
+        "which learned DCS's. See PAPER_COMPARISON.md:347-351 -- of ByT5's",
+        "errors against this reference only 0.2% over-generate, so the S",
+        "column understates their system rather than measuring it badly.",
+        "Reporting our 81.38 alone would understate ByT5 by ~12 points."
+      ],
+      "published": {
+        "pm": 93.83,
+        "source": "papers/2024-FgRTq7-2024.findings-emnlp.805 (1).pdf, Table 3",
+        "citation": "Nehrdich, Hellwig et al., *One Model is All You Need: ByT5-Sanskrit, a Unified Model for Sanskrit NLP Tasks*, Findings of EMNLP 2024, arXiv:2409.13920, Table 3 (SIGHUM column).",
+        "split_note": "This is a SIGHUM figure and so is comparable in principle, but it is a **different configuration from the one we ran**: their model was fine-tuned on SIGHUM (99k samples) while ours is the released multitask checkpoint used off the shelf. The 12-point gap against our measured 81.38 is mostly that, not a reproduction failure. Their Hackathon figure is 94.29.",
+        "reproduced": false,
+        "levels": {"S": 84.61, "L": 79.88, "S+M": 63.86, "L+M": 62.00,
+                   "S+L+M": 61.27},
+        "levels_corpus": "DIFFERENT CORPUS -- Table 7, `Sen` column: a DCS April-2024 split (601,403 sentences, 8,398 test), not SIGHUM. Their test split also excludes reconstructed forms and is 'strongly biased towards Vedic texts' (their §5.5). Read this row for category alignment, never as a SIGHUM result. The `Par` column is excluded deliberately: it feeds pseudo-paragraphs of up to 512 characters, a different input granularity from our per-sentence decode.",
+        "_verified": "Read directly from Tables 3 and 7 of the PDF on 2026-09-08."
+      }
+    },
+
     "sighum_test/translist": {
       "published": {
         "p_macro": 98.80, "r_macro": 98.93, "f1_macro": 98.86, "pm": 93.97,
@@ -107,6 +133,7 @@
                                             "variants": ["raw", "maps"]}},
     "g95_heldout/cushr_gpu_rerank": null,
     "g95_heldout/byt5":             null,
+    "g95_heldout/byt5_paper":       null,
     "g95_heldout/cushr_cpu":        null,
     "g95_heldout/translist":        null
   },

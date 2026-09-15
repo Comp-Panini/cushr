@@ -58,17 +58,27 @@ in corpus order.)
 """
 import argparse
 import time
+from collections import Counter
 
 import numpy as np
 import torch
 import torch.nn as nn
 
+import seg_features as SF
+
 
 class PathRanker(nn.Module):
     def __init__(self, n_morph, n_lemma, emb=32, hidden=64, lemma_emb=32,
-                 dropout=0.3, use_lemma=True):
+                 dropout=0.3, use_lemma=True, n_form=0, form_emb=32,
+                 use_seq=True, n_feat=0, feat_hidden=16):
         super().__init__()
         self.m_emb = nn.Embedding(n_morph, emb)
+        # Optional surface-form embedding (n_form > 0), for the segmentation
+        # reranker: which WORDS a split produces matters more there than their
+        # morphology. Id 0 = pad, 1 = rare/unseen form. Off by default, so old
+        # checkpoints load unchanged.
+        self.f_emb = (nn.Embedding(n_form, form_emb, padding_idx=0)
+                      if n_form > 0 else None)
         # Optional. The hypothesis is about the MORPHOLOGY sequence, and the
         # morph table is 848 entries against a lemma vocabulary two orders
         # bigger -- so the lemma branch is most of the parameters and most of
@@ -78,7 +88,8 @@ class PathRanker(nn.Module):
         # The lemma vocabulary is large (~10^5) against ~10^5 training
         # sentences, so this is where the model will memorise if anywhere.
         self.drop = nn.Dropout(dropout)
-        self.lstm = nn.LSTM(emb + (lemma_emb if use_lemma else 0), hidden,
+        self.lstm = nn.LSTM(emb + (lemma_emb if use_lemma else 0)
+                            + (form_emb if n_form > 0 else 0), hidden,
                             batch_first=True,
                             bidirectional=True)
         self.out = nn.Linear(2 * hidden, 1)
@@ -97,20 +108,59 @@ class PathRanker(nn.Module):
         self.w_base = nn.Parameter(torch.ones(1))
         self.bias = nn.Parameter(torch.zeros(1))
 
-    def forward(self, morph, lemma, lengths, base, return_ctx=False):
-        """morph/lemma [N, T] padded; lengths [N]; base [N] -> scores [N]."""
-        x = self.m_emb(morph)
-        if self.l_emb is not None:
-            x = torch.cat([x, self.l_emb(lemma)], -1)
-        x = self.drop(x)
-        packed = nn.utils.rnn.pack_padded_sequence(
-            x, lengths.cpu(), batch_first=True, enforce_sorted=False)
-        h, _ = self.lstm(packed)
-        h, _ = nn.utils.rnn.pad_packed_sequence(h, batch_first=True)
-        mask = (torch.arange(h.shape[1], device=h.device)[None, :]
-                < lengths[:, None]).unsqueeze(-1).float()
-        pooled = (h * mask).sum(1) / mask.sum(1).clamp(min=1)
-        ctx = self.out(self.drop(pooled)).squeeze(-1)
+        # --no-seq: drop the BiLSTM branch entirely (features only).
+        self.use_seq = use_seq
+        if not use_seq:
+            self.m_emb = self.f_emb = self.l_emb = self.lstm = self.out = None
+        # Optional segmentation-feature head (seg_features.py). Its LAST layer is
+        # zero-initialised -- the only zero factor on this branch, so the
+        # epoch-0 identity with the base decoder still holds without the
+        # deadlock described above. Inputs are standardised with train
+        # statistics stored as buffers, so they travel with the checkpoint.
+        self.feat_head = None
+        if n_feat > 0:
+            self.feat_head = nn.Sequential(nn.Linear(n_feat, feat_hidden),
+                                           nn.Tanh(),
+                                           nn.Linear(feat_hidden, 1))
+            nn.init.zeros_(self.feat_head[2].weight)
+            nn.init.zeros_(self.feat_head[2].bias)
+            self.register_buffer("feat_mu", torch.zeros(n_feat))
+            self.register_buffer("feat_sd", torch.ones(n_feat))
+
+    def set_feat_stats(self, feats):
+        f = torch.as_tensor(np.asarray(feats, dtype=np.float32))
+        self.feat_mu.copy_(f.mean(0))
+        self.feat_sd.copy_(f.std(0).clamp(min=1e-3))
+
+    def forward(self, morph, lemma, lengths, base, return_ctx=False, form=None,
+                feats=None):
+        """morph/lemma/form [N, T] padded; lengths [N]; base [N]; feats [N, F]
+        -> scores [N]."""
+        ctx = base.new_zeros(base.shape)
+        if self.use_seq:
+            x = self.m_emb(morph)
+            if self.l_emb is not None:
+                x = torch.cat([x, self.l_emb(lemma)], -1)
+            if self.f_emb is not None:
+                if form is None:
+                    raise ValueError("this reranker was trained with --use-form; "
+                                     "pass form ids")
+                x = torch.cat([x, self.f_emb(form)], -1)
+            x = self.drop(x)
+            packed = nn.utils.rnn.pack_padded_sequence(
+                x, lengths.cpu(), batch_first=True, enforce_sorted=False)
+            h, _ = self.lstm(packed)
+            h, _ = nn.utils.rnn.pad_packed_sequence(h, batch_first=True)
+            mask = (torch.arange(h.shape[1], device=h.device)[None, :]
+                    < lengths[:, None]).unsqueeze(-1).float()
+            pooled = (h * mask).sum(1) / mask.sum(1).clamp(min=1)
+            ctx = self.out(self.drop(pooled)).squeeze(-1)
+        if self.feat_head is not None:
+            if feats is None:
+                raise ValueError("this reranker was trained with --seg-features; "
+                                 "pass feats")
+            ctx = ctx + self.feat_head(
+                (feats - self.feat_mu) / self.feat_sd).squeeze(-1)
         s = self.w_base * base + ctx + self.bias
         return (s, ctx) if return_ctx else s
 
@@ -118,8 +168,12 @@ class PathRanker(nn.Module):
 class Data:
     """Candidate lists grouped by sentence, with per-word ids attached."""
 
-    def __init__(self, npz_path, morph_ids, lemma_ids, max_len=32):
+    def __init__(self, npz_path, morph_ids, lemma_ids, max_len=32,
+                 form_ids=None, seg=None):
+        """seg = (SegFeaturizer, raw form id per node, leave_one_out) to attach
+        segmentation features to every candidate; None = no features."""
         d = np.load(npz_path)
+        self.form_ids = form_ids
         self.off = d["cand_off"]
         self.nodes = d["cand_nodes"]
         self.sent = d["cand_sent"]
@@ -135,6 +189,21 @@ class Data:
         np.logical_or.at(has, self.sent, self.label)
         self.usable = np.nonzero(has)[0]
 
+        self.feats = None
+        if seg is not None:
+            featurizer, fid, loo = seg
+            self.feats = np.zeros((len(self.sent), SF.N_FEAT), dtype=np.float32)
+            for a, b in self.groups:
+                seqs = [self.nodes[self.off[c]:self.off[c + 1]]
+                        for c in range(a, b)]
+                excl = None
+                if loo:
+                    good = [q for q, y in zip(seqs, self.label[a:b]) if y]
+                    if good:
+                        excl = Counter(int(fid[g]) for g in good[0])
+                self.feats[a:b] = featurizer.feats(seqs, self.score[a:b], fid,
+                                                   excl)
+
     def batch(self, sent_idx, dev):
         lo = [self.groups[s][0] for s in sent_idx]
         hi = [self.groups[s][1] for s in sent_idx]
@@ -145,10 +214,14 @@ class Data:
         morph = np.zeros((len(seqs), T), dtype=np.int64)
         lemma = np.zeros((len(seqs), T), dtype=np.int64)
         lens = np.ones(len(seqs), dtype=np.int64)
+        form = (np.zeros((len(seqs), T), dtype=np.int64)
+                if self.form_ids is not None else None)
         for i, s in enumerate(seqs):
             if len(s):
                 morph[i, :len(s)] = self.morph_ids[s]
                 lemma[i, :len(s)] = self.lemma_ids[s]
+                if form is not None:
+                    form[i, :len(s)] = self.form_ids[s]
                 lens[i] = len(s)
         gsz = [b - a for a, b in zip(lo, hi)]
         return (torch.as_tensor(morph, device=dev),
@@ -156,7 +229,20 @@ class Data:
                 torch.as_tensor(lens),
                 torch.as_tensor(self.score[cands], device=dev),
                 torch.as_tensor(self.label[cands], device=dev),
-                gsz)
+                gsz,
+                torch.as_tensor(form, device=dev) if form is not None else None,
+                (torch.as_tensor(self.feats[cands], device=dev)
+                 if self.feats is not None else None))
+
+
+def form_index(kept_fids, all_fids):
+    """Raw form id per node -> reranker form id: 2.. for kept forms, 1 = rare."""
+    kept = np.asarray(kept_fids, dtype=np.int64)
+    f = np.asarray(all_fids, dtype=np.int64).ravel()
+    if len(kept) == 0:
+        return np.ones_like(f)
+    pos = np.clip(np.searchsorted(kept, f), 0, len(kept) - 1)
+    return np.where(kept[pos] == f, pos + 2, 1)
 
 
 def listwise_loss(scores, labels, gsz):
@@ -174,6 +260,24 @@ def listwise_loss(scores, labels, gsz):
 
 
 @torch.no_grad()
+def dev_loss(model, data, dev, batch=64):
+    """Mean listwise loss over sentences with a correct candidate. Unlike top-1
+    it moves smoothly: top-1 on 1,636 dev sentences changes in steps of 0.06
+    and a lucky early epoch can win by one sentence (measured: seed 2 kept its
+    epoch-1 checkpoint through 6 epochs of patience and scored lowest)."""
+    model.eval()
+    tot, n = 0.0, 0
+    for lo in range(0, data.n_sent, batch):
+        idx = list(range(lo, min(lo + batch, data.n_sent)))
+        m, l, ln, bs, y, gsz, f, ft = data.batch(idx, dev)
+        loss, k = listwise_loss(model(m, l, ln, bs, form=f, feats=ft), y, gsz)
+        tot += float(loss) * k
+        n += k
+    model.train()
+    return tot / max(1, n)
+
+
+@torch.no_grad()
 def evaluate(model, data, dev, batch=64):
     """Top-1 accuracy after reranking, plus the base and beam references."""
     model.eval()
@@ -181,8 +285,8 @@ def evaluate(model, data, dev, batch=64):
     ctx_mag = n_cand = 0.0
     for lo in range(0, data.n_sent, batch):
         idx = list(range(lo, min(lo + batch, data.n_sent)))
-        m, l, ln, bs, y, gsz = data.batch(idx, dev)
-        sc, cx = model(m, l, ln, bs, return_ctx=True)
+        m, l, ln, bs, y, gsz, f, ft = data.batch(idx, dev)
+        sc, cx = model(m, l, ln, bs, return_ctx=True, form=f, feats=ft)
         ctx_mag += float(cx.abs().sum())
         n_cand += len(cx)
         i = 0
@@ -220,7 +324,30 @@ def main():
                     help="stop after this many epochs with no dev improvement")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="reranker.pt")
+    # --- segmentation reranker option. Off by default: original model.
+    ap.add_argument("--use-form", action="store_true",
+                    help="add a surface-form embedding per word. Vocabulary is "
+                         "the forms seen >= --form-min-count times in the TRAIN "
+                         "candidate lists; the rest share one rare-form id.")
+    ap.add_argument("--form-min-count", type=int, default=3)
+    ap.add_argument("--form-emb", type=int, default=32)
+    # --- segmentation features (seg_features.py). Off by default.
+    ap.add_argument("--seg-features", action="store_true",
+                    help="add split-level scalar features (word count, gold-word "
+                         "frequency prior, unseen/rare/short counts, relative "
+                         "base score) through a small head")
+    ap.add_argument("--no-seq", action="store_true",
+                    help="drop the BiLSTM branch; requires --seg-features")
+    ap.add_argument("--feat-hidden", type=int, default=16)
+    ap.add_argument("--select-by", choices=("top1", "loss"), default="top1",
+                    help="dev criterion for the saved checkpoint and patience. "
+                         "top1 (original) is step-noisy on a small dev set; "
+                         "loss is smooth.")
+    ap.add_argument("--form-vocab", default="../data/form_vocabulary.txt",
+                    help="for --seg-features word lengths")
     args = ap.parse_args()
+    if args.no_seq and not args.seg_features:
+        raise SystemExit("--no-seq needs --seg-features (nothing left to score)")
 
     torch.manual_seed(args.seed)
     dev = torch.device("cpu")
@@ -228,8 +355,32 @@ def main():
     morph_ids = np.asarray(z["node_features"]).ravel().astype(np.int64)
     lemma_ids = np.asarray(z["node_lemma_id"]).ravel().astype(np.int64)
 
-    tr = Data(args.train, morph_ids, lemma_ids)
-    dv = Data(args.dev, morph_ids, lemma_ids)
+    form_ids, kept_forms = None, None
+    if args.use_form:
+        raw_fid = np.asarray(z["node_form_id"], dtype=np.int64).ravel()
+        tr_nodes = np.load(args.train)["cand_nodes"]
+        u, c = np.unique(raw_fid[tr_nodes], return_counts=True)
+        kept_forms = u[c >= args.form_min_count]
+        form_ids = form_index(kept_forms, raw_fid)
+        print(f"form embedding: {len(kept_forms):,} forms kept "
+              f"(>= {args.form_min_count} in train candidates)")
+
+    featurizer = seg_fids = seg_counts = seg_fid = None
+    if args.seg_features:
+        seg_fid = np.asarray(z["node_form_id"], dtype=np.int64).ravel()
+        d = np.load(args.train)
+        seg_fids, seg_counts = SF.gold_form_counts(
+            d["cand_nodes"], d["cand_off"], d["cand_sent"], d["cand_label"],
+            seg_fid)
+        featurizer = SF.SegFeaturizer(
+            seg_fids, seg_counts, SF.form_lengths(SF.load_forms(args.form_vocab)))
+        print(f"seg features {SF.NAMES}: gold-word prior over "
+              f"{len(seg_fids):,} forms from train (leave-one-out on train)")
+    seg_tr = (featurizer, seg_fid, True) if featurizer else None
+    seg_ev = (featurizer, seg_fid, False) if featurizer else None
+
+    tr = Data(args.train, morph_ids, lemma_ids, form_ids=form_ids, seg=seg_tr)
+    dv = Data(args.dev, morph_ids, lemma_ids, form_ids=form_ids, seg=seg_ev)
     print(f"train {tr.n_sent:,} sentences ({len(tr.usable):,} with a correct "
           f"candidate = {100*len(tr.usable)/tr.n_sent:.2f}%)")
     print(f"dev   {dv.n_sent:,} sentences ({len(dv.usable):,} usable)")
@@ -238,7 +389,14 @@ def main():
 
     model = PathRanker(int(morph_ids.max()) + 1, int(lemma_ids.max()) + 1,
                        hidden=args.hidden, dropout=args.dropout,
-                       use_lemma=not args.no_lemma).to(dev)
+                       use_lemma=not args.no_lemma,
+                       n_form=(len(kept_forms) + 2) if args.use_form else 0,
+                       form_emb=args.form_emb,
+                       use_seq=not args.no_seq,
+                       n_feat=SF.N_FEAT if args.seg_features else 0,
+                       feat_hidden=args.feat_hidden).to(dev)
+    if args.seg_features:
+        model.set_feat_stats(tr.feats)
     opt = torch.optim.Adam(model.parameters(), lr=args.lr,
                            weight_decay=args.weight_decay)
     print(f"  {sum(p.numel() for p in model.parameters()):,} reranker parameters"
@@ -253,14 +411,16 @@ def main():
         "wrong (argmax over base score must equal argmax over total score)")
 
     rng = np.random.default_rng(args.seed)
-    best, stale = -1.0, 0
+    best, stale = -float("inf"), 0
+    best_top1, best_ep = float("nan"), 0
     for ep in range(1, args.epochs + 1):
         order = rng.permutation(tr.usable)
         tot, nb, t0 = 0.0, 0, time.time()
         for lo in range(0, len(order), args.batch):
             idx = order[lo:lo + args.batch].tolist()
-            m, l, ln, bs, y, gsz = tr.batch(idx, dev)
-            loss, n = listwise_loss(model(m, l, ln, bs), y, gsz)
+            m, l, ln, bs, y, gsz, f, ft = tr.batch(idx, dev)
+            loss, n = listwise_loss(model(m, l, ln, bs, form=f, feats=ft),
+                                    y, gsz)
             if not n:
                 continue
             opt.zero_grad()
@@ -273,17 +433,29 @@ def main():
                 print(f"    ep{ep} {lo:,}/{len(order):,} loss {tot/nb:.4f}",
                       flush=True)
         a, b, c, cm = evaluate(model, dv, dev)
+        dl = dev_loss(model, dv, dev) if args.select_by == "loss" else None
+        crit = a if dl is None else -dl
         print(f"epoch {ep}  loss {tot/max(1,nb):.4f}  dev top-1 {a:6.2f}  "
+              + (f"dev loss {dl:.4f}  " if dl is not None else "") +
               f"(base {b:6.2f}, ceiling {c:6.2f})  "
               f"w_base {float(model.w_base.detach()):.3f}  |ctx| {cm:.4f}  "
               f"{time.time()-t0:.0f}s")
-        if a > best:
-            best = a
+        if crit > best:
+            best = crit
+            best_top1, best_ep = a, ep
             torch.save({"state": model.state_dict(),
                         "n_morph": int(morph_ids.max()) + 1,
                         "n_lemma": int(lemma_ids.max()) + 1,
                         "hidden": args.hidden,
-                        "use_lemma": not args.no_lemma}, args.out)
+                        "use_lemma": not args.no_lemma,
+                        "n_form": (len(kept_forms) + 2) if args.use_form else 0,
+                        "form_emb": args.form_emb,
+                        "form_vocab": kept_forms,
+                        "use_seq": not args.no_seq,
+                        "n_feat": SF.N_FEAT if args.seg_features else 0,
+                        "feat_hidden": args.feat_hidden,
+                        "seg_fids": seg_fids,
+                        "seg_counts": seg_counts}, args.out)
             print(f"    saved {args.out}")
             stale = 0
         else:
@@ -295,10 +467,11 @@ def main():
                       f"the last.")
                 break
 
-    print(f"\nbest dev top-1 (gold-path match): {best:.2f}")
+    print(f"\nbest dev top-1 (gold-path match): {best_top1:.2f}  "
+          f"(epoch {best_ep}, selected by {args.select_by})")
     if args.test:
-        te = Data(args.test, morph_ids, lemma_ids)
-        model.load_state_dict(torch.load(args.out)["state"])
+        te = Data(args.test, morph_ids, lemma_ids, form_ids=form_ids, seg=seg_ev)
+        model.load_state_dict(torch.load(args.out, weights_only=False)["state"])
         a, b, c, cm = evaluate(model, te, dev)
         print(f"test  top-1 {a:6.2f}   base {b:6.2f}   beam ceiling {c:6.2f}"
               f"   ({a-b:+.2f})")
