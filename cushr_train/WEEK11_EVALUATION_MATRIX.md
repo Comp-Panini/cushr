@@ -60,9 +60,10 @@ marked against that policy, not against the original wording.
 | TransLIST † | 98.80 | 98.93 | 98.86 | 93.97 |
 
 † Reported by Sandhan et al., *TransLIST*, Findings of EMNLP 2022, arXiv:2210.11753,
-Table 1 (SIGHUM column); **not reproduced here** — see §2. Their split overlaps ours by
-97.02% (4,075/4,200), so this is a comparison across near-identical rather than
-identical data. Their Hackathon column is 97.78 / 97.44 / 97.61 / 85.47 and is a
+Table 1 (SIGHUM column); **not reproduced here** — see §2. Their split is *identical*
+to ours (same 4,200 DCS-IDs, identical input and gold strings; verify with
+`check_testset_overlap.py`), so this is a comparison on the same data against a
+reported number. Their Hackathon column is 97.78 / 97.44 / 97.61 / 85.47 and is a
 different dataset; do not mix the two.
 
 #### Sentence-level perfect match by annotation level
@@ -216,10 +217,15 @@ our exact 4,200 through the identical reference and `score()`, so the honest col
 the one we measured. The published ByT5 ladder may still be shown *as literature
 context*, clearly labelled as a different corpus, never as a table row.
 
-**TransLIST's split is not identical to ours either.** `PAPER_COMPARISON.md:51`:
-`sighum_test_4200.tsv` and the published SIGHUM test split share 4,075 of 4,200
-sentences (97.02%) after transliterating to a common scheme. The generated footnote
-says "97% overlapping", not "the same split", and it should stay that way.
+**TransLIST's split IS identical to ours** — measured, after this document
+originally claimed the opposite. `sighum_test_4200.tsv` and the `split=test` rows of
+the file TransLIST reads (`LREC-Data/new_LREC_data_complete.csv`) carry the same
+4,200 DCS-IDs with identical input and gold strings; `check_testset_overlap.py`
+reproduces it. The old "97.02% (4,075/4,200), after transliterating to a common
+scheme" claim was never computed by any code and is wrong. The generated footnote
+(`results_manifest.json` → `cells."sighum_test/translist".published.split_note`) now
+says "identical", and the remaining asymmetry is only that their number is *reported*
+rather than re-scored by us.
 
 **Numbers verified at source.** TransLIST's row was read directly from Table 1 of
 `papers/2210.11753v1.pdf`: SIGHUM 98.80 / 98.93 / 98.86 / 93.97, Hackathon

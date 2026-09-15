@@ -1,149 +1,189 @@
 {
-  "_readme": [
-    "Every cell names a cached artifact or is null. null renders as an em-dash",
-    "in RESULTS_MATRIX.md with a footnote -- make_results_matrix.py never",
-    "interpolates, infers, or back-fills a missing number.",
-    "Paths are relative to cushr_train/."
+ "_readme": [
+  "Every cell names a cached artifact or is null. null renders as an em-dash",
+  "in RESULTS_MATRIX.md with a footnote -- make_results_matrix.py never",
+  "interpolates, infers, or back-fills a missing number.",
+  "Paths are relative to cushr_train/."
+ ],
+ "common": {
+  "cache": "./cache95_ctx_ex4200",
+  "model": "model95_ctx_ex4200.npz",
+  "index": "../data/sentence_index_g95.json",
+  "raw": "../data/cushr_data_g95.npz",
+  "_maps_why": [
+   "The convention tables that translate SHR's analytical vocabulary into",
+   "DCS's. They compose by backoff in eval_slm.py analysis(): the",
+   "convention map is tried first on the (lemma, cng) pair, the lemma map",
+   "second on the lemma alone. Both are built from TRAIN ids only and",
+   "build_lemma_map.py asserts dev/test membership is absent rather than",
+   "assuming it, so applying them at eval is not leakage.",
+   "They rewrite lemma and cng, never form, so S must be identical with and",
+   "without them. Any S movement between the two variants is a bug.",
+   "eval_slm.py applies them to cuSHR AND its ORACLE, never to --pred-jsonl:",
+   "ByT5 emits DCS conventions natively and needs no translation."
   ],
-
-  "common": {
-    "cache": "./cache95_ctx_ex4200",
-    "model": "model95_ctx_ex4200.npz",
-    "index": "../data/sentence_index_g95.json",
-    "raw": "../data/cushr_data_g95.npz",
-
-    "_maps_why": [
-      "The convention tables that translate SHR's analytical vocabulary into",
-      "DCS's. They compose by backoff in eval_slm.py analysis(): the",
-      "convention map is tried first on the (lemma, cng) pair, the lemma map",
-      "second on the lemma alone. Both are built from TRAIN ids only and",
-      "build_lemma_map.py asserts dev/test membership is absent rather than",
-      "assuming it, so applying them at eval is not leakage.",
-      "They rewrite lemma and cng, never form, so S must be identical with and",
-      "without them. Any S movement between the two variants is a bug.",
-      "eval_slm.py applies them to cuSHR AND its ORACLE, never to --pred-jsonl:",
-      "ByT5 emits DCS conventions natively and needs no translation."
-    ],
-    "maps": {
-      "lemma_map": "lemma_map.json",
-      "convention_map": "convention_map.json"
-    }
-  },
-
-  "datasets": {
-    "sighum_test": {
-      "label": "SIGHUM-test (in-domain, published)",
-      "tsv": "sighum_test_4200.tsv",
-      "n": 4200,
-      "no_surface": false
-    },
-    "g95_heldout": {
-      "label": "g95 held-out (no surface reference)",
-      "tsv": "heldout_1000.tsv",
-      "n": 1000,
-      "no_surface": true,
-      "note": "Out-of-domain by text, not by lattice source: every sentence still comes from an SHR graphml. No surface segmentation gold exists outside the published 4,200, so S / P / R / F1 / PM are unmeasurable here by construction, not merely unmeasured."
-    }
-  },
-
-  "systems": {
-    "cushr_gpu_top1":   {"label": "cuSHR K4 top-1 (GPU)",  "kind": "cushr"},
-    "cushr_gpu_rerank": {"label": "cuSHR K4 + reranker",   "kind": "cushr"},
-    "cushr_cpu":        {"label": "cushr_cpu (week 3)",    "kind": "cpu"},
-    "byt5":             {"label": "ByT5-Sanskrit (we ran it)", "kind": "external"},
-    "byt5_paper":       {"label": "ByT5-Sanskrit (reported)",  "kind": "published"},
-    "translist":        {"label": "TransLIST (reported)",   "kind": "published"}
-  },
-
-  "cells": {
-    "sighum_test/cushr_gpu_top1": {
-      "_note": [
-        "cands/kbest are here only to produce the recall@K curve out to 64.",
-        "Verified they do not perturb the top-1 ladder: with and without them",
-        "the levels are 91.52 / 65.62 / 45.69 / 45.45 / 45.29, the CP-5",
-        "anchors. The reranker cell below is deliberately LEFT at kbest 32:",
-        "reranking over 64 candidates instead of 32 is a different experiment",
-        "and would move its 91.98, which is not what filling in a column means."
-      ],
-      "slm":     {"cands": "gpu_rerank_k64.npz", "kbest": 64,
-                  "variants": ["raw", "maps"]},
-      "surface": {}
-    },
-    "sighum_test/cushr_gpu_rerank": {
-      "slm": {"cands": "gpu_rerank_k32.npz", "kbest": 32,
-              "rerank": "reranker_full.pt",
-              "variants": ["raw", "maps"]}
-    },
-    "sighum_test/byt5": {
-      "slm": {"pred_jsonl": "byt5_preds_segmentation-lemma-morphosyntax_sighum_test.jsonl",
-              "pred_name": "ByT5"}
-    },
-    "sighum_test/cushr_cpu": {
-      "same_accuracy_as": "cushr_gpu_top1",
-      "why": [
-        "The CPU decoder is not a different system: same biaffine weights,",
-        "same lattice, same top-1 Viterbi. Week 10 established the GPU top-1",
-        "is digit-identical to it, and k4_bench_F_k64_checked.csv re-confirms",
-        "it here with score_mismatch = count_mismatch = 0 over all 119,503",
-        "sentences. So its accuracy row IS the cushr_gpu_top1 row; only",
-        "throughput differs. Stated here rather than copied silently, so a",
-        "reader can see it is an asserted identity, not a second measurement.",
-        "NOTE: cpu_bench.csv's own precision/recall/f1 are node-level over the",
-        "whole 119,503-sentence corpus and are NOT the surface-level numbers",
-        "measured on the 4,200. Do not put those in this table."
-      ]
-    },
-    "sighum_test/byt5_paper": {
-      "_why": [
-        "ByT5's own SIGHUM figure, cited beside the run we did ourselves.",
-        "These are NOT the same system configuration and the gap is large:",
-        "93.83 reported vs 81.38 measured. Their number comes from a model",
-        "FINE-TUNED ON SIGHUM, which learned SIGHUM's compound convention;",
-        "ours is the off-the-shelf chronbmm/sanskrit5-multitask checkpoint,",
-        "which learned DCS's. See PAPER_COMPARISON.md:347-351 -- of ByT5's",
-        "errors against this reference only 0.2% over-generate, so the S",
-        "column understates their system rather than measuring it badly.",
-        "Reporting our 81.38 alone would understate ByT5 by ~12 points."
-      ],
-      "published": {
-        "pm": 93.83,
-        "source": "papers/2024-FgRTq7-2024.findings-emnlp.805 (1).pdf, Table 3",
-        "citation": "Nehrdich, Hellwig et al., *One Model is All You Need: ByT5-Sanskrit, a Unified Model for Sanskrit NLP Tasks*, Findings of EMNLP 2024, arXiv:2409.13920, Table 3 (SIGHUM column).",
-        "split_note": "This is a SIGHUM figure and so is comparable in principle, but it is a **different configuration from the one we ran**: their model was fine-tuned on SIGHUM (99k samples) while ours is the released multitask checkpoint used off the shelf. The 12-point gap against our measured 81.38 is mostly that, not a reproduction failure. Their Hackathon figure is 94.29.",
-        "reproduced": false,
-        "levels": {"S": 84.61, "L": 79.88, "S+M": 63.86, "L+M": 62.00,
-                   "S+L+M": 61.27},
-        "levels_corpus": "DIFFERENT CORPUS -- Table 7, `Sen` column: a DCS April-2024 split (601,403 sentences, 8,398 test), not SIGHUM. Their test split also excludes reconstructed forms and is 'strongly biased towards Vedic texts' (their §5.5). Read this row for category alignment, never as a SIGHUM result. The `Par` column is excluded deliberately: it feeds pseudo-paragraphs of up to 512 characters, a different input granularity from our per-sentence decode.",
-        "_verified": "Read directly from Tables 3 and 7 of the PDF on 2026-09-08."
-      }
-    },
-
-    "sighum_test/translist": {
-      "published": {
-        "p_macro": 98.80, "r_macro": 98.93, "f1_macro": 98.86, "pm": 93.97,
-        "source": "papers/2210.11753v1.pdf, via PAPER_COMPARISON.md",
-        "citation": "Sandhan, Singha, Rao, Samanta, Behera and Goyal, *TransLIST: A Transformer-Based Linguistically Informed Sanskrit Tokenizer*, Findings of EMNLP 2022, arXiv:2210.11753, Table 1 (SIGHUM column).",
-        "split_note": "Measured on the published SIGHUM test split, which overlaps ours by 97.02% (4,075 of 4,200 sentences; see PAPER_COMPARISON.md), so this is a comparison across near-identical rather than identical data. Their Hackathon column reads 97.78 / 97.44 / 97.61 / 85.47 and is a different dataset -- do not mix the two.",
-        "reproduced": false,
-        "_verified": "Read directly from Table 1 of the PDF on 2026-09-08, not transcribed from a secondary source."
-      }
-    },
-
-    "g95_heldout/cushr_gpu_top1":   {"slm": {"cands": null, "kbest": 32,
-                                            "variants": ["raw", "maps"]}},
-    "g95_heldout/cushr_gpu_rerank": null,
-    "g95_heldout/byt5":             null,
-    "g95_heldout/byt5_paper":       null,
-    "g95_heldout/cushr_cpu":        null,
-    "g95_heldout/translist":        null
-  },
-
-  "bench": {
-    "k_sweep":     "../cushr_gpu/k4_bench_C_biaffine_twopass.csv",
-    "k_sweep_label": "cuSHR GPU, biaffine, k4=twopass, batch -1",
-    "checked_k32": "../cushr_gpu/k4_bench_E_k32_checked.csv",
-    "checked_k64": "../cushr_gpu/k4_bench_F_k64_checked.csv",
-    "batch_sweep": "../cushr_gpu/batched_bench_b*.csv",
-    "cpu_csv":     "../cushr_cpu/cpu_bench.csv"
+  "maps": {
+   "lemma_map": "lemma_map.json",
+   "convention_map": "convention_map.json"
   }
+ },
+ "datasets": {
+  "sighum_test": {
+   "label": "SIGHUM-test (in-domain, published)",
+   "tsv": "sighum_test_4200.tsv",
+   "n": 4200,
+   "no_surface": false
+  },
+  "g95_heldout": {
+   "label": "g95 held-out (no surface reference)",
+   "tsv": "heldout_1000.tsv",
+   "n": 1000,
+   "no_surface": true,
+   "note": "Out-of-domain by text, not by lattice source: every sentence still comes from an SHR graphml. No surface segmentation gold exists outside the published 4,200, so S / P / R / F1 / PM are unmeasurable here by construction, not merely unmeasured."
+  }
+ },
+ "systems": {
+  "cushr_gpu_top1": {
+   "label": "cuSHR K4 top-1 (GPU)",
+   "kind": "cushr"
+  },
+  "cushr_gpu_rerank": {
+   "label": "cuSHR K4 + reranker",
+   "kind": "cushr"
+  },
+  "cushr_cpu": {
+   "label": "cushr_cpu (week 3)",
+   "kind": "cpu"
+  },
+  "byt5": {
+   "label": "ByT5-Sanskrit (we ran it)",
+   "kind": "external"
+  },
+  "byt5_paper": {
+   "label": "ByT5-Sanskrit (reported)",
+   "kind": "published"
+  },
+  "translist": {
+   "label": "TransLIST (reported)",
+   "kind": "published"
+  }
+ },
+ "cells": {
+  "sighum_test/cushr_gpu_top1": {
+   "_note": [
+    "cands/kbest are here only to produce the recall@K curve out to 64.",
+    "Verified they do not perturb the top-1 ladder: with and without them",
+    "the levels are 91.52 / 65.62 / 45.69 / 45.45 / 45.29, the CP-5",
+    "anchors. The reranker cell below is deliberately LEFT at kbest 32:",
+    "reranking over 64 candidates instead of 32 is a different experiment",
+    "and would move its 91.98, which is not what filling in a column means."
+   ],
+   "slm": {
+    "cands": "gpu_rerank_k64.npz",
+    "kbest": 64,
+    "variants": [
+     "raw",
+     "maps"
+    ]
+   },
+   "surface": {}
+  },
+  "sighum_test/cushr_gpu_rerank": {
+   "slm": {
+    "cands": "gpu_rerank_k32.npz",
+    "kbest": 32,
+    "rerank": "reranker_full.pt",
+    "variants": [
+     "raw",
+     "maps"
+    ]
+   }
+  },
+  "sighum_test/byt5": {
+   "slm": {
+    "pred_jsonl": "byt5_preds_segmentation-lemma-morphosyntax_sighum_test.jsonl",
+    "pred_name": "ByT5"
+   }
+  },
+  "sighum_test/cushr_cpu": {
+   "same_accuracy_as": "cushr_gpu_top1",
+   "why": [
+    "The CPU decoder is not a different system: same biaffine weights,",
+    "same lattice, same top-1 Viterbi. Week 10 established the GPU top-1",
+    "is digit-identical to it, and k4_bench_F_k64_checked.csv re-confirms",
+    "it here with score_mismatch = count_mismatch = 0 over all 119,503",
+    "sentences. So its accuracy row IS the cushr_gpu_top1 row; only",
+    "throughput differs. Stated here rather than copied silently, so a",
+    "reader can see it is an asserted identity, not a second measurement.",
+    "NOTE: cpu_bench.csv's own precision/recall/f1 are node-level over the",
+    "whole 119,503-sentence corpus and are NOT the surface-level numbers",
+    "measured on the 4,200. Do not put those in this table."
+   ]
+  },
+  "sighum_test/byt5_paper": {
+   "_why": [
+    "ByT5's own SIGHUM figure, cited beside the run we did ourselves.",
+    "These are NOT the same system configuration and the gap is large:",
+    "93.83 reported vs 81.38 measured. Their number comes from a model",
+    "FINE-TUNED ON SIGHUM, which learned SIGHUM's compound convention;",
+    "ours is the off-the-shelf chronbmm/sanskrit5-multitask checkpoint,",
+    "which learned DCS's. See PAPER_COMPARISON.md:347-351 -- of ByT5's",
+    "errors against this reference only 0.2% over-generate, so the S",
+    "column understates their system rather than measuring it badly.",
+    "Reporting our 81.38 alone would understate ByT5 by ~12 points."
+   ],
+   "published": {
+    "pm": 93.83,
+    "source": "papers/2024-FgRTq7-2024.findings-emnlp.805 (1).pdf, Table 3",
+    "citation": "Nehrdich, Hellwig et al., *One Model is All You Need: ByT5-Sanskrit, a Unified Model for Sanskrit NLP Tasks*, Findings of EMNLP 2024, arXiv:2409.13920, Table 3 (SIGHUM column).",
+    "split_note": "This is a SIGHUM figure and so is comparable in principle, but it is a **different configuration from the one we ran**: their model was fine-tuned on SIGHUM (99k samples) while ours is the released multitask checkpoint used off the shelf. The 12-point gap against our measured 81.38 is mostly that, not a reproduction failure. Their Hackathon figure is 94.29.",
+    "reproduced": false,
+    "levels": {
+     "S": 84.61,
+     "L": 79.88,
+     "S+M": 63.86,
+     "L+M": 62.0,
+     "S+L+M": 61.27
+    },
+    "levels_corpus": "DIFFERENT CORPUS -- Table 7, `Sen` column: a DCS April-2024 split (601,403 sentences, 8,398 test), not SIGHUM. Their test split also excludes reconstructed forms and is 'strongly biased towards Vedic texts' (their §5.5). Read this row for category alignment, never as a SIGHUM result. The `Par` column is excluded deliberately: it feeds pseudo-paragraphs of up to 512 characters, a different input granularity from our per-sentence decode.",
+    "_verified": "Read directly from Tables 3 and 7 of the PDF on 2026-09-08."
+   }
+  },
+  "sighum_test/translist": {
+   "published": {
+    "p_macro": 98.8,
+    "r_macro": 98.93,
+    "f1_macro": 98.86,
+    "pm": 93.97,
+    "source": "papers/2210.11753v1.pdf, via PAPER_COMPARISON.md",
+    "citation": "Sandhan, Singha, Rao, Samanta, Behera and Goyal, *TransLIST: A Transformer-Based Linguistically Informed Sanskrit Tokenizer*, Findings of EMNLP 2022, arXiv:2210.11753, Table 1 (SIGHUM column).",
+    "split_note": "Measured on the published SIGHUM test split, which is **identical to ours**: the same 4,200 DCS-IDs, with identical input sentences and identical gold segmentations (the split=test rows of LREC-Data/new_LREC_data_complete.csv, the file TransLISTs sighum-ngram / sighum-shr settings read). Verify with cushr_train/check_testset_overlap.py. An earlier version of this note claimed the splits overlap by 97.02% (4,075 of 4,200); that figure was never computed by any code and is wrong, so this is a comparison on identical data. Their Hackathon column reads 97.78 / 97.44 / 97.61 / 85.47 and is a different dataset -- do not mix the two.",
+    "reproduced": false,
+    "_verified": "Read directly from Table 1 of the PDF on 2026-09-08, not transcribed from a secondary source."
+   }
+  },
+  "g95_heldout/cushr_gpu_top1": {
+   "slm": {
+    "cands": null,
+    "kbest": 32,
+    "variants": [
+     "raw",
+     "maps"
+    ]
+   }
+  },
+  "g95_heldout/cushr_gpu_rerank": null,
+  "g95_heldout/byt5": null,
+  "g95_heldout/byt5_paper": null,
+  "g95_heldout/cushr_cpu": null,
+  "g95_heldout/translist": null
+ },
+ "bench": {
+  "k_sweep": "../cushr_gpu/k4_bench_C_biaffine_twopass.csv",
+  "k_sweep_label": "cuSHR GPU, biaffine, k4=twopass, batch -1",
+  "checked_k32": "../cushr_gpu/k4_bench_E_k32_checked.csv",
+  "checked_k64": "../cushr_gpu/k4_bench_F_k64_checked.csv",
+  "batch_sweep": "../cushr_gpu/batched_bench_b*.csv",
+  "cpu_csv": "../cushr_cpu/cpu_bench.csv"
+ }
 }

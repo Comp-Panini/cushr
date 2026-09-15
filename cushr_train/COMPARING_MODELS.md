@@ -45,15 +45,28 @@ All three cuSHR models see exactly the same data.
 | | cuSHR (all three) | TransLIST |
 |---|---|---|
 | corpus | SIGHUM, ingested by `ingest/parallel_ingest.py` into `cushr_data_g95.npz` (119,503 sentences, 96.61% with a resolved gold path) | SIGHUM |
-| train / dev / test | 104,159 / 1,636 / 5,681 sentences (`splits95_ex4200.json`) | 97k / 3k / 4.2k (official split) |
+| train / dev / test | 104,159 / 1,636 / 5,681 sentences (`splits95_ex4200.json`) | 99,260 / 4,322 / 4,200 (the split shipped in `new_LREC_data_complete.csv`) |
 | benchmark held out | yes — all 4,200 benchmark sentences excluded from train and dev | no (the 4,200 are its official test split) |
 | pretraining | none | none |
 | lexicon | SHR lattice (candidate words + edges) | SHR lattice, or n-grams (a separate variant) |
 
-The 4,200 benchmark sentences and the published SIGHUM test split share 4,075
-sentences (97.02%). **The cuSHR and TransLIST rows are therefore scored on test
-sets overlapping by 97%, not on identical data**, so a half-point gap is not
-resolvable by these numbers alone.
+**The test sets are identical.** `sighum_test_4200.tsv` and the `split=test`
+rows of `LREC-Data/new_LREC_data_complete.csv` — the file TransLIST's
+`sighum-ngram` / `sighum-shr` settings read
+(`fastnlp-copy/core/dataset.py:798`, `constrained_inference.py:36`) — are the
+same 4,200 DCS-IDs, with identical input sentences and identical gold
+segmentations after normalising the word separator. Verify with
+`python check_testset_overlap.py`.
+
+> Earlier versions of this document, `PAPER_COMPARISON.md`,
+> `RESULTS_MATRIX.md` and `WEEK11_EVALUATION_MATRIX.md` all said the two sets
+> overlap by 97.02% (4,075 / 4,200) and caveated every TransLIST comparison
+> accordingly. **That was wrong** — no code ever computed it, and measured
+> against the file TransLIST actually loads the overlap is 4,200 / 4,200. The
+> 97.02% most likely came from string-matching a differently transliterated or
+> differently sourced copy, where 125 sentences failed to match as strings while
+> being the same sentences. The consequence is that the gap to TransLIST is a
+> difference between the systems, not between the data.
 
 ## 3. cuSHR architecture and parameters
 
@@ -236,8 +249,12 @@ construction.
 
 1. **One base-model seed.** cuSHR-node and cuSHR-seg are single runs (seed 0);
    only the reranker has a variance estimate (±0.13 over 3 seeds).
-2. **97% test-set overlap** with TransLIST's split (§2). The 0.54-point gap is
-   within what that difference could explain in either direction.
+2. **The TransLIST row is reported, not reproduced.** Its 93.97 comes from the
+   paper's Table 1, not from running their checkpoint through `eval_surface.py`.
+   The test set is identical (§2), so the 0.54-point gap is a system
+   difference — but it is a gap against a published number, and the two were
+   produced by different scoring code. Running their released
+   `best_sighum_shr2` through our scorer would remove that last asymmetry.
 3. **Model selection used dev only.** Epochs were chosen on dev loss / dev
    surface PM, never on the SIGHUM result.
 4. **The 91.52 and 92.76 rows have no saved JSON** — they were read from console

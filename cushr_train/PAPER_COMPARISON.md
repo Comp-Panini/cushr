@@ -47,10 +47,23 @@ Recovery of the unsandhied word forms: no lemma, no morphological tag.
 
 ### Test-set identity and contamination
 
-`sighum_test_4200.tsv` and the
-published SIGHUM test split share 4,075 of 4,200 sentences (97.02%) after
-transliterating to a common scheme. Rows above are
-therefore compared across test sets overlapping by 97%, not on identical data.
+`sighum_test_4200.tsv` and the published SIGHUM test split are the **same 4,200
+sentences**: the same DCS-IDs, with identical input strings and identical gold
+segmentations once `_` and space are treated alike. "The published split" here
+means the `split=test` rows of `LREC-Data/new_LREC_data_complete.csv`, the file
+TransLIST's `sighum-ngram` / `sighum-shr` settings actually read
+(`fastnlp-copy/core/dataset.py:798`, `constrained_inference.py:36`).
+`check_testset_overlap.py` verifies it. Rows above are therefore compared on
+identical data.
+
+> **Correction.** This section previously said the two share 4,075 of 4,200
+> sentences (97.02%) "after transliterating to a common scheme", and every
+> TransLIST comparison in this repo caveated itself accordingly. **No code ever
+> computed that number, and it is wrong.** The 125 apparent misses were a
+> string-matching artefact against a differently sourced or differently
+> transliterated copy; both files are already in SLP1 and agree exactly. The
+> practical consequence: a gap against TransLIST is a difference between the
+> systems, not between the data.
 
 
 **Contamination is asymmetric and favours ByT5:**
