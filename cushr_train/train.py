@@ -16,6 +16,7 @@ import learned_featurizers as LF
 from dataset import LatticeStore, collate
 from model import BiaffineEdgeScorer
 from viterbi import viterbi, path_score, gold_score, predicted_nodes
+import losses as LOSS
 
 
 def to_torch(batch, dev):
@@ -70,9 +71,12 @@ def f1_counts(pred_sets, gold_sets):
 
 
 @torch.no_grad()
-def evaluate(model, store, ids, dev, batch_size=128):
+def evaluate(model, store, ids, dev, batch_size=128, surface=None):
+    """Node-level P/R/F/PM against the gold path. With a SurfaceTable, also
+    surface_* metrics: the same scores over segmentation words only."""
     model.eval()
     tp = fp = fn = pm = n = 0
+    stp = sfp = sfn = spm = 0
     for chunk in batches(ids, batch_size, shuffle=False):
         b = collate(store, chunk)
         t = to_torch(b, dev)
@@ -85,12 +89,23 @@ def evaluate(model, store, ids, dev, batch_size=128):
                 for s in chunk]
         a, c, d, e = f1_counts(pred, gold)
         tp += a; fp += c; fn += d; pm += e; n += len(chunk)
+        if surface is not None:
+            a, c, d, e = f1_counts([surface.word_set(p) for p in pred],
+                                   [surface.word_set(g) for g in gold])
+            stp += a; sfp += c; sfn += d; spm += e
     prec = tp / (tp + fp) if tp + fp else 0.0
     rec = tp / (tp + fn) if tp + fn else 0.0
     f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
     model.train()
-    return {"precision": prec, "recall": rec, "f1": f1,
-            "perfect_match": pm / n if n else 0.0, "n": n}
+    out = {"precision": prec, "recall": rec, "f1": f1,
+           "perfect_match": pm / n if n else 0.0, "n": n}
+    if surface is not None:
+        sp = stp / (stp + sfp) if stp + sfp else 0.0
+        sr = stp / (stp + sfn) if stp + sfn else 0.0
+        out.update(surface_precision=sp, surface_recall=sr,
+                   surface_f1=2 * sp * sr / (sp + sr) if sp + sr else 0.0,
+                   surface_pm=spm / n if n else 0.0)
+    return out
 
 
 def main():
@@ -100,6 +115,28 @@ def main():
     ap.add_argument("--batch", type=int, default=64)
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--margin", type=float, default=1.0)
+    # --- objective (losses.py). Defaults reproduce the original node objective.
+    ap.add_argument("--cost", choices=LOSS.COSTS, default="node",
+                    help="node: any non-gold node costs --margin (original). "
+                         "surface: only a wrong segmentation word costs "
+                         "--margin; a right word with wrong lemma/cng costs "
+                         "--margin * --morph-cost.")
+    ap.add_argument("--gold-target", choices=LOSS.GOLD_TARGETS, default="exact",
+                    help="exact: hinge against the gold node path (original). "
+                         "surface: against the best path spelling the gold "
+                         "segmentation.")
+    ap.add_argument("--morph-cost", type=float, default=0.0,
+                    help="with --cost surface: relative cost of a same-"
+                         "segmentation node with the wrong lemma/cng")
+    ap.add_argument("--surface-raw", default="",
+                    help="ingest npz supplying full-vocabulary node_form_id for "
+                         "surface identity (recommended; falls back to the "
+                         "cache's thresholded form ids)")
+    ap.add_argument("--select-by", default="f1",
+                    choices=("f1", "perfect_match", "surface_f1", "surface_pm"),
+                    help="dev metric that picks the best epoch. surface_* need "
+                         "a surface table (--cost/--gold-target surface or "
+                         "--surface-raw).")
     ap.add_argument("--weight-decay", type=float, default=1e-5)
     ap.add_argument("--hidden", type=int, default=128)
     ap.add_argument("--seed", type=int, default=0)
@@ -140,6 +177,20 @@ def main():
                     help="per-direction LSTM hidden size")
     ap.add_argument("--ctx-layers", type=int, default=2)
     ap.add_argument("--ctx-char-dim", type=int, default=32)
+    # --- lattice_attn / lattice_attn_char only; ignored by char_bilstm
+    ap.add_argument("--ctx-heads", type=int, default=8,
+                    help="attention heads; must divide --ctx-hidden")
+    ap.add_argument("--ctx-max-rel", type=int, default=64,
+                    help="span distances are clipped to +/- this before being "
+                         "looked up in the four position tables")
+    ap.add_argument("--pair-budget", type=int, default=1_000_000,
+                    help="max sentences * max_nodes^2 attended at once. Caps "
+                         "peak memory without changing the result: attention "
+                         "never crosses a sentence, so any budget gives "
+                         "identical vectors.")
+    ap.add_argument("--no-span-bias", action="store_true",
+                    help="ablation: attention with no four-position bias, to "
+                         "separate 'attention helps' from 'span geometry helps'")
     ap.add_argument("--resume", action="store_true",
                     help="restart from <--out>.ckpt if it exists. Written after "
                          "every epoch, so a killed run resumes rather than "
@@ -183,6 +234,17 @@ def main():
     if args.limit_train:
         train_ids = train_ids[:args.limit_train]
 
+    # Training objective (losses.py). A surface table is built whenever the
+    # objective or the selection metric needs it, or --surface-raw is given so
+    # a node-objective run can still report surface metrics for comparison.
+    surface = None
+    if (args.cost == "surface" or args.gold_target == "surface"
+            or args.select_by.startswith("surface") or args.surface_raw):
+        surface = LOSS.SurfaceTable(store, args.surface_raw)
+    objective = LOSS.MarginObjective(args.margin, args.cost, args.gold_target,
+                                     args.morph_cost, surface)
+    print(f"objective: {objective.describe()}  select_by={args.select_by}")
+
     # feat_dim comes from the data, not a constant: the featurizer that built
     # this cache decided it.
     feat_dim = store.feat_dim
@@ -195,24 +257,9 @@ def main():
     # from the archive. Everything downstream of scoring is identical either
     # way; see learned_featurizers.materialize for how this collapses back to a
     # plain dense archive once training finishes.
-    # A contextual encoder widens the node vector by its own out_dim. It is
-    # built first because the scorer has to be sized for the concatenation.
-    encoder = None
-    if args.encoder != "none":
-        if not store.has_chars:
-            raise SystemExit(
-                f"--encoder {args.encoder} needs surface_text / "
-                "node_char_start in the cache. Re-run prepare.py against an "
-                "archive built by a build_features.py that passes them "
-                "through (RAW_PASSTHROUGH).")
-        encoder = CTX.get(args.encoder, char_dim=args.ctx_char_dim,
-                          hidden=args.ctx_hidden, layers=args.ctx_layers,
-                          out_dim=args.ctx_dim).to(dev)
-        print(f"contextual encoder {args.encoder!r}: "
-              f"hidden={args.ctx_hidden} layers={args.ctx_layers} "
-              f"out_dim={encoder.out_dim}  "
-              f"params={sum(p.numel() for p in encoder.parameters()):,}")
-
+    # The featurizer is built FIRST because a lattice-attention encoder attends
+    # over the featurized node vectors and must be sized from their width.
+    # char_bilstm ignores `base_dim`, so the reordering does not touch it.
     featurizer = None
     if store.node_ids is not None and args.learned != "none":
         # Caches built before the morph-tag column existed carry three sizes;
@@ -225,15 +272,6 @@ def main():
                             n_preverbs=n_preverbs, n_tags=n_tags,
                             out_dim=args.node_dim,
                             word_dropout=args.word_dropout).to(dev)
-        # The featurizer is authoritative about its own width: a variant with no
-        # projection (LF.HybridFeaturizer.project = False) ignores out_dim and
-        # emits the raw concatenation instead, so building the scorer from
-        # args.node_dim would size it wrong and fail on the first batch.
-        node_dim = featurizer.out_dim + (encoder.out_dim if encoder else 0)
-        scorer = BiaffineEdgeScorer(node_dim, args.hidden).to(dev)
-        model = (CTX.ContextualBiaffine(featurizer, encoder, scorer).to(dev)
-                 if encoder is not None
-                 else LF.LearnedBiaffine(featurizer, scorer).to(dev))
         print(f"learned featurizer {args.learned!r}: "
               f"forms={n_forms:,} lemmas={n_lemmas:,} preverbs={n_preverbs:,} "
               f"node_dim={featurizer.out_dim} word_dropout={args.word_dropout}")
@@ -243,6 +281,45 @@ def main():
                   f"using {featurizer.out_dim}")
         print(f"  embedding params: "
               f"{sum(p.numel() for p in featurizer.embedding_parameters()):,}")
+
+    # A contextual encoder widens the node vector by its own out_dim; the scorer
+    # below is sized for the concatenation.
+    encoder = None
+    if args.encoder != "none":
+        if not store.has_chars:
+            raise SystemExit(
+                f"--encoder {args.encoder} needs surface_text / "
+                "node_char_start in the cache. Re-run prepare.py against an "
+                "archive built by a build_features.py that passes them "
+                "through (RAW_PASSTHROUGH).")
+        # CTX.get drops kwargs an encoder does not declare, so this one call
+        # serves every encoder.
+        encoder = CTX.get(args.encoder, char_dim=args.ctx_char_dim,
+                          hidden=args.ctx_hidden, layers=args.ctx_layers,
+                          out_dim=args.ctx_dim,
+                          base_dim=(featurizer.out_dim if featurizer is not None
+                                    else feat_dim),
+                          heads=args.ctx_heads, max_rel=args.ctx_max_rel,
+                          pair_budget=args.pair_budget,
+                          span_bias=not args.no_span_bias).to(dev)
+        print(f"contextual encoder {args.encoder!r}: "
+              f"hidden={args.ctx_hidden} layers={args.ctx_layers} "
+              f"out_dim={encoder.out_dim}  "
+              f"params={sum(p.numel() for p in encoder.parameters()):,}")
+        if getattr(encoder, "span_tables", "absent") is None:
+            print("  span bias DISABLED (--no-span-bias): attention with no "
+                  "relative-span geometry, the ablation arm")
+
+    if featurizer is not None:
+        # The featurizer is authoritative about its own width: a variant with no
+        # projection (LF.HybridFeaturizer.project = False) ignores out_dim and
+        # emits the raw concatenation instead, so building the scorer from
+        # args.node_dim would size it wrong and fail on the first batch.
+        node_dim = featurizer.out_dim + (encoder.out_dim if encoder else 0)
+        scorer = BiaffineEdgeScorer(node_dim, args.hidden).to(dev)
+        model = (CTX.ContextualBiaffine(featurizer, encoder, scorer).to(dev)
+                 if encoder is not None
+                 else LF.LearnedBiaffine(featurizer, scorer).to(dev))
         # Embedding gradients are sparse -- a batch touches only the rows it
         # gathered -- so materialising a dense gradient over the whole table
         # every step would dominate the step time. SparseAdam handles the
@@ -316,24 +393,21 @@ def main():
             # add margin of 1 to any wrong edge
             # this way if inflated path beats gold, it is too close and weights need to be fixed
             # ensure that gold beats by certain margin
-            cost = args.margin * (~t["gold_node"][t["dst"]]).to(w.dtype)
-
+            #
             # run viterbi to get best path with cost augmented scores
             # you either get:
             # 1) best wrong path - need to optimize
             # 2) gold path - good
-            pe, pmask, _ = viterbi(t, (w + cost).detach())
-
-            s_pred = path_score(w, pe, pmask)
-
+            #
             # hamming is the number of nodes on predicted path not on gold path * 1.0 margin
-            hamming = (cost[pe] * pmask.to(w.dtype)).sum(-1)
-            s_gold = gold_score(w, t["gold_edge"], t["gold_edge_ptr"], len(chunk))
-
+            #
             # compute loss using rectified linear unit which makes negative value = 0
             # if the next best path you got is a lot smaller than gold score, RELU = 0
             # if you get gold path meaning score, margin is 0 so RELU = 0
-            loss_vec = torch.relu(hamming + s_pred - s_gold)
+            #
+            # All of the above now lives in losses.MarginObjective; with the
+            # default --cost node --gold-target exact it is the same math.
+            loss_vec = objective(w, t, b, len(chunk))
             loss = loss_vec.mean()
 
             opt.zero_grad(set_to_none=True)
@@ -366,9 +440,10 @@ def main():
             # evaluate after each epoch
             # decode to get best path, get F1 (best compared to gold), select the model of all the 10 epochs that gives best result
             # evaluate on test
-            rec["dev"] = evaluate(model, store, dev_ids, dev)
-            if rec["dev"]["f1"] > best_f1:
-                best_f1 = rec["dev"]["f1"]
+            rec["dev"] = evaluate(model, store, dev_ids, dev, surface=surface)
+            # best_f1 holds the --select-by metric (f1 by default).
+            if rec["dev"][args.select_by] > best_f1:
+                best_f1 = rec["dev"][args.select_by]
                 best_state = {k: v.detach().clone()
                               for k, v in model.state_dict().items()}
                 # Checkpoint on every improvement rather than only at the end.
@@ -396,13 +471,17 @@ def main():
         print(f"epoch {ep:>2}  loss {rec['train_loss']:.4f}  "
               f"active {rec['active_frac']:.3f}  {rec['sec']:.1f}s"
               + (f"  dev_F1 {d['f1']:.4f}  dev_PM {d['perfect_match']:.4f}"
-                 if d else ""))
+                 if d else "")
+              + (f"  dev_sF1 {d['surface_f1']:.4f}  dev_sPM {d['surface_pm']:.4f}"
+                 if d and "surface_f1" in d else ""))
 
     if best_state is not None:
         model.load_state_dict(best_state)
-    test = evaluate(model, store, test_ids, dev)
+    test = evaluate(model, store, test_ids, dev, surface=surface)
     print(f"\ntest: F1 {test['f1']:.4f}  P {test['precision']:.4f}  "
-          f"R {test['recall']:.4f}  PM {test['perfect_match']:.4f}  n={test['n']}")
+          f"R {test['recall']:.4f}  PM {test['perfect_match']:.4f}  n={test['n']}"
+          + (f"  surface F1 {test['surface_f1']:.4f}  "
+             f"PM {test['surface_pm']:.4f}" if "surface_f1" in test else ""))
 
     save_model(args.out, scorer_module, export_dim, args.hidden, export_name)
     print(f"wrote {args.out}")

@@ -31,6 +31,8 @@ from dataset import LatticeStore, collate
 from model import BiaffineEdgeScorer
 from train import batches, to_torch
 from viterbi import viterbi, predicted_nodes
+from kbest import kbest, predicted_nodes_k
+import surface_cands as SC
 
 
 def load_forms(path):
@@ -55,7 +57,21 @@ def main():
                     help="also write the printed numbers as a JSON dict, for "
                          "make_results_matrix.py; does not change what is "
                          "computed or printed")
+    # --- k-best / segmentation reranker. All off by default: 1-best as before.
+    ap.add_argument("--kbest", type=int, default=0,
+                    help="also report surface recall@k against the reference: "
+                         "is the right segmentation anywhere in the top k?")
+    ap.add_argument("--k-decode", type=int, default=0,
+                    help="decode this many paths before --dedup-surface keeps "
+                         "the best --kbest distinct segmentations (0 = --kbest)")
+    ap.add_argument("--dedup-surface", action="store_true",
+                    help="one candidate per distinct segmentation")
+    ap.add_argument("--rerank", default="",
+                    help="rerank.py checkpoint; with --kbest, the reported "
+                         "prediction becomes the reranker's pick")
     args = ap.parse_args()
+    if args.rerank and not args.kbest:
+        raise SystemExit("--rerank requires --kbest")
 
     rows = list(csv.DictReader(open(args.tsv, encoding="utf-8-sig"),
                                delimiter="\t"))
@@ -85,6 +101,53 @@ def main():
     net.bias.data = torch.as_tensor(np.asarray(m["bias"]).reshape(1), device=dev)
     net.eval()
 
+    ranker = None
+    if args.rerank:
+        from rerank import PathRanker, form_index
+        ck = torch.load(args.rerank, weights_only=False)
+        ranker = PathRanker(ck["n_morph"], ck["n_lemma"], hidden=ck["hidden"],
+                            use_lemma=ck.get("use_lemma", True),
+                            n_form=ck.get("n_form", 0),
+                            form_emb=ck.get("form_emb", 32),
+                            use_seq=ck.get("use_seq", True),
+                            n_feat=ck.get("n_feat", 0),
+                            feat_hidden=ck.get("feat_hidden", 16))
+        ranker.load_state_dict(ck["state"])
+        ranker.eval()
+        r_morph = np.asarray(_raw["node_features"]).ravel().astype(np.int64)
+        r_lemma = np.asarray(_raw["node_lemma_id"]).ravel().astype(np.int64)
+        r_form = (form_index(ck["form_vocab"], raw_fid)
+                  if ck.get("n_form", 0) else None)
+        seg = None
+        if ck.get("n_feat", 0):
+            import seg_features as SF
+            seg = SF.SegFeaturizer(ck["seg_fids"], ck["seg_counts"],
+                                   SF.form_lengths(forms))
+        print(f"reranker: {args.rerank} over the top {args.kbest} "
+              f"{'distinct segmentations' if args.dedup_surface else 'paths'}")
+
+    def rerank_pick(seqs, scores):
+        T = max(1, max(len(q) for q in seqs))
+        mo = np.zeros((len(seqs), T), dtype=np.int64)
+        le = np.zeros_like(mo)
+        fo = np.zeros_like(mo) if r_form is not None else None
+        ln = np.ones(len(seqs), dtype=np.int64)
+        for j, q in enumerate(seqs):
+            if q:
+                mo[j, :len(q)] = r_morph[q]
+                le[j, :len(q)] = r_lemma[q]
+                if fo is not None:
+                    fo[j, :len(q)] = r_form[q]
+                ln[j] = len(q)
+        sc = ranker(torch.as_tensor(mo), torch.as_tensor(le), torch.as_tensor(ln),
+                    torch.as_tensor(np.asarray(scores, np.float32)),
+                    form=torch.as_tensor(fo) if fo is not None else None,
+                    feats=(torch.as_tensor(seg.feats(seqs, scores, raw_fid))
+                           if seg is not None else None))
+        return int(sc.argmax())
+
+    first_hit = []          # per sentence: rank of first correct candidate
+    n_moved = 0
     pm = n = 0
     tp = fp = fn = 0
     # TransLIST (Sandhan et al. 2022, §3) reports MACRO-averaged word-level
@@ -103,16 +166,31 @@ def main():
     for chunk in batches(sids, 128, shuffle=False):
         b = collate(store, chunk)
         t = to_torch(b, dev)
-        pe, pmask, _ = viterbi(t, net(t["feats"], t["src"], t["dst"],
-                                      t.get("ids"), t))
+        w_edge = net(t["feats"], t["src"], t["dst"], t.get("ids"), t)
+        pe, pmask, _ = viterbi(t, w_edge)
         pred_local = predicted_nodes(t, pe, pmask)
         gn = np.asarray(b["global_node"])
+        kb = None
+        if args.kbest:
+            ke, km, ksc, kv = kbest(t, w_edge, max(args.kbest, args.k_decode))
+            kb = predicted_nodes_k(t, ke, km, kv)
         for i, s in enumerate(chunk):
             nodes = sorted((int(gn[x]) for x in pred_local[i]),
                            key=lambda g: int(char_start[g]))
+            gold = ref[int(s)]
+            if kb is not None:
+                seqs, scs = SC.sentence_candidates(
+                    kb[i], ksc[i], gn, char_start, raw_fid, forms,
+                    args.kbest, args.dedup_surface)
+                hit = [j for j, q in enumerate(seqs)
+                       if [forms[raw_fid[x]] for x in q] == gold]
+                first_hit.append(hit[0] if hit else float("inf"))
+                if ranker is not None and seqs:
+                    pick = rerank_pick(seqs, scs)
+                    nodes = seqs[pick]
+                    n_moved += pick != 0
             words = [forms[raw_fid[x]] for x in nodes]
             words = [w for w in words if w]
-            gold = ref[int(s)]
             pm += int(words == gold)
             n += 1
             # multiset token overlap
@@ -151,6 +229,21 @@ def main():
         if tot:
             print(f"    {k:<16} PM {100 * h / tot:6.2f}   n={tot:,}")
 
+    recall = {}
+    if first_hit:
+        ks = [k for k in (1, 2, 4, 8, 16, 32, 64) if k <= args.kbest]
+        if ks[-1] != args.kbest:
+            ks.append(args.kbest)
+        recall = {k: 100 * sum(1 for r in first_hit if r < k) / len(first_hit)
+                  for k in ks}
+        what = ("distinct segmentations" if args.dedup_surface else "paths")
+        print(f"\n  surface recall@k over top-k {what} "
+              f"(ceiling for any reranker):")
+        print("    " + "  ".join(f"@{k} {v:.2f}" for k, v in recall.items()))
+        if ranker is not None:
+            print(f"  reranker moved the prediction on {n_moved:,} / {n:,} "
+                  f"sentences; the numbers above ARE the reranked result.")
+
     if args.json_out:
         # Exactly the values printed above -- recomputing nothing, so the file
         # and the table can never disagree.
@@ -168,6 +261,11 @@ def main():
             "tsv": args.tsv,
             "cache": args.cache,
             "model": args.model,
+            **({"kbest": args.kbest, "dedup_surface": args.dedup_surface,
+                "recall": {str(k): v for k, v in recall.items()}}
+               if recall else {}),
+            **({"rerank": args.rerank, "rerank_moved": n_moved}
+               if ranker is not None else {}),
         }, open(args.json_out, "w"), indent=1)
         print(f"wrote {args.json_out}")
 
