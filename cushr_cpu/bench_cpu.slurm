@@ -59,6 +59,7 @@
 set -euo pipefail
 
 module purge
+module load gcc
 
 cd "$SLURM_SUBMIT_DIR"
 
@@ -80,6 +81,7 @@ echo
 # a compile error here is expected-if-unlucky rather than surprising. It is a
 # self-contained block at the end of main() in apps/evaluate.cpp.
 echo "=== build ==="
+make clean
 make cushr_evaluate
 echo
 

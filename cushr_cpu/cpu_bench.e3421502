@@ -1,0 +1,30 @@
+src/lattice.o: In function `std::_Rb_tree<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, cnpy::NpyArray>, std::_Select1st<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, cnpy::NpyArray> >, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, cnpy::NpyArray> > >::_M_erase(std::_Rb_tree_node<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, cnpy::NpyArray> >*) [clone .isra.0]':
+lattice.cpp:(.text+0x17db): undefined reference to `__libc_single_threaded'
+src/lattice.o: In function `std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release_last_use_cold()':
+lattice.cpp:(.text._ZNSt16_Sp_counted_baseILN9__gnu_cxx12_Lock_policyE2EE24_M_release_last_use_coldEv[_ZNSt16_Sp_counted_baseILN9__gnu_cxx12_Lock_policyE2EE24_M_release_last_use_coldEv]+0x10): undefined reference to `__libc_single_threaded'
+src/metrics.o: In function `cushr::evaluate_word_metrics(std::vector<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > > const&, std::vector<std::vector<int, std::allocator<int> >, std::allocator<std::vector<int, std::allocator<int> > > > const&)':
+metrics.cpp:(.text+0xc19): undefined reference to `std::__throw_bad_array_new_length()'
+metrics.cpp:(.text+0xc37): undefined reference to `std::__throw_bad_array_new_length()'
+src/metrics.o: In function `std::_Hashtable<int, int, std::allocator<int>, std::__detail::_Identity, std::equal_to<int>, std::hash<int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert_unique_node(unsigned long, unsigned long, std::__detail::_Hash_node<int, false>*, unsigned long)':
+metrics.cpp:(.text._ZNSt10_HashtableIiiSaIiENSt8__detail9_IdentityESt8equal_toIiESt4hashIiENS1_18_Mod_range_hashingENS1_20_Default_ranged_hashENS1_20_Prime_rehash_policyENS1_17_Hashtable_traitsILb0ELb1ELb1EEEE21_M_insert_unique_nodeEmmPNS1_10_Hash_nodeIiLb0EEEm[_ZNSt10_HashtableIiiSaIiENSt8__detail9_IdentityESt8equal_toIiESt4hashIiENS1_18_Mod_range_hashingENS1_20_Default_ranged_hashENS1_20_Prime_rehash_policyENS1_17_Hashtable_traitsILb0ELb1ELb1EEEE21_M_insert_unique_nodeEmmPNS1_10_Hash_nodeIiLb0EEEm]+0x1af): undefined reference to `std::__throw_bad_array_new_length()'
+vendor/cnpy.o: In function `std::_Rb_tree<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, cnpy::NpyArray>, std::_Select1st<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, cnpy::NpyArray> >, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, cnpy::NpyArray> > >::_M_erase(std::_Rb_tree_node<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, cnpy::NpyArray> >*) [clone .isra.0]':
+cnpy.cpp:(.text+0x124b): undefined reference to `__libc_single_threaded'
+vendor/cnpy.o: In function `cnpy::parse_npy_header(_IO_FILE*, unsigned long&, std::vector<unsigned long, std::allocator<unsigned long> >&, bool&)':
+cnpy.cpp:(.text+0x204e): undefined reference to `__libc_single_threaded'
+cnpy.cpp:(.text+0x215e): undefined reference to `__isoc23_strtol'
+cnpy.cpp:(.text+0x24d4): undefined reference to `__isoc23_strtol'
+vendor/cnpy.o: In function `cnpy::parse_npy_header(unsigned char*, unsigned long&, std::vector<unsigned long, std::allocator<unsigned long> >&, bool&)':
+cnpy.cpp:(.text+0x2a62): undefined reference to `__libc_single_threaded'
+cnpy.cpp:(.text+0x2b2e): undefined reference to `__libc_single_threaded'
+cnpy.cpp:(.text+0x2c3e): undefined reference to `__isoc23_strtol'
+cnpy.cpp:(.text+0x2fba): undefined reference to `__isoc23_strtol'
+cnpy.cpp:(.text+0x3066): undefined reference to `__libc_single_threaded'
+vendor/cnpy.o: In function `cnpy::npz_load(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >)':
+cnpy.cpp:(.text+0x37a0): undefined reference to `__libc_single_threaded'
+cnpy.cpp:(.text+0x3832): undefined reference to `__libc_single_threaded'
+cnpy.cpp:(.text+0x39cb): undefined reference to `__libc_single_threaded'
+vendor/cnpy.o: In function `std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release()':
+cnpy.cpp:(.text._ZNSt16_Sp_counted_baseILN9__gnu_cxx12_Lock_policyE2EE10_M_releaseEv[_ZNSt16_Sp_counted_baseILN9__gnu_cxx12_Lock_policyE2EE10_M_releaseEv]+0x19): undefined reference to `__libc_single_threaded'
+vendor/cnpy.o:cnpy.cpp:(.text._ZN4cnpy8NpyArrayD2Ev[_ZN4cnpy8NpyArrayD5Ev]+0x4c): more undefined references to `__libc_single_threaded' follow
+collect2: error: ld returned 1 exit status
+make: *** [Makefile:19: cushr_evaluate] Error 1

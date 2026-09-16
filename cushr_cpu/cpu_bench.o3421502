@@ -1,0 +1,12 @@
+=== preflight ===
+-rwxrwxrwx 1 njhavar G-828996 3824615371 Aug 20 14:14 /work/11503/njhavar/ls6/cushr/data/g95_ctx_mat.npz
+-rw------- 1 njhavar G-828996 196624 Aug 20 14:26 ../cushr_train/model95_ctx.bin
+CPU(s):              128
+Thread(s) per core:  1
+Core(s) per socket:  64
+Model name:          AMD EPYC 7763 64-Core Processor
+
+=== build ===
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude -Ivendor -c -o src/scorer.o src/scorer.cpp
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude -Ivendor -c -o apps/evaluate.o apps/evaluate.cpp
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -o cushr_evaluate src/lattice.o src/scorer.o src/decoder.o src/metrics.o src/json_io.o vendor/cnpy.o apps/evaluate.o -lz

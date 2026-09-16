@@ -1,0 +1,40 @@
+=== preflight ===
+-rwxrwxrwx 1 njhavar G-828996 3824615371 Aug 20 14:14 /work/11503/njhavar/ls6/cushr/data/g95_ctx_mat.npz
+-rw------- 1 njhavar G-828996 196624 Aug 20 14:26 ../cushr_train/model95_ctx.bin
+CPU(s):              128
+Thread(s) per core:  1
+Core(s) per socket:  64
+Model name:          AMD EPYC 7763 64-Core Processor
+
+=== build ===
+rm -f src/lattice.o src/scorer.o src/decoder.o src/metrics.o src/json_io.o vendor/cnpy.o tests/test_main.o tests/test_lattice.o tests/test_decoder.o tests/test_scorer.o apps/evaluate.o cushr_evaluate cushr_tests
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude -Ivendor -c -o src/lattice.o src/lattice.cpp
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude -Ivendor -c -o src/scorer.o src/scorer.cpp
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude -Ivendor -c -o src/decoder.o src/decoder.cpp
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude -Ivendor -c -o src/metrics.o src/metrics.cpp
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude -Ivendor -c -o src/json_io.o src/json_io.cpp
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude -Ivendor -c -o vendor/cnpy.o vendor/cnpy.cpp
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -Iinclude -Ivendor -c -o apps/evaluate.o apps/evaluate.cpp
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -o cushr_evaluate src/lattice.o src/scorer.o src/decoder.o src/metrics.o src/json_io.o vendor/cnpy.o apps/evaluate.o -lz
+
+=== top-1 decode, whole corpus ===
+Loading lattice from /work/11503/njhavar/ls6/cushr/data/g95_ctx_mat.npz ...
+  nodes=4488155 edges=78847461 sentences=119503 feat_dim=192 load_ms=24166.7
+  loaded biaffine: feat_dim=192 hidden=128
+Scorer: biaffine
+Decoded 119503 sentences in 110.985 s  (1076.75 sent/s)
+
+--- Word-level metrics (top-1) ---
+  sentences (with gold) : 115447
+  TP/FP/FN              : 709464 / 44614 / 45024
+  precision             : 0.940836
+  recall                : 0.940325
+  F1                    : 0.940581
+  perfect match         : 82099 / 115447  (71.114%)
+Wrote csv to cpu_bench.csv
+
+=== results ===
+K,n_sentences,n_gold,wall_sec,us_per_sent,sent_per_sec,precision,recall,f1,perfect_match,scorer
+1,119503,115447,110.985,928.718,1076.75,0.940836,0.940325,0.940581,82099,biaffine
+
+Copy cpu_bench.csv back to cushr_cpu/.

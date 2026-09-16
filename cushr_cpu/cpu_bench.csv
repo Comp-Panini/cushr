@@ -1,0 +1,2 @@
+K,n_sentences,n_gold,wall_sec,us_per_sent,sent_per_sec,precision,recall,f1,perfect_match,scorer
+1,119503,115447,110.985,928.718,1076.75,0.940836,0.940325,0.940581,82099,biaffine
