@@ -177,6 +177,20 @@ def main():
                     help="per-direction LSTM hidden size")
     ap.add_argument("--ctx-layers", type=int, default=2)
     ap.add_argument("--ctx-char-dim", type=int, default=32)
+    # --- lattice_attn / lattice_attn_char only; ignored by char_bilstm
+    ap.add_argument("--ctx-heads", type=int, default=8,
+                    help="attention heads; must divide --ctx-hidden")
+    ap.add_argument("--ctx-max-rel", type=int, default=64,
+                    help="span distances are clipped to +/- this before being "
+                         "looked up in the four position tables")
+    ap.add_argument("--pair-budget", type=int, default=1_000_000,
+                    help="max sentences * max_nodes^2 attended at once. Caps "
+                         "peak memory without changing the result: attention "
+                         "never crosses a sentence, so any budget gives "
+                         "identical vectors.")
+    ap.add_argument("--no-span-bias", action="store_true",
+                    help="ablation: attention with no four-position bias, to "
+                         "separate 'attention helps' from 'span geometry helps'")
     ap.add_argument("--resume", action="store_true",
                     help="restart from <--out>.ckpt if it exists. Written after "
                          "every epoch, so a killed run resumes rather than "
@@ -243,24 +257,9 @@ def main():
     # from the archive. Everything downstream of scoring is identical either
     # way; see learned_featurizers.materialize for how this collapses back to a
     # plain dense archive once training finishes.
-    # A contextual encoder widens the node vector by its own out_dim. It is
-    # built first because the scorer has to be sized for the concatenation.
-    encoder = None
-    if args.encoder != "none":
-        if not store.has_chars:
-            raise SystemExit(
-                f"--encoder {args.encoder} needs surface_text / "
-                "node_char_start in the cache. Re-run prepare.py against an "
-                "archive built by a build_features.py that passes them "
-                "through (RAW_PASSTHROUGH).")
-        encoder = CTX.get(args.encoder, char_dim=args.ctx_char_dim,
-                          hidden=args.ctx_hidden, layers=args.ctx_layers,
-                          out_dim=args.ctx_dim).to(dev)
-        print(f"contextual encoder {args.encoder!r}: "
-              f"hidden={args.ctx_hidden} layers={args.ctx_layers} "
-              f"out_dim={encoder.out_dim}  "
-              f"params={sum(p.numel() for p in encoder.parameters()):,}")
-
+    # The featurizer is built FIRST because a lattice-attention encoder attends
+    # over the featurized node vectors and must be sized from their width.
+    # char_bilstm ignores `base_dim`, so the reordering does not touch it.
     featurizer = None
     if store.node_ids is not None and args.learned != "none":
         # Caches built before the morph-tag column existed carry three sizes;
@@ -273,15 +272,6 @@ def main():
                             n_preverbs=n_preverbs, n_tags=n_tags,
                             out_dim=args.node_dim,
                             word_dropout=args.word_dropout).to(dev)
-        # The featurizer is authoritative about its own width: a variant with no
-        # projection (LF.HybridFeaturizer.project = False) ignores out_dim and
-        # emits the raw concatenation instead, so building the scorer from
-        # args.node_dim would size it wrong and fail on the first batch.
-        node_dim = featurizer.out_dim + (encoder.out_dim if encoder else 0)
-        scorer = BiaffineEdgeScorer(node_dim, args.hidden).to(dev)
-        model = (CTX.ContextualBiaffine(featurizer, encoder, scorer).to(dev)
-                 if encoder is not None
-                 else LF.LearnedBiaffine(featurizer, scorer).to(dev))
         print(f"learned featurizer {args.learned!r}: "
               f"forms={n_forms:,} lemmas={n_lemmas:,} preverbs={n_preverbs:,} "
               f"node_dim={featurizer.out_dim} word_dropout={args.word_dropout}")
@@ -291,6 +281,45 @@ def main():
                   f"using {featurizer.out_dim}")
         print(f"  embedding params: "
               f"{sum(p.numel() for p in featurizer.embedding_parameters()):,}")
+
+    # A contextual encoder widens the node vector by its own out_dim; the scorer
+    # below is sized for the concatenation.
+    encoder = None
+    if args.encoder != "none":
+        if not store.has_chars:
+            raise SystemExit(
+                f"--encoder {args.encoder} needs surface_text / "
+                "node_char_start in the cache. Re-run prepare.py against an "
+                "archive built by a build_features.py that passes them "
+                "through (RAW_PASSTHROUGH).")
+        # CTX.get drops kwargs an encoder does not declare, so this one call
+        # serves every encoder.
+        encoder = CTX.get(args.encoder, char_dim=args.ctx_char_dim,
+                          hidden=args.ctx_hidden, layers=args.ctx_layers,
+                          out_dim=args.ctx_dim,
+                          base_dim=(featurizer.out_dim if featurizer is not None
+                                    else feat_dim),
+                          heads=args.ctx_heads, max_rel=args.ctx_max_rel,
+                          pair_budget=args.pair_budget,
+                          span_bias=not args.no_span_bias).to(dev)
+        print(f"contextual encoder {args.encoder!r}: "
+              f"hidden={args.ctx_hidden} layers={args.ctx_layers} "
+              f"out_dim={encoder.out_dim}  "
+              f"params={sum(p.numel() for p in encoder.parameters()):,}")
+        if getattr(encoder, "span_tables", "absent") is None:
+            print("  span bias DISABLED (--no-span-bias): attention with no "
+                  "relative-span geometry, the ablation arm")
+
+    if featurizer is not None:
+        # The featurizer is authoritative about its own width: a variant with no
+        # projection (LF.HybridFeaturizer.project = False) ignores out_dim and
+        # emits the raw concatenation instead, so building the scorer from
+        # args.node_dim would size it wrong and fail on the first batch.
+        node_dim = featurizer.out_dim + (encoder.out_dim if encoder else 0)
+        scorer = BiaffineEdgeScorer(node_dim, args.hidden).to(dev)
+        model = (CTX.ContextualBiaffine(featurizer, encoder, scorer).to(dev)
+                 if encoder is not None
+                 else LF.LearnedBiaffine(featurizer, scorer).to(dev))
         # Embedding gradients are sparse -- a batch touches only the rows it
         # gathered -- so materialising a dense gradient over the whole table
         # every step would dominate the step time. SparseAdam handles the

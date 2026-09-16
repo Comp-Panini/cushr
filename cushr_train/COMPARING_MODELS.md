@@ -297,6 +297,52 @@ and the original reranker exactly (`losses.py` defaults `--cost node
 --gold-target exact`; `make_rerank_data.py` defaults `--label node` with no
 dedup; `rerank.py` defaults `--select-by top1` with no features).
 
+## 10. Built but not yet trained: lattice attention
+
+The reranker's ceiling is recall@16 = 98.55, and it can only reorder what the
+first-order scorer produced. Closing the last ~0.5 needs the scorer itself to see
+more than two nodes at a time — TransLIST's actual advantage, once its 6.3M-row
+word table is set aside.
+
+`context.py` now carries two more encoders:
+
+- **`lattice_attn`** — global self-attention over the candidate nodes of one
+  sentence: every candidate attends to every other candidate.
+- **`lattice_attn_char`** — the same, with the proven char-BiLSTM span vector as
+  an additional input. ~306K new parameters (3,095,541 total vs 2,789,109).
+
+Attention logits carry a learned bias built from the four signed distances
+between two candidates' character spans (`ss`, `se`, `es`, `ee`), which is what
+lets the model read *overlap* (mutually exclusive candidates), *precedence*, and
+*shared head* (competing splits from one start point). One distance cannot
+express that family; four can. The fusion matrix is folded into four per-head
+tables, so nothing wider than `[group, nodes, nodes, heads]` is materialised.
+
+**The decoder is untouched.** The encoder output is still a per-node vector that
+depends on the sentence but never on the path, so `--materialize` freezes it and
+`cushr_gpu/` consumes it unchanged.
+
+```bash
+python test_lattice_attn.py --cache ./cache95_ngrams80            # invariants
+python test_lattice_attn.py --cache ./cache95_ngrams80 --double   # rounding vs bug
+sbatch --export=ALL,STAGE=preflight train_attn.slurm              # then STAGE=train, STAGE=eval
+```
+
+`test_lattice_attn.py` is the regression suite, and it matters because every
+failure mode here is silent — the loss still falls and the score is merely worse.
+It checks padding invariance, chunk invariance, no cross-sentence leakage,
+permutation equivariance, zeroed boundary rows, finiteness, that the attention is
+not inert, that the span bias changes the output, that `char_bilstm` is
+bit-identical under the widened signature, and that `materialize_contextual`
+reproduces the training path. The invariances are exact in arithmetic but not
+bitwise in float32 (~1e-6); `--double` drops them to ~1.7e-15, which is how a
+rounding residual is told apart from a real bug.
+
+**No accuracy numbers yet** — this machine is CPU-only (`torch 2.13.0+cpu`), so
+training runs on the cluster. The gate is a base decoder above 92.76; the
+most informative ablation is `--no-span-bias`, which separates "attention helps"
+from "span geometry helps".
+
 ## Sources
 
 - Sandhan, Singha, Rao, Samanta, Behera, Goyal. *TransLIST: A Transformer-Based
