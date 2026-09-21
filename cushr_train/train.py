@@ -71,12 +71,13 @@ def f1_counts(pred_sets, gold_sets):
 
 
 @torch.no_grad()
-def evaluate(model, store, ids, dev, batch_size=128, surface=None):
+def evaluate(model, store, ids, dev, batch_size=128, surface=None, lm=None):
     """Node-level P/R/F/PM against the gold path. With a SurfaceTable, also
     surface_* metrics: the same scores over segmentation words only."""
     model.eval()
     tp = fp = fn = pm = n = 0
     stp = sfp = sfn = spm = 0
+    ltp = lfp = lfn = lpm = 0
     for chunk in batches(ids, batch_size, shuffle=False):
         b = collate(store, chunk)
         t = to_torch(b, dev)
@@ -93,6 +94,10 @@ def evaluate(model, store, ids, dev, batch_size=128, surface=None):
             a, c, d, e = f1_counts([surface.word_set(p) for p in pred],
                                    [surface.word_set(g) for g in gold])
             stp += a; sfp += c; sfn += d; spm += e
+        if lm is not None:
+            a, c, d, e = f1_counts([lm.word_set(p) for p in pred],
+                                   [lm.word_set(g) for g in gold])
+            ltp += a; lfp += c; lfn += d; lpm += e
     prec = tp / (tp + fp) if tp + fp else 0.0
     rec = tp / (tp + fn) if tp + fn else 0.0
     f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
@@ -105,6 +110,11 @@ def evaluate(model, store, ids, dev, batch_size=128, surface=None):
         out.update(surface_precision=sp, surface_recall=sr,
                    surface_f1=2 * sp * sr / (sp + sr) if sp + sr else 0.0,
                    surface_pm=spm / n if n else 0.0)
+    if lm is not None:
+        lp = ltp / (ltp + lfp) if ltp + lfp else 0.0
+        lr = ltp / (ltp + lfn) if ltp + lfn else 0.0
+        out.update(lm_f1=2 * lp * lr / (lp + lr) if lp + lr else 0.0,
+                   lm_pm=lpm / n if n else 0.0)
     return out
 
 
@@ -133,7 +143,8 @@ def main():
                          "surface identity (recommended; falls back to the "
                          "cache's thresholded form ids)")
     ap.add_argument("--select-by", default="f1",
-                    choices=("f1", "perfect_match", "surface_f1", "surface_pm"),
+                    choices=("f1", "perfect_match", "surface_f1", "surface_pm",
+                             "lm_f1", "lm_pm"),
                     help="dev metric that picks the best epoch. surface_* need "
                          "a surface table (--cost/--gold-target surface or "
                          "--surface-raw).")
@@ -241,8 +252,15 @@ def main():
     if (args.cost == "surface" or args.gold_target == "surface"
             or args.select_by.startswith("surface") or args.surface_raw):
         surface = LOSS.SurfaceTable(store, args.surface_raw)
+    # L+M table: built for the lm objective/selection, and whenever the raw
+    # archive is available so every run reports dev lm_pm for comparison.
+    lm = None
+    if (args.cost == "lm" or args.gold_target == "lm"
+            or args.select_by.startswith("lm") or args.surface_raw):
+        lm = LOSS.LMTable(store, args.surface_raw)
+    use_lm = args.cost == "lm" or args.gold_target == "lm"
     objective = LOSS.MarginObjective(args.margin, args.cost, args.gold_target,
-                                     args.morph_cost, surface)
+                                     args.morph_cost, lm if use_lm else surface)
     print(f"objective: {objective.describe()}  select_by={args.select_by}")
 
     # feat_dim comes from the data, not a constant: the featurizer that built
@@ -440,7 +458,8 @@ def main():
             # evaluate after each epoch
             # decode to get best path, get F1 (best compared to gold), select the model of all the 10 epochs that gives best result
             # evaluate on test
-            rec["dev"] = evaluate(model, store, dev_ids, dev, surface=surface)
+            rec["dev"] = evaluate(model, store, dev_ids, dev, surface=surface,
+                                  lm=lm)
             # best_f1 holds the --select-by metric (f1 by default).
             if rec["dev"][args.select_by] > best_f1:
                 best_f1 = rec["dev"][args.select_by]
@@ -473,11 +492,12 @@ def main():
               + (f"  dev_F1 {d['f1']:.4f}  dev_PM {d['perfect_match']:.4f}"
                  if d else "")
               + (f"  dev_sF1 {d['surface_f1']:.4f}  dev_sPM {d['surface_pm']:.4f}"
-                 if d and "surface_f1" in d else ""))
+                 if d and "surface_f1" in d else "")
+              + (f"  dev_lmPM {d['lm_pm']:.4f}" if d and "lm_pm" in d else ""))
 
     if best_state is not None:
         model.load_state_dict(best_state)
-    test = evaluate(model, store, test_ids, dev, surface=surface)
+    test = evaluate(model, store, test_ids, dev, surface=surface, lm=lm)
     print(f"\ntest: F1 {test['f1']:.4f}  P {test['precision']:.4f}  "
           f"R {test['recall']:.4f}  PM {test['perfect_match']:.4f}  n={test['n']}"
           + (f"  surface F1 {test['surface_f1']:.4f}  "

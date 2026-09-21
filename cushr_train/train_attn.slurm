@@ -50,8 +50,10 @@ STAGE="${STAGE:-preflight}"
 ENC="${ENC:-lattice_attn_char}"
 EPOCHS="${EPOCHS:-8}"
 SEED="${SEED:-0}"
+OBJ="${OBJ:-surface}"              # surface = S model; lm = L+M model
 EXTRA="${EXTRA:-}"                 # e.g. EXTRA="--no-span-bias" for the ablation
-TAG="${TAG:-${ENC}_s${SEED}}"
+TAG="${TAG:-${ENC}_${OBJ}_s${SEED}}"
+if [ "$OBJ" = surface ]; then TAG="${TAG/_surface_/_}"; fi   # keep old S tag names (set -e safe)
 
 CACHE=./cache95_ngrams80
 RAW=../data/cushr_data_g95.npz
@@ -97,7 +99,7 @@ if [ "$STAGE" = "preflight" ]; then
     $PY train.py --cache "$CACHE" --learned hybrid_tag --encoder "$ENC" \
         --epochs 1 --limit-train 200 --batch 16 --device cuda \
         --splits-override "$SPLITS" \
-        --cost surface --gold-target surface --select-by surface_pm \
+        --cost "$OBJ" --gold-target "$OBJ" --select-by "${OBJ}_pm" \
         --surface-raw "$RAW" $EXTRA \
         --out /tmp/attn_preflight.npz --log /tmp/attn_preflight.json
     echo "PREFLIGHT OK -- now: sbatch --export=ALL,STAGE=train,ENC=$ENC train_attn.slurm"
@@ -109,7 +111,7 @@ if [ "$STAGE" = "train" ]; then
     $PY train.py --cache "$CACHE" --learned hybrid_tag --encoder "$ENC" \
         --word-dropout 0.1 --epochs "$EPOCHS" --seed "$SEED" --device cuda \
         --splits-override "$SPLITS" \
-        --cost surface --gold-target surface --select-by surface_pm \
+        --cost "$OBJ" --gold-target "$OBJ" --select-by "${OBJ}_pm" \
         --surface-raw "$RAW" $EXTRA \
         --out "$MODEL" --log "log95_${TAG}.json" --materialize "$MATZ"
     echo "wrote $MODEL and $MATZ -- now: sbatch --export=ALL,STAGE=eval,TAG=$TAG train_attn.slurm"

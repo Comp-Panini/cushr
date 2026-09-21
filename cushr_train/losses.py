@@ -21,6 +21,10 @@ Two independent choices, selected by flags:
                the model is still being taught morphology.
 
 For segmentation-only training use `--cost surface --gold-target surface`.
+For lemma+morph training use `--cost lm --gold-target lm`: identical mechanics,
+but a node's identity is (char_start, word_len, lemma, morph tag) instead of
+(char_start, word_len, form), so a form/sandhi variant carrying the gold
+analysis is free and a wrong lemma or tag is charged.
 The exported scorer, materialised features and decoders are untouched by any of
 this: only what the scorer is trained toward changes.
 """
@@ -30,8 +34,8 @@ import torch
 
 from viterbi import viterbi, path_score, gold_score
 
-COSTS = ("node", "surface")
-GOLD_TARGETS = ("exact", "surface")
+COSTS = ("node", "surface", "lm")
+GOLD_TARGETS = ("exact", "surface", "lm")
 
 # Additive penalty that keeps the constrained decode on surface-gold nodes. Edge
 # scores are O(10); this dominates without overflowing float32 path sums.
@@ -120,6 +124,35 @@ class SurfaceTable:
                 if r[0] >= 0 and r[1] > 0}
 
 
+class LMTable(SurfaceTable):
+    """Per-node analysis identity without the form: (char_start, word_len,
+    lemma id, morph tag id). Reuses SurfaceTable's rank/edge logic."""
+
+    def __init__(self, store, raw_path):
+        if not store.has_chars:
+            raise SystemExit("lm objective needs node_char_start in the cache.")
+        if not raw_path:
+            raise SystemExit("lm objective needs --surface-raw <ingest npz> "
+                             "(source of node_lemma_id / morph tag ids).")
+        raw = np.load(raw_path)
+        lem = np.asarray(raw["node_lemma_id"], dtype=np.int64)
+        tag = np.asarray(raw["node_features"], dtype=np.int64).ravel()
+        n = store.node_features.shape[0]
+        if len(lem) != n or len(tag) != n:
+            raise SystemExit(f"{raw_path} has {len(lem):,} nodes, cache has "
+                             f"{n:,}; must be the archive the cache came from.")
+        self.lemma, self.tag = lem, tag
+        self.char_start = store.char_start
+        self.word_len = store.word_len
+        print(f"lm identity: lemma + morph tag ids from {raw_path}")
+
+    def keys(self, global_nodes):
+        g = np.asarray(global_nodes, dtype=np.int64)
+        return np.stack([np.asarray(self.char_start[g], dtype=np.int64),
+                         np.asarray(self.word_len[g], dtype=np.int64),
+                         self.lemma[g], self.tag[g]], axis=1)
+
+
 class MarginObjective:
     """Structured hinge: relu(cost(pred) + s(pred) - s(gold))."""
 
@@ -130,16 +163,22 @@ class MarginObjective:
         self.morph_cost = morph_cost
         self.surface = surface
         if self.needs_surface and surface is None:
-            raise ValueError("surface cost/gold target needs a SurfaceTable")
+            raise ValueError("surface/lm cost or gold target needs a "
+                             "SurfaceTable/LMTable")
+        if cost != "node" and gold_target != "exact" and cost != gold_target:
+            raise ValueError("--cost and --gold-target must share a table "
+                             f"(got {cost} / {gold_target})")
 
     @property
     def needs_surface(self):
-        return self.cost == "surface" or self.gold_target == "surface"
+        return self.cost != "node" or self.gold_target != "exact"
 
     def describe(self):
         s = f"cost={self.cost} gold_target={self.gold_target} margin={self.margin}"
         if self.cost == "surface":
             s += f" morph_cost={self.morph_cost}"
+        if self.surface is not None:
+            s += f" table={type(self.surface).__name__}"
         return s
 
     def __call__(self, w, t, b, n_sent):
