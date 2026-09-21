@@ -95,12 +95,12 @@ echo
 echo "=== K=64, checked, whole corpus ==="
 time ./cushr_batched "$DATA" --scorer biaffine --model "$MODEL" --k4 twopass \
     --K 64 --batch -1 --check -1 --csv k4_bench_F_k64_checked.csv \
-    --dump-paths gpu_k64.npz
+    --dump-paths /work/11503/njhavar/ls6/cushr/data/gpu_k64.npz
 
 echo
 echo "=== results ==="
 cat k4_bench_F_k64_checked.csv
-ls -la gpu_k64_K64.npz
+ls -la /work/11503/njhavar/ls6/cushr/data/gpu_k64_K64.npz
 
 echo
 echo "score_mismatch and count_mismatch must both be 0 above."
