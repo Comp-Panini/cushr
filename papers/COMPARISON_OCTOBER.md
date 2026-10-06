@@ -90,8 +90,9 @@ the scorer can express "this candidate is wrong given a word ten characters
 away". Attention is computed in span groups under a `--pair-budget` so nothing
 wider than `[G, N, N, heads]` is ever materialised.
 
-**No SIGHUM-test number yet** — dev segmentation PM is 94.25 against
-cuSHR-seg's 93.58. Eval job pending.
+**Measured Oct 6 and it did not help:** 92.45 base / 93.36 ± 0.09 reranked,
+against cuSHR-seg's 92.76 / 93.43 ± 0.13. Dev had promised +0.67 and none of it
+transferred. See §1.
 
 ### cuSHR-lm — `model95_lm_ex4200.npz`
 
@@ -145,13 +146,17 @@ inference is a deterministic C++/CUDA decoder that needs no GPU to serve.
 | TransLIST | **93.97**† | **98.86**† | Sandhan et al. 2022, Table 1 (SIGHUM) |
 | ByT5-Sanskrit, fine-tuned on SIGHUM | 93.83† | — | Nehrdich et al. 2024, Table 3 |
 | **cuSHR-seg + reranker** (our best) | **93.43 ± 0.13** | 98.73 | 3-seed mean, `COMPARING_MODELS.md` |
+| cuSHR-attn + reranker | 93.36 ± 0.09 | **98.80** | 3-seed mean, `eval_lattice_attn_char_s0_rerank_s{0,1,2}.json` |
 | cuSHR-seg | 92.76 | 98.42 | `model95_seg_ex4200` |
+| cuSHR-attn | 92.45 | 98.46 | `eval_lattice_attn_char_s0_base.json` |
 | cuSHR-lm | 92.29 | — | `eval_lm_raw.json`, Oct 6 |
 | cuSHR-node (joint) | 91.52 | 98.32 | `RESULTS_MATRIX.md` |
 | ByT5-Sanskrit, off-the-shelf multitask (we ran it) | 81.38 | — | `eval_lm_raw.json` |
 | *ORACLE (our gold vs the reference)* | *98.00* | — | ceiling |
 
 **Standing: third, by 0.54 against TransLIST and 0.40 against fine-tuned ByT5.**
+The best S model is `cuSHR-seg` — the plain character BiLSTM. Lattice attention
+was tried and did not beat it (below).
 
 Two readings to keep straight. The 81.38 we measured for ByT5 is the *released
 multitask checkpoint*, which uses DCS compound conventions while this reference
@@ -160,11 +165,35 @@ uses SIGHUM's; most of its errors are compound-boundary disagreements
 comparison is their fine-tuned 93.83. Our 11-point win over 81.38 is a
 configuration artifact and should not be quoted as a result.
 
-**Unmeasured and possibly decisive:** `model95_lattice_attn_char_s0`, the
-lattice-attention model, has dev segmentation PM **94.25** against cuSHR-seg's
-93.58 (+0.67) but no SIGHUM-test number yet. If that margin carries and the
-reranker adds its usual +0.67, the headline becomes ≈94.1 — above TransLIST.
-One job: `sbatch --export=ALL,STAGE=eval,TAG=lattice_attn_char_s0`.
+### Lattice attention did not help — a negative result (Oct 6)
+
+`cuSHR-attn` adds TransLIST's own mechanism to cuSHR's lattice: 8-head
+self-attention over all candidate words with a four-position span bias, 306K
+parameters on top of the BiLSTM. On dev it looked decisive, **+0.67** (94.25 vs
+cuSHR-seg's 93.58). **None of it transferred.**
+
+| | base PM | + reranker (3 seeds) | F1 macro | F1 micro |
+|---|---:|---:|---:|---:|
+| cuSHR-seg | **92.76** | **93.43 ± 0.13** | 98.73 | 98.86 |
+| cuSHR-attn | 92.45 | 93.36 ± 0.09 | **98.80** | **98.89** |
+
+Per seed: 93.43 / 93.38 / 93.26. The base model is **0.31 worse**, and the
+reranked mean is 0.07 lower — inside the seed spread either way. The only real
+gain is F1, +0.07 macro, which does not move perfect match.
+
+Dev and test differ in corpus, not just sample: dev is 5,607 g95 sentences,
+test is the 4,200 published SIGHUM ones. The extra capacity fit dev-specific
+structure. Read this as a warning about the dev metric as much as about the
+encoder.
+
+**What it rules out.** Porting TransLIST's attention onto a fixed SHR lattice
+does not reproduce TransLIST's score. Their advantage is likely architectural in
+a way this port does not capture: they inject candidate words as extra tokens
+into a character transformer rather than scoring the edges of a pre-built
+lattice, so candidate selection and context modelling are not separate stages.
+
+Incidental: cuSHR-attn's beam is slightly *better* (recall@16 98.50 vs 97.74)
+yet its reranker extracts less from it, moving only 71–82 of 4,200 sentences.
 
 ## 2. Lemma + morphology (L+M)
 

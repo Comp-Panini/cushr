@@ -33,6 +33,16 @@ The cuSHR row is the base joint model. Later segmentation-specific models reach
 92.76, and 93.43 ± 0.13 with the reranker — see
 [`cushr_train/COMPARING_MODELS.md`](cushr_train/COMPARING_MODELS.md).
 
+**Lattice attention was tried and did not help (Oct 2026).** Porting
+TransLIST's mechanism onto cuSHR's lattice — 8-head self-attention over all
+candidate words with a four-position span bias, +306K params — scored 92.45
+base / 93.36 ± 0.09 reranked against the BiLSTM's 92.76 / 93.43 ± 0.13: worse
+at the base, level after reranking, +0.07 F1 macro. Dev had shown +0.67 and
+none of it transferred (dev is 5,607 g95 sentences; the test is the 4,200
+published SIGHUM ones). The best segmentation model remains the plain character
+BiLSTM. Details and what it rules out:
+[`papers/COMPARISON_OCTOBER.md`](papers/COMPARISON_OCTOBER.md) §1.
+
 ## Decoder throughput
 
 Batching the k-best merge across sentences collapses **1,205,796 kernel
