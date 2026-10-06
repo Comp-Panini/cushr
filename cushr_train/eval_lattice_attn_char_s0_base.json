@@ -1,0 +1,23 @@
+{
+ "n": 4200,
+ "pm": 92.45238095238095,
+ "p_macro": 98.57644746126888,
+ "r_macro": 98.40443911247483,
+ "f1_macro": 98.46404367469678,
+ "p_micro": 98.86291628529183,
+ "r_micro": 98.64760432766614,
+ "f1_micro": 98.75514294756832,
+ "by_group": {
+  "gold-resolved": {
+   "pm": 92.54051477597712,
+   "n": 4196
+  },
+  "no-gold-path": {
+   "pm": 0.0,
+   "n": 4
+  }
+ },
+ "tsv": "sighum_test_4200.tsv",
+ "cache": "./cache95_lattice_attn_char_s0",
+ "model": "model95_lattice_attn_char_s0.npz"
+}
