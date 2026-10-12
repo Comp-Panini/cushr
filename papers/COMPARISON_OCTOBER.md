@@ -38,7 +38,7 @@ archive and `cushr_gpu/` consumes it unchanged.
 
 **Training data** (identical for all four): the SHR lattice archive
 `cushr_data_g95.npz`, 119,503 sentences, 115,447 (96.6%) with a resolved gold
-path. Split by `splits95_ex4200.json` — **train 104,159 / dev 5,607 / test
+path. Split by `splits95_ex4200.json` — **train 104,159 / dev 1,636 / test
 5,681**, with all 4,200 SIGHUM benchmark sentences held out of training. 8
 epochs, batch 64, lr 1e-3, margin 1.0, weight decay 1e-5, seed 0, structured
 hinge loss.
@@ -181,7 +181,7 @@ Per seed: 93.43 / 93.38 / 93.26. The base model is **0.31 worse**, and the
 reranked mean is 0.07 lower — inside the seed spread either way. The only real
 gain is F1, +0.07 macro, which does not move perfect match.
 
-Dev and test differ in corpus, not just sample: dev is 5,607 g95 sentences,
+Dev and test differ in corpus, not just sample: dev is 1,636 g95 sentences,
 test is the 4,200 published SIGHUM ones. The extra capacity fit dev-specific
 structure. Read this as a warning about the dev metric as much as about the
 encoder.

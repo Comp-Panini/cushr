@@ -1,0 +1,79 @@
+{
+ "n_sent": 5681,
+ "in_beam": 5618,
+ "top1_ok": 5263,
+ "miss": 355,
+ "rank_median": 2.0,
+ "margin_median": 1.6629409790039062,
+ "kinds": {
+  "same word count, different split points": 276,
+  "one boundary added/removed (compound-style)": 65,
+  "whole region re-split": 14
+ },
+ "examples": [
+  {
+   "sent": 49,
+   "rank": 2,
+   "margin": 1.486,
+   "pred": "paSya mAm pfTutA AmrA akza varuRaH asmi jaleSvaraH",
+   "gold": "paSya mAm pfTu tAmra akza varuRaH asmi jaleSvaraH",
+   "kind": "same word count, different split points"
+  },
+  {
+   "sent": 70,
+   "rank": 2,
+   "margin": 0.463,
+   "pred": "samIpam ftuparRasya sa hi veda nEpuRam",
+   "gold": "samIpam ftuparRasya sa hi veda akza nEpuRam",
+   "kind": "one boundary added/removed (compound-style)"
+  },
+  {
+   "sent": 72,
+   "rank": 2,
+   "margin": 3.357,
+   "pred": "dvi nAmAni iva varzARi yaTA eva girayaH taTA",
+   "gold": "dvi nAmAni eva varzARi yaTA eva girayaH taTA",
+   "kind": "same word count, different split points"
+  },
+  {
+   "sent": 81,
+   "rank": 3,
+   "margin": 5.208,
+   "pred": "kaTam vakzyanti ime hayAH mama",
+   "gold": "kaTam alpa bala prARAH vakzyanti ime hayAH mama",
+   "kind": "whole region re-split"
+  },
+  {
+   "sent": 87,
+   "rank": 2,
+   "margin": 0.686,
+   "pred": "AtmAnam AtmanA satyaH jita svargA na saMSayaH",
+   "gold": "AtmAnam AtmanA satyaH jita svargAH na saMSayaH",
+   "kind": "same word count, different split points"
+  },
+  {
+   "sent": 162,
+   "rank": 2,
+   "margin": 1.384,
+   "pred": "janma bala pravfttO iti Sukra SoRita duzwim vinA api mAtuH apacAra bala jAtAH apacAraH iti duzwa AhAra AcArO apacAraH",
+   "gold": "janma bala pravfttAH iti Sukra SoRita duzwim vinA api mAtuH apacAra bala jAtAH apacAraH iti duzwa AhAra AcArO apacAraH",
+   "kind": "same word count, different split points"
+  },
+  {
+   "sent": 167,
+   "rank": 2,
+   "margin": 0.546,
+   "pred": "tAH rAja Baya aBItAH ca SApa BItAH ca yozitaH",
+   "gold": "tAH rAja Baya BItAH ca SApa BItAH ca yozitaH",
+   "kind": "same word count, different split points"
+  },
+  {
+   "sent": 175,
+   "rank": 2,
+   "margin": 1.422,
+   "pred": "mohaH mAyA nija AKyAtiH tat jayAt tat parABavAt",
+   "gold": "mohaH mAyA nija aKyAtiH tat jayAt tat parABavAt",
+   "kind": "same word count, different split points"
+  }
+ ]
+}

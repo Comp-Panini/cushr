@@ -38,7 +38,7 @@ TransLIST's mechanism onto cuSHR's lattice — 8-head self-attention over all
 candidate words with a four-position span bias, +306K params — scored 92.45
 base / 93.36 ± 0.09 reranked against the BiLSTM's 92.76 / 93.43 ± 0.13: worse
 at the base, level after reranking, +0.07 F1 macro. Dev had shown +0.67 and
-none of it transferred (dev is 5,607 g95 sentences; the test is the 4,200
+none of it transferred (dev is 1,636 g95 sentences; the test is the 4,200
 published SIGHUM ones). The best segmentation model remains the plain character
 BiLSTM. Details and what it rules out:
 [`papers/COMPARISON_OCTOBER.md`](papers/COMPARISON_OCTOBER.md) §1.
@@ -166,8 +166,13 @@ reaches **61.21** — past the ceiling counts could ever have hit.
   nom.sg.n. vs acc.sg.n. (494 cases), which are *always* homographic in
   Sanskrit and half of which sit in sentences with no finite verb to
   disambiguate against.
-- **Test sets overlap 97%, not 100%.** Our SIGHUM copy and the published split
-  differ on 125 of 4,200 sentences.
+- **The test set is the published one.** An earlier version of this file
+  claimed our SIGHUM copy differed from the published split on 125 of 4,200
+  sentences. That was wrong: the splits are identical, so the comparison
+  against TransLIST is same-data.
 - **Contamination is asymmetric.** cuSHR excludes all 4,200 benchmark sentences
   from training; ByT5 saw every one during pretraining, unavoidably.
-- **Single seed throughout.** No variance estimates or significance tests.
+- **Seed variance is reported only where it was measured.** The segmentation
+  rerankers are 3-seed means with spreads (±0.13 and ±0.09); the base models
+  and every lemma/morphology number are single-seed, with no variance estimate
+  and no significance test.

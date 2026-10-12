@@ -1,0 +1,90 @@
+{
+ "k": 16,
+ "tsv": "sighum_test_4200.tsv",
+ "models": {
+  "seg": {
+   "cache": "cache95_seg_ex4200",
+   "model": "model95_seg_ex4200.npz",
+   "rerank": [
+    "segrr_k16_featseq_loss_s0.pt",
+    "segrr_k16_featseq_loss_s1.pt",
+    "segrr_k16_featseq_loss_s2.pt"
+   ]
+  },
+  "segcopy": {
+   "cache": "cache95_seg_ex4200",
+   "model": "model95_seg_ex4200.npz",
+   "rerank": [
+    "segrr_k16_featseq_loss_s0.pt",
+    "segrr_k16_featseq_loss_s1.pt",
+    "segrr_k16_featseq_loss_s2.pt"
+   ]
+  }
+ },
+ "union": {
+  "in_both": 11856,
+  "only_seg": 0,
+  "only_segcopy": 0,
+  "oracle_pm": 97.5
+ },
+ "seg": {
+  "n": 4200,
+  "pm": 93.42857142857143,
+  "p_macro": 98.76000672996472,
+  "r_macro": 98.73567906960766,
+  "f1_macro": 98.72817781800772,
+  "p_micro": 98.87190300474433,
+  "r_micro": 98.82675284529998,
+  "f1_micro": 98.84932276935508,
+  "by_group": {
+   "gold-resolved": {
+    "pm": 93.51763584366063,
+    "n": 4196
+   },
+   "no-gold-path": {
+    "pm": 0.0,
+    "n": 4
+   }
+  }
+ },
+ "segcopy": {
+  "n": 4200,
+  "pm": 93.42857142857143,
+  "p_macro": 98.76000672996472,
+  "r_macro": 98.73567906960766,
+  "f1_macro": 98.72817781800772,
+  "p_micro": 98.87190300474433,
+  "r_micro": 98.82675284529998,
+  "f1_micro": 98.84932276935508,
+  "by_group": {
+   "gold-resolved": {
+    "pm": 93.51763584366063,
+    "n": 4196
+   },
+   "no-gold-path": {
+    "pm": 0.0,
+    "n": 4
+   }
+  }
+ },
+ "ensemble": {
+  "n": 4200,
+  "pm": 93.42857142857143,
+  "p_macro": 98.76000672996472,
+  "r_macro": 98.73567906960766,
+  "f1_macro": 98.72817781800772,
+  "p_micro": 98.87190300474433,
+  "r_micro": 98.82675284529998,
+  "f1_micro": 98.84932276935508,
+  "by_group": {
+   "gold-resolved": {
+    "pm": 93.51763584366063,
+    "n": 4196
+   },
+   "no-gold-path": {
+    "pm": 0.0,
+    "n": 4
+   }
+  }
+ }
+}
