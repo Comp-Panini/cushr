@@ -61,6 +61,97 @@ or tag).
 | **total** | **2,789,109** | **3,095,541** |
 | SIGHUM PM alone, base | 92.76 | 92.45 |
 
+### How the lattice self-attention works
+
+Code: `LatticeAttentionCharEncoder` in `cushr_train/context.py:375`, built on
+`LatticeAttentionEncoder` at `context.py:240`. It replaces only the encoder.
+The featurizer, the biaffine scorer and the Viterbi decode are the same as in
+cuSHR-seg.
+
+**The problem it addresses.** The biaffine scorer is first-order: an edge's
+score depends only on the two words it connects. Each word's vector therefore
+has to carry everything the scorer needs to know. In cuSHR-seg that vector is
+the word's own features plus a character BiLSTM read at its first and last
+character. Neither tells a word what other candidate words exist elsewhere in
+the sentence. Attention lets every candidate word look at every other candidate
+word in the same sentence and fold what it sees into its own vector.
+
+The attention runs over **lattice nodes** (SHR's candidate words, 37.6 per
+sentence on average, ~104 at the 99th percentile), not over characters.
+
+**1. Input vector per node** (`context.py:325-329`). The 96-dim featurizer
+vector (form, lemma, preverb and morph embeddings plus hand-built features) is
+concatenated with the 96-dim char-BiLSTM vector (the BiLSTM runs over the
+sandhi-fused sentence and is read at the node's first and last character). The
+192-dim result is projected to 128 (`in_proj`).
+
+**2. Four span distances for every pair of nodes** (`context.py:310-314`).
+Each node covers characters `S` to `E` of the surface string (`E` inclusive).
+For node *i* attending to node *j*:
+
+| distance | formula | what it captures |
+|---|---|---|
+| ss | Sᵢ − Sⱼ | same start (0) means competing splits from one point |
+| se | Sᵢ − Eⱼ | where *i* starts relative to *j*'s end |
+| es | Eᵢ − Sⱼ | negative: *i* ends before *j* begins; 0: they share a character |
+| ee | Eᵢ − Eⱼ | same end means competing analyses ending at one point |
+
+Each distance is clipped to ±64 and looked up in its own learned table
+(129 rows × 8 values, one per head). The four lookups are summed into one bias
+per head per pair. The tables start at zero, so training begins as plain
+attention and learns the span patterns gradually (`context.py:283-293`).
+
+*Why four distances and not one.* Sandhi merges neighbouring words, so
+"adjacent" is not simply "ends one character before the other starts". Take
+`taTeti` = *tathā* + *iti* (characters 0–5, SLP1). **tathā** covers 0–3 and
+**iti** covers 3–5: they share the fused `e`, so es = 0, ss = −3, ee = −2, the
+pattern for "consecutive words joined by sandhi". A competing candidate
+starting at 0, like **ta**, has ss = 0 with *tathā*, the pattern for "rival
+splits of the same span". One distance cannot separate these relations; four
+can, and the tables learn what each combination means.
+
+**3. Mask** (`context.py:298-306`). Padding slots and the lattice's boundary
+nodes are blocked (−∞) as keys. Each node can always attend to itself, so no
+row is fully masked (a fully masked row would produce NaN and spread silently).
+
+**4. Two transformer blocks** (`_AttnBlock`, `context.py:211`). Layer norm
+before each sub-layer; 8 heads of 16 dimensions; the span bias is added to the
+attention scores before the softmax, so a head can learn things like "attend to
+words that end exactly where I start". Then a feed-forward layer
+(128 → 256 → 128, GELU), with residual connections and dropout 0.1.
+
+**5. Output** (`context.py:370-372`). Layer norm, then a projection back to 96
+dims; boundary nodes are zeroed. `ContextualBiaffine.node_vectors`
+(`context.py:120`) concatenates this with an untouched copy of the 96-dim
+featurizer vector, giving the 192-dim vector the scorer reads. Because the raw
+features are still there, attention only has to learn a correction to them.
+
+**The output does not depend on which path is chosen.** A node's vector
+depends on the whole sentence and all its candidates, wrong ones included, but
+never on the path Viterbi picks. So vectors are computed once per sentence and
+frozen (`--materialize`), and the C++/CUDA decoder consumes them unchanged. That
+is also the limit: a node knows a strong rival exists, but not whether that
+rival ended up on the chosen path. That kind of reasoning belongs to the
+reranker.
+
+**Batching does not affect the result.** `span_groups` (`context.py:180`)
+packs sentences of similar length so that no more than `--pair-budget` node
+pairs (sentences × nodes²) are held at once. Attention never crosses sentences,
+so grouping changes memory use, not the output; `test_lattice_attn.py` measures
+differences around 1e-15 in float64, which is rounding.
+
+**How it differs from TransLIST.** TransLIST adds candidate words as extra
+tokens next to the characters inside one transformer, so choosing candidates
+and modelling context happen together. cuSHR keeps them separate: attention
+only enriches each node's vector, and the first-order scorer plus Viterbi still
+decide. That is probably why porting the mechanism alone did not reproduce
+TransLIST's score (92.45 against cuSHR-seg's 92.76). What it did change is
+*which* sentences the model gets wrong, which is what the ensemble uses (§4).
+
+**Size.** 925,056 encoder parameters: the 618,624-parameter char BiLSTM plus
+about 306K for the attention blocks, the projections and the 4,128 span-bias
+values.
+
 ### The rerankers (three per base model, six in all)
 
 `rerank.py`, the same design for both models. **865,844 params each.** Each
