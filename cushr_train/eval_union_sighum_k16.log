@@ -1,0 +1,31 @@
+sighum_test_4200.tsv: 4,200 rows, 4,200 located in our corpus
+K=16 distinct segmentations per model; 3+3 rerankers, equal weight
+decoded seg
+decoded attn
+
+union candidates: in both 8,388  only seg 3,468  only attn 4,467
+union oracle (gold word sequence present): 98.24
+
+seg alone, 3-seed prob-mean  (n=4,200)
+  perfect match     : 93.43
+  word P/R/F MACRO  : 98.76 / 98.74 / 98.73   <- TransLIST's protocol
+  word P/R/F micro  : 98.87 / 98.83 / 98.85
+    gold-resolved    PM  93.52   n=4,196
+    no-gold-path     PM   0.00   n=4
+
+attn alone, 3-seed prob-mean  (n=4,200)
+  perfect match     : 93.36
+  word P/R/F MACRO  : 98.91 / 98.81 / 98.84   <- TransLIST's protocol
+  word P/R/F micro  : 98.98 / 98.84 / 98.91
+    gold-resolved    PM  93.45   n=4,196
+    no-gold-path     PM   0.00   n=4
+
+SUM-RULE ENSEMBLE over the union  (n=4,200)
+  perfect match     : 94.43
+  word P/R/F MACRO  : 98.96 / 98.96 / 98.94   <- TransLIST's protocol
+  word P/R/F micro  : 99.03 / 99.01 / 99.02
+    gold-resolved    PM  94.52   n=4,196
+    no-gold-path     PM   0.00   n=4
+  wrote C:/Users/nishk/AppData/Local/Temp/claude/C--Users-nishk-OneDrive---The-University-of-Texas-at-Austin-Sanskrit-cushr/2e65e466-6ffb-40f2-b930-1212c329ccd0/scratchpad/eval_union_sighum_k16_preds.json
+
+wrote C:/Users/nishk/AppData/Local/Temp/claude/C--Users-nishk-OneDrive---The-University-of-Texas-at-Austin-Sanskrit-cushr/2e65e466-6ffb-40f2-b930-1212c329ccd0/scratchpad/eval_union_sighum_k16.json

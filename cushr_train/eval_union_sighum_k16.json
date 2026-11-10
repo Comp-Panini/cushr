@@ -1,0 +1,90 @@
+{
+ "k": 16,
+ "tsv": "sighum_test_4200.tsv",
+ "models": {
+  "seg": {
+   "cache": "./cache95_seg_ex4200",
+   "model": "model95_seg_ex4200.npz",
+   "rerank": [
+    "segrr_k16_featseq_loss_s0.pt",
+    "segrr_k16_featseq_loss_s1.pt",
+    "segrr_k16_featseq_loss_s2.pt"
+   ]
+  },
+  "attn": {
+   "cache": "C:/Users/nishk/AppData/Local/Temp/claude/C--Users-nishk-OneDrive---The-University-of-Texas-at-Austin-Sanskrit-cushr/2e65e466-6ffb-40f2-b930-1212c329ccd0/scratchpad/attn/cache95_lattice_attn_char_s0",
+   "model": "model95_lattice_attn_char_s0.npz",
+   "rerank": [
+    "segrr_lattice_attn_char_s0_s0.pt",
+    "segrr_lattice_attn_char_s0_s1.pt",
+    "segrr_lattice_attn_char_s0_s2.pt"
+   ]
+  }
+ },
+ "union": {
+  "in_both": 8388,
+  "only_seg": 3468,
+  "only_attn": 4467,
+  "oracle_pm": 98.23809523809524
+ },
+ "seg": {
+  "n": 4200,
+  "pm": 93.42857142857143,
+  "p_macro": 98.76000672996472,
+  "r_macro": 98.73567906960766,
+  "f1_macro": 98.72817781800772,
+  "p_micro": 98.87190300474433,
+  "r_micro": 98.82675284529998,
+  "f1_micro": 98.84932276935508,
+  "by_group": {
+   "gold-resolved": {
+    "pm": 93.51763584366063,
+    "n": 4196
+   },
+   "no-gold-path": {
+    "pm": 0.0,
+    "n": 4
+   }
+  }
+ },
+ "attn": {
+  "n": 4200,
+  "pm": 93.35714285714286,
+  "p_macro": 98.9110760601832,
+  "r_macro": 98.80883339544056,
+  "f1_macro": 98.83801597534975,
+  "p_micro": 98.9763973407436,
+  "r_micro": 98.84080370942813,
+  "f1_micro": 98.90855405381653,
+  "by_group": {
+   "gold-resolved": {
+    "pm": 93.4461391801716,
+    "n": 4196
+   },
+   "no-gold-path": {
+    "pm": 0.0,
+    "n": 4
+   }
+  }
+ },
+ "ensemble": {
+  "n": 4200,
+  "pm": 94.42857142857143,
+  "p_macro": 98.95516124476208,
+  "r_macro": 98.95839748875463,
+  "f1_macro": 98.94011391351617,
+  "p_micro": 99.03025192368504,
+  "r_micro": 99.00590136293383,
+  "f1_micro": 99.01807514623478,
+  "by_group": {
+   "gold-resolved": {
+    "pm": 94.51858913250715,
+    "n": 4196
+   },
+   "no-gold-path": {
+    "pm": 0.0,
+    "n": 4
+   }
+  }
+ }
+}

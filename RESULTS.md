@@ -33,6 +33,14 @@ The cuSHR row is the base joint model. Later segmentation-specific models reach
 92.76, and 93.43 ± 0.13 with the reranker — see
 [`cushr_train/COMPARING_MODELS.md`](cushr_train/COMPARING_MODELS.md).
 
+**Nov 2026: a two-model ensemble reaches 94.43 PM / 98.94 word F (macro)**,
+above TransLIST's 93.97 / 98.86. It combines cuSHR-seg and cuSHR-attn, each
+with its three rerankers (11.1M params in all), and is +1.00 over cuSHR-seg
+alone (paired McNemar p = 3 × 10⁻⁵). The lead over TransLIST is inside
+sampling noise (95% CI [93.71, 95.12]), and it is an ensemble against a single
+model. Details and reliability:
+[`papers/NOVEMBER_UPDATES.md`](papers/NOVEMBER_UPDATES.md).
+
 **Lattice attention was tried and did not help (Oct 2026).** Porting
 TransLIST's mechanism onto cuSHR's lattice — 8-head self-attention over all
 candidate words with a four-position span bias, +306K params — scored 92.45
